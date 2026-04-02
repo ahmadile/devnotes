@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff } from 'lucide-react';
 import { CodeSnippet, Annotation } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -40,6 +40,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [hoveredLine, setHoveredLine] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isMinimizedMode, setIsMinimizedMode] = useState(true);
+  const [dragRange, setDragRange] = useState<{ start: number, end: number } | null>(null);
+
   const [newAnnotation, setNewAnnotation] = useState({ 
     line: 1, 
     endLine: 1,
@@ -76,21 +81,43 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
     }
   };
 
-  const handleLineClick = (line: number) => {
-    if (selectionStart === null) {
-      setSelectionStart(line);
-    } else {
-      const start = Math.min(selectionStart, line);
-      const end = Math.max(selectionStart, line);
-      setNewAnnotation({
-        ...newAnnotation,
-        line: start,
-        endLine: end
+  const handleMouseDown = (line: number) => {
+    if (isEditing) return;
+    setIsDragging(true);
+    setSelectionStart(line);
+    setDragRange({ start: line, end: line });
+  };
+
+  const handleMouseEnterLine = (line: number) => {
+    setHoveredLine(line);
+    if (isDragging && selectionStart !== null) {
+      setDragRange({ 
+        start: Math.min(selectionStart, line), 
+        end: Math.max(selectionStart, line) 
       });
-      setSelectionStart(null);
-      setIsAddingAnnotation(true);
     }
   };
+
+  const handleMouseUp = () => {
+    if (isDragging && dragRange) {
+      setNewAnnotation({
+        ...newAnnotation,
+        line: dragRange.start,
+        endLine: dragRange.end
+      });
+      setIsAddingAnnotation(true);
+    }
+    setIsDragging(false);
+    setSelectionStart(null);
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) handleMouseUp();
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isDragging, dragRange]);
 
   const addAnnotation = () => {
     if (!newAnnotation.text) return;
@@ -209,6 +236,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
           >
             <Plus className="w-4 h-4" />
           </button>
+          <button 
+            onClick={() => setIsMinimizedMode(!isMinimizedMode)}
+            className={cn(
+              "p-2 rounded-md transition-all",
+              isMinimizedMode ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "text-zinc-500 hover:bg-zinc-800/60"
+            )}
+            title={isMinimizedMode ? "Show All Notes" : "Minimize to Pulse Dots"}
+          >
+            {isMinimizedMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
           <div className="w-px h-4 bg-zinc-800 mx-1" />
           <button 
             onClick={() => setIsEditing(!isEditing)}
@@ -258,32 +295,39 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                 showLineNumbers
                 wrapLines={true}
                 lineProps={(lineNumber) => {
-                  const isSelected = selectionStart === lineNumber;
-                  const isInActiveBlock = snippet.annotations.some(a => 
-                    lineNumber >= a.line && lineNumber <= (a.endLine || a.line)
-                  );
+                  const isBeingSelected = isDragging && dragRange && lineNumber >= dragRange.start && lineNumber <= dragRange.end;
                   const activeAnnotation = snippet.annotations.find(a => 
                     lineNumber >= a.line && lineNumber <= (a.endLine || a.line)
                   );
+                  const isInActiveBlock = !!activeAnnotation;
+                  const isHovered = hoveredLine === lineNumber || (activeAnnotation && snippet.annotations.find(a => hoveredLine ? (hoveredLine >= a.line && hoveredLine <= (a.endLine || a.line)) : false)?.id === activeAnnotation.id);
 
                   return { 
                     style: { 
                       display: 'block', 
-                      cursor: 'pointer',
-                      backgroundColor: isSelected 
-                        ? 'rgba(99, 102, 241, 0.15)' 
+                      cursor: 'text',
+                      backgroundColor: isBeingSelected 
+                        ? 'rgba(99, 102, 241, 0.2)' 
                         : isInActiveBlock 
-                          ? ANNOTATION_COLORS.find(c => c.value === activeAnnotation?.color)?.bg || 'rgba(99, 102, 241, 0.05)'
+                          ? isHovered 
+                            ? (ANNOTATION_COLORS.find(c => c.value === activeAnnotation?.color)?.bg.replace('0.1', '0.2') || 'rgba(99, 102, 241, 0.1)')
+                            : (ANNOTATION_COLORS.find(c => c.value === activeAnnotation?.color)?.bg || 'rgba(99, 102, 241, 0.05)')
                           : 'transparent',
-                      borderLeft: isSelected 
+                      borderLeft: isBeingSelected 
                         ? '3px solid #6366f1' 
                         : isInActiveBlock 
                           ? `3px solid ${activeAnnotation?.color || '#6366f1'}`
                           : '3px solid transparent',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.15s ease',
+                      opacity: isDragging && !isBeingSelected ? 0.6 : 1
                     },
-                    onClick: () => handleLineClick(lineNumber),
-                    className: isInActiveBlock ? 'group/line relative' : 'relative'
+                    onMouseDown: () => handleMouseDown(lineNumber),
+                    onMouseEnter: () => handleMouseEnterLine(lineNumber),
+                    onMouseLeave: () => setHoveredLine(null),
+                    className: cn(
+                      'relative select-none',
+                      isInActiveBlock && 'group/line'
+                    )
                   };
                 }}
               >
@@ -295,22 +339,32 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                 <AnimatePresence>
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
-                    // Stacking logic: if previous cards occupy space, we could shift this one.
-                    // For now, absolute positioning relative to line is best.
-                    const topOffset = (ann.line - 1) * 1.6; // matching line height
+                    const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
+                    const topOffset = (ann.line - 1) * 1.6;
+                    const isVisible = !isMinimizedMode || isActive;
 
                     return (
                       <motion.div
                         key={ann.id}
                         initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        animate={{ 
+                          opacity: isVisible ? (hoveredLine === null || isActive ? 1 : 0.2) : 0, 
+                          x: isActive ? -5 : 0,
+                          scale: isActive ? 1 : 0.98,
+                          pointerEvents: isVisible ? 'auto' : 'none'
+                        }}
                         exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                        className="absolute right-0 pointer-events-auto w-full bg-[#121214]/95 backdrop-blur-xl rounded-xl border-l-[3px] shadow-2xl group/card overflow-hidden"
+                        className={cn(
+                          "absolute right-0 w-full bg-[#121214]/95 backdrop-blur-xl rounded-xl border-l-[3px] shadow-2xl group/card overflow-hidden transition-all duration-300",
+                          isActive ? "shadow-indigo-500/20 ring-1 ring-white/10" : "grayscale-[0.5]"
+                        )}
                         style={{ 
                           borderColor: ann.color || '#6366f1',
                           top: `${topOffset}rem`,
-                          zIndex: isExpanded ? 50 : 10 + index
+                          zIndex: isActive ? 100 : (isExpanded ? 50 : 10 + index)
                         }}
+                        onMouseEnter={() => setHoveredLine(ann.line)}
+                        onMouseLeave={() => setHoveredLine(null)}
                       >
                         <div className="p-4">
                           <div className="flex items-start gap-3">
@@ -366,10 +420,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                           )}
                         </AnimatePresence>
                         
-                        {/* Connection Dot */}
+                        {/* Connection Dot Trigger */}
                         <div 
-                          className="absolute -left-[1.3rem] top-4 w-2 h-2 rounded-full hidden lg:block" 
-                          style={{ backgroundColor: ann.color || '#6366f1', boxShadow: `0 0 10px ${ann.color || '#6366f1'}` }}
+                          className={cn(
+                            "absolute -left-[1.3rem] top-4 w-2.5 h-2.5 rounded-full cursor-pointer transition-all duration-300",
+                            isActive ? "scale-125 shadow-[0_0_15px_rgba(99,102,241,0.6)]" : "opacity-60 hover:opacity-100"
+                          )}
+                          style={{ 
+                            backgroundColor: ann.color || '#6366f1', 
+                            boxShadow: `0 0 10px ${ann.color || '#6366f1'}` 
+                          }}
+                          onMouseEnter={() => setHoveredLine(ann.line)}
                         />
                       </motion.div>
                     );
