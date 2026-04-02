@@ -340,7 +340,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
                     const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
-                    const topOffset = (ann.line - 1) * 1.6;
+                    // Match SyntaxHighlighter padding: 1.5rem, lineHeight: 1.6, fontSize: 0.85rem
+                    // math: 1.5 + (line-1) * (0.85 * 1.6)
+                    const topOffset = 1.35 + (ann.line - 1) * 1.36; 
                     const isVisible = !isMinimizedMode || isActive;
 
                     return (
@@ -413,7 +415,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                               exit={{ height: 0, opacity: 0 }}
                               className="border-t border-zinc-800/60 bg-zinc-900/30 overflow-hidden"
                             >
-                              <div className="p-4 text-[11px] text-zinc-400 prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-indigo-300">
+                              <div className="p-4 text-[11px] text-zinc-400 prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-indigo-300 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                                 <ReactMarkdown>{ann.fullContext}</ReactMarkdown>
                               </div>
                             </motion.div>
