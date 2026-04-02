@@ -5,6 +5,7 @@ import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edi
 import { CodeSnippet, Annotation } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 
 const ANNOTATION_COLORS = [
   { name: 'Indigo', value: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.4)' },
@@ -37,16 +38,33 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
   const [isEditing, setIsEditing] = useState(!snippet.code);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [newAnnotation, setNewAnnotation] = useState({ 
     line: 1, 
     endLine: 1,
     text: '', 
+    fullContext: '',
     type: 'logic' as Annotation['type'],
     color: ANNOTATION_COLORS[0].value,
     accentColor: ANNOTATION_COLORS[0].value
   });
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(snippet.code);
+      // Optional: add a "Copied!" state if wanted, but for now just function
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
+
   const handlePaste = async () => {
+    if (snippet.code && snippet.code.trim().length > 0) {
+      const confirmPaste = window.confirm("This will replace your current code and may affect your existing notes. Continue?");
+      if (!confirmPaste) return;
+    }
+
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
@@ -76,16 +94,50 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
 
   const addAnnotation = () => {
     if (!newAnnotation.text) return;
-    const annotation: Annotation = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...newAnnotation
-    };
-    onUpdate({
-      ...snippet,
-      annotations: [...snippet.annotations, annotation].sort((a, b) => a.line - b.line)
+    
+    if (editingId) {
+      onUpdate({
+        ...snippet,
+        annotations: snippet.annotations.map(a => 
+          a.id === editingId ? { ...a, ...newAnnotation } : a
+        )
+      });
+      setEditingId(null);
+    } else {
+      const annotation: Annotation = {
+        id: Math.random().toString(36).substr(2, 9),
+        ...newAnnotation
+      };
+      onUpdate({
+        ...snippet,
+        annotations: [...snippet.annotations, annotation].sort((a, b) => a.line - b.line)
+      });
+    }
+    
+    setNewAnnotation({ 
+      line: 1, 
+      endLine: 1, 
+      text: '', 
+      fullContext: '', 
+      type: 'logic', 
+      color: ANNOTATION_COLORS[0].value, 
+      accentColor: ANNOTATION_COLORS[0].value 
     });
-    setNewAnnotation({ ...newAnnotation, text: '' });
     setIsAddingAnnotation(false);
+  };
+
+  const handleEdit = (ann: Annotation) => {
+    setNewAnnotation({
+      line: ann.line,
+      endLine: ann.endLine || ann.line,
+      text: ann.text,
+      fullContext: ann.fullContext || '',
+      type: ann.type,
+      color: ann.color || ANNOTATION_COLORS[0].value,
+      accentColor: ann.color || ANNOTATION_COLORS[0].value
+    });
+    setEditingId(ann.id);
+    setIsAddingAnnotation(true);
   };
 
   const removeAnnotation = (id: string) => {
@@ -144,12 +196,20 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
 
         <div className="flex items-center gap-1">
           <button 
-            onClick={handlePaste}
+            onClick={handleCopy}
             className="p-2 hover:bg-zinc-800/60 rounded-md transition-colors text-zinc-500 hover:text-indigo-400"
-            title="Paste Snippet"
+            title="Copy Code"
           >
             <Clipboard className="w-4 h-4" />
           </button>
+          <button 
+            onClick={handlePaste}
+            className="p-2 hover:bg-zinc-800/60 rounded-md transition-colors text-zinc-500 hover:text-emerald-400"
+            title="Import/Replace Code from Clipboard"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <div className="w-px h-4 bg-zinc-800 mx-1" />
           <button 
             onClick={() => setIsEditing(!isEditing)}
             className={cn(
@@ -231,45 +291,89 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
               </SyntaxHighlighter>
 
               {/* Floating Annotation Cards (Desktop side) */}
-              <div className="absolute top-0 right-4 w-72 h-full pointer-events-none py-6 space-y-4 hidden lg:block">
+              <div className="absolute top-0 right-4 w-80 h-full pointer-events-none py-6 hidden lg:block">
                 <AnimatePresence>
-                  {snippet.annotations.map((ann) => (
-                    <motion.div
-                      key={ann.id}
-                      initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                      className="pointer-events-auto floating-card bg-[#121214]/95 backdrop-blur-xl p-4 rounded-xl border-l-[3px] shadow-2xl relative group/card"
-                      style={{ 
-                        borderColor: ann.color || '#6366f1',
-                        marginTop: `${Math.max(0, (ann.line - 1) * 1.36)}rem`, // Approximation line height
-                      }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5">{getIcon(ann.type, ann.color)}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
-                              Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
-                            </span>
-                            <button 
-                              onClick={() => removeAnnotation(ann.id)}
-                              className="opacity-0 group-hover/card:opacity-100 p-1 hover:bg-zinc-800 rounded transition-all text-zinc-500 hover:text-red-400"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                  {snippet.annotations.map((ann, index) => {
+                    const isExpanded = expandedId === ann.id;
+                    // Stacking logic: if previous cards occupy space, we could shift this one.
+                    // For now, absolute positioning relative to line is best.
+                    const topOffset = (ann.line - 1) * 1.6; // matching line height
+
+                    return (
+                      <motion.div
+                        key={ann.id}
+                        initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                        className="absolute right-0 pointer-events-auto w-full bg-[#121214]/95 backdrop-blur-xl rounded-xl border-l-[3px] shadow-2xl group/card overflow-hidden"
+                        style={{ 
+                          borderColor: ann.color || '#6366f1',
+                          top: `${topOffset}rem`,
+                          zIndex: isExpanded ? 50 : 10 + index
+                        }}
+                      >
+                        <div className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5">{getIcon(ann.type, ann.color)}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
+                                  Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
+                                </span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all">
+                                  <button 
+                                    onClick={() => handleEdit(ann)}
+                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-indigo-400"
+                                    title="Edit Note"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                  <button 
+                                    onClick={() => removeAnnotation(ann.id)}
+                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                    title="Delete Note"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-zinc-200 leading-relaxed font-medium mb-2">{ann.text}</p>
+                              
+                              {ann.fullContext && (
+                                <button 
+                                  onClick={() => setExpandedId(isExpanded ? null : ann.id)}
+                                  className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                                >
+                                  {isExpanded ? 'Show Less' : 'Read Full Context'}
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-xs text-zinc-300 leading-relaxed font-sans">{ann.text}</p>
                         </div>
-                      </div>
-                      
-                      {/* Connection Dot */}
-                      <div 
-                        className="absolute -left-[1.3rem] top-4 w-2 h-2 rounded-full hidden lg:block" 
-                        style={{ backgroundColor: ann.color || '#6366f1', boxShadow: `0 0 10px ${ann.color || '#6366f1'}` }}
-                      />
-                    </motion.div>
-                  ))}
+
+                        <AnimatePresence>
+                          {isExpanded && ann.fullContext && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="border-t border-zinc-800/60 bg-zinc-900/30 overflow-hidden"
+                            >
+                              <div className="p-4 text-[11px] text-zinc-400 prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-indigo-300">
+                                <ReactMarkdown>{ann.fullContext}</ReactMarkdown>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        
+                        {/* Connection Dot */}
+                        <div 
+                          className="absolute -left-[1.3rem] top-4 w-2 h-2 rounded-full hidden lg:block" 
+                          style={{ backgroundColor: ann.color || '#6366f1', boxShadow: `0 0 10px ${ann.color || '#6366f1'}` }}
+                        />
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             </div>
@@ -290,10 +394,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-4 bg-indigo-500 rounded-full" />
-                  <h4 className="text-sm font-bold text-zinc-200">New Logical Note</h4>
+                  <h4 className="text-sm font-bold text-zinc-200">
+                    {editingId ? 'Update Logical Note' : 'New Logical Note'}
+                  </h4>
                 </div>
                 <button 
-                  onClick={() => setIsAddingAnnotation(false)}
+                  onClick={() => {
+                    setIsAddingAnnotation(false);
+                    setEditingId(null);
+                  }}
                   className="text-zinc-500 hover:text-zinc-300 text-lg"
                 >
                   &times;
@@ -334,20 +443,37 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <textarea 
-                  placeholder="Describe the logic behind this block..."
-                  value={newAnnotation.text}
-                  onChange={(e) => setNewAnnotation({ ...newAnnotation, text: e.target.value })}
-                  className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Short Logic (Visible directly)</label>
+                  <textarea 
+                    placeholder="Describe the logic behind this block..."
+                    value={newAnnotation.text}
+                    onChange={(e) => setNewAnnotation({ ...newAnnotation, text: e.target.value })}
+                    className="w-full h-20 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Detailed Context (Optional, Markdown Supported)</label>
+                  <textarea 
+                    placeholder="Add in-depth details about libraries (Pandas, OS), functions, or external links..."
+                    value={newAnnotation.fullContext}
+                    onChange={(e) => setNewAnnotation({ ...newAnnotation, fullContext: e.target.value })}
+                    className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] text-zinc-500 italic">
-                    Block: Lignes {newAnnotation.line} à {newAnnotation.endLine}
+                    Block: Lines {newAnnotation.line} to {newAnnotation.endLine}
                   </p>
                   <div className="flex gap-3">
                     <button 
-                      onClick={() => setIsAddingAnnotation(false)}
+                      onClick={() => {
+                        setIsAddingAnnotation(false);
+                        setEditingId(null);
+                      }}
                       className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors"
                     >
                       Cancel
@@ -356,7 +482,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                       onClick={addAnnotation}
                       className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-900/20"
                     >
-                      Attach Note
+                      {editingId ? 'Update Note' : 'Attach Note'}
                     </button>
                   </div>
                 </div>

@@ -6,6 +6,7 @@ export interface Annotation {
   type: 'info' | 'warning' | 'tip' | 'logic' | 'debug' | 'important';
   color?: string; // The hex color code
   accentColor?: string; // The Tailwind color name or hex
+  fullContext?: string;
 }
 
 export interface CodeSnippet {
