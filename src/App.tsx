@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
@@ -56,8 +56,27 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [lastCloudSyncAt, setLastCloudSyncAt] = useState<number | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => 
+    (localStorage.getItem('theme') as 'dark' | 'light') || 'dark'
+  );
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const mainContentRef = useRef<HTMLDivElement>(null);
   const didHydrate = useRef(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setShowScrollTop(e.currentTarget.scrollTop > 400);
+  };
+
+  const scrollToTop = () => {
+    mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Theme support
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+    document.documentElement.classList.toggle('light', theme === 'light');
+  }, [theme]);
 
   // Load data
   useEffect(() => {
@@ -306,7 +325,7 @@ export default function App() {
         <Login />
       </SignedOut>
       <SignedIn>
-        <div className="flex h-screen w-full bg-[#09090b] text-zinc-300 overflow-hidden font-sans selection:bg-indigo-500/30 antialiased">
+        <div className="flex h-screen w-full bg-background text-foreground overflow-hidden font-sans selection:bg-indigo-500/30 antialiased transition-colors duration-300">
           {/* Sidebar */}
           <AnimatePresence mode="wait">
             {isSidebarOpen && (
@@ -329,9 +348,9 @@ export default function App() {
           </AnimatePresence>
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col h-full bg-[#09090b] relative min-w-0">
+          <main className="flex-1 flex flex-col h-full bg-background relative min-w-0 transition-colors duration-300">
             {/* Header */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-zinc-800/60 sticky top-0 bg-[#09090b]/80 backdrop-blur-sm z-20">
+            <header className="h-16 flex items-center justify-between px-6 border-b border-border sticky top-0 bg-background/80 backdrop-blur-sm z-20 transition-colors">
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -361,7 +380,15 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-3 text-zinc-400 border-l border-zinc-800 pl-6">
+                <div className="flex items-center gap-3 text-zinc-400 border-l border-border pl-6">
+                  <button 
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="hover:text-primary transition-colors p-1.5 hover:bg-secondary rounded-md"
+                    title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                  >
+                    {theme === 'dark' ? <Sun className="w-4 h-4" stroke-width="1.5" /> : <Moon className="w-4 h-4" stroke-width="1.5" />}
+                  </button>
+                  <div className="w-px h-4 bg-border mx-1" />
                   <button 
                     onClick={manualSave}
                     className="hover:text-zinc-100 transition-colors p-1.5 hover:bg-zinc-800/50 rounded-md"
@@ -420,14 +447,18 @@ export default function App() {
             </header>
 
             {syncMessage && (
-              <div className="px-8 py-2 text-xs text-indigo-400/80 border-b border-zinc-800/40 bg-indigo-500/[0.02] backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-300">
+              <div className="px-8 py-2 text-xs text-indigo-400/80 border-b border-border bg-indigo-500/2 backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-300">
                 {syncMessage}
                 {lastCloudSyncAt ? ` • Last cloud sync: ${new Date(lastCloudSyncAt).toLocaleTimeString()}` : ''}
               </div>
             )}
 
             {/* Editor Area */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-12">
+            <div 
+              ref={mainContentRef}
+              onScroll={(e) => setShowScrollTop(e.currentTarget.scrollTop > 400)}
+              className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-12 scroll-smooth"
+            >
               <div className="max-w-5xl mx-auto flex flex-col gap-8">
                 {activeNote ? (
                   <>
@@ -580,6 +611,21 @@ export default function App() {
                 )}
               </div>
             </div>
+
+            {/* Scroll to Top Button */}
+            <AnimatePresence>
+              {showScrollTop && (
+                <motion.button
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  onClick={scrollToTop}
+                  className="fixed bottom-8 right-8 p-3 bg-primary text-white rounded-full shadow-lg hover:scale-110 transition-all z-50 neon-glow"
+                >
+                  <ChevronUp className="w-6 h-6" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </main>
 
           {/* Settings Modal (Simplified) */}

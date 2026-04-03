@@ -28,9 +28,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <aside className="w-72 border-r border-zinc-800/60 bg-[#09090b] flex flex-col shrink-0 overflow-hidden">
+    <aside className="w-72 border-r border-border bg-background flex flex-col shrink-0 overflow-hidden transition-colors duration-300">
       {/* App Header */}
-      <div className="h-16 flex items-center justify-between px-5 border-b border-zinc-800/60">
+      <div className="h-16 flex items-center justify-between px-5 border-b border-border">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center text-white">
             <Hash className="w-3.5 h-3.5" stroke-width="2" />
@@ -42,8 +42,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             appearance={{
               elements: {
                 avatarBox: "w-6 h-6 rounded outline-none ring-0",
-                userButtonTrigger: "hover:bg-zinc-800/50 p-1 rounded transition-colors outline-none ring-0",
-                userButtonPopoverCard: "bg-[#121214] border border-zinc-800 shadow-2xl",
+                userButtonTrigger: "hover:bg-secondary p-1 rounded transition-colors outline-none ring-0",
+                userButtonPopoverCard: "bg-card border border-border shadow-2xl text-foreground",
               }
             }}
           />
@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-4 flex flex-col gap-4">
         <button 
           onClick={onNewNote}
-          className="w-full flex items-center justify-center gap-2 bg-transparent hover:bg-zinc-800/50 border border-zinc-700/50 text-zinc-200 py-2 rounded-md text-sm transition-colors group"
+          className="w-full flex items-center justify-center gap-2 bg-transparent hover:bg-secondary border border-border text-foreground py-2 rounded-md text-sm transition-colors group"
         >
           <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" stroke-width="2" />
           New Note
@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             placeholder="Search notes..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#121214] border border-zinc-800/80 rounded-md pl-9 pr-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-all font-sans"
+            className="w-full bg-secondary border border-border rounded-md pl-9 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
           />
         </div>
       </div>
@@ -95,8 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={cn(
                     "w-full text-left p-3 rounded-lg border transition-all group relative",
                     activeNoteId === note.id 
-                      ? "bg-zinc-800/40 border-zinc-700/50 shadow-sm" 
-                      : "hover:bg-zinc-800/20 border-transparent"
+                      ? "bg-secondary border-primary/20 shadow-sm" 
+                      : "hover:bg-secondary border-transparent"
                   )}
                 >
                   <div className="flex items-start justify-between mb-1">

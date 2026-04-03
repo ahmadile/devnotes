@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
 import { CodeSnippet, Annotation } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,7 +43,81 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
   const [hoveredLine, setHoveredLine] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isMinimizedMode, setIsMinimizedMode] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [dragRange, setDragRange] = useState<{ start: number, end: number } | null>(null);
+  const prevCodeRef = React.useRef(snippet.code);
+
+  useEffect(() => {
+    prevCodeRef.current = snippet.code;
+  }, [snippet.code]);
+
+  const handleCodeChange = (newCode: string) => {
+    const oldCode = prevCodeRef.current;
+    if (oldCode === newCode) return;
+
+    const oldLines = oldCode.split('\n');
+    const newLines = newCode.split('\n');
+    const oldLineCount = oldLines.length;
+    const newLineCount = newLines.length;
+    const lineDelta = newLineCount - oldLineCount;
+
+    if (lineDelta !== 0) {
+      // Basic line tracking logic
+      // 1. Find divergence from start
+      let start = 0;
+      while (start < oldLineCount && start < newLineCount && oldLines[start] === newLines[start]) {
+        start++;
+      }
+
+      // 2. Find divergence from end
+      let oldEnd = oldLineCount - 1;
+      let newEnd = newLineCount - 1;
+      while (oldEnd >= start && newEnd >= start && oldLines[oldEnd] === newLines[newEnd]) {
+        oldEnd--;
+        newEnd--;
+      }
+
+      // Adjustment logic
+      const adjustedAnnotations = snippet.annotations.map(ann => {
+        let { line, endLine } = ann;
+        const annLineIdx = line - 1;
+        const annEndLineIdx = (endLine || line) - 1;
+
+        // Case: Annotation is completely after the change point
+        if (annLineIdx > oldEnd) {
+          line += lineDelta;
+          if (endLine) endLine += lineDelta;
+        } 
+        // Case: Annotation overlaps or is inside the change point
+        else if (annEndLineIdx >= start) {
+          // If the primary line of the annotation was removed (only if lines were actually deleted)
+          if (lineDelta < 0 && annLineIdx >= start && annLineIdx <= oldEnd) {
+            return null; // Mark for removal as requested by user
+          }
+          
+          // Adjust endLine if it was after the change point
+          if (endLine && annEndLineIdx > oldEnd) {
+            endLine += lineDelta;
+          }
+        }
+        
+        const updatedAnn = { 
+          ...ann, 
+          line: Math.max(1, line)
+        } as Annotation;
+        if (endLine) {
+          updatedAnn.endLine = Math.max(1, endLine);
+        } else {
+          delete updatedAnn.endLine;
+        }
+        return updatedAnn;
+      }).filter((ann): ann is Annotation => ann !== null && (ann as Annotation).line <= newLineCount);
+
+      onUpdate({ ...snippet, code: newCode, annotations: adjustedAnnotations });
+    } else {
+      onUpdate({ ...snippet, code: newCode });
+    }
+  };
 
   const [newAnnotation, setNewAnnotation] = useState({ 
     line: 1, 
@@ -188,10 +262,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
   };
 
   return (
-    <div className="group relative mb-12 bg-[#0c0c0e] rounded-2xl border border-zinc-800/60 overflow-hidden shadow-2xl transition-all hover:border-zinc-700/80">
+    <div className="group relative mb-12 bg-card rounded-2xl border border-border overflow-hidden shadow-2xl transition-all hover:border-primary/30">
       {/* Snippet Header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-zinc-900/40 border-b border-zinc-800/60">
+      <div className="flex items-center justify-between px-5 py-3 bg-secondary/50 border-b border-border">
         <div className="flex items-center gap-4 flex-1">
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
+            title={isCollapsed ? "Expand Snippet" : "Collapse Snippet"}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
           <div className="flex gap-1.5 shrink-0">
             <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/30" />
             <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/30" />
@@ -269,18 +350,26 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
       </div>
 
       {/* Editor / Viewer Container */}
-      <div className="relative flex">
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <textarea
-              autoFocus
-              value={snippet.code}
-              onChange={(e) => onUpdate({ ...snippet, code: e.target.value })}
-              placeholder="Paste your logic here..."
-              className="w-full h-[400px] p-6 bg-transparent text-sm font-mono text-zinc-300 focus:outline-none resize-none placeholder:text-zinc-800 leading-relaxed"
-              spellCheck={false}
-            />
-          ) : (
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="relative flex overflow-hidden"
+          >
+            <div className="flex-1 min-w-0">
+              {isEditing ? (
+                <textarea
+                  autoFocus
+                  value={snippet.code}
+                  onChange={(e) => handleCodeChange(e.target.value)}
+                  placeholder="Paste your logic here..."
+                  className="w-full h-[400px] p-6 bg-transparent text-sm font-mono text-foreground focus:outline-none resize-none placeholder:text-muted-foreground leading-relaxed transition-colors"
+                  spellCheck={false}
+                />
+              ) : (
             <div className="relative">
               <SyntaxHighlighter
                 language={snippet.language}
@@ -442,7 +531,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
 
       {/* Contextual Annotation Form */}
       <AnimatePresence>
@@ -451,7 +542,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-t border-zinc-800/60 bg-[#121214]/50 backdrop-blur-md"
+            className="border-t border-border bg-secondary/50 backdrop-blur-md"
           >
             <div className="p-6 space-y-6 max-w-3xl mx-auto">
               <div className="flex items-center justify-between">
@@ -474,11 +565,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
 
               <div className="grid grid-cols-12 gap-5">
                 <div className="col-span-3">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Category</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Category</label>
                   <select 
                     value={newAnnotation.type}
                     onChange={(e) => setNewAnnotation({ ...newAnnotation, type: e.target.value as any })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-colors"
                   >
                     <option value="logic">Code Logic</option>
                     <option value="tip">Best Practice</option>
@@ -508,27 +599,27 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Short Logic (Visible directly)</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Short Logic (Visible directly)</label>
                   <textarea 
                     placeholder="Describe the logic behind this block..."
                     value={newAnnotation.text}
                     onChange={(e) => setNewAnnotation({ ...newAnnotation, text: e.target.value })}
-                    className="w-full h-20 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+                    className="w-full h-20 bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Detailed Context (Optional, Markdown Supported)</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Detailed Context (Optional, Markdown Supported)</label>
                   <textarea 
                     placeholder="Add in-depth details about libraries (Pandas, OS), functions, or external links..."
                     value={newAnnotation.fullContext}
                     onChange={(e) => setNewAnnotation({ ...newAnnotation, fullContext: e.target.value })}
-                    className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+                    className="w-full h-32 bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors"
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-zinc-500 italic">
+                  <p className="text-[10px] text-muted-foreground italic">
                     Block: Lines {newAnnotation.line} to {newAnnotation.endLine}
                   </p>
                   <div className="flex gap-3">
@@ -537,13 +628,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
                         setIsAddingAnnotation(false);
                         setEditingId(null);
                       }}
-                      className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Cancel
                     </button>
                     <button 
                       onClick={addAnnotation}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-900/20"
+                      className="bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-900/20"
                     >
                       {editingId ? 'Update Note' : 'Attach Note'}
                     </button>
@@ -557,14 +648,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, onUpdate, onDel
 
       {/* Footer Info */}
       {!isEditing && (
-        <div className="px-5 py-2 bg-zinc-900/40 border-t border-zinc-800/60 flex items-center justify-between">
+        <div className="px-5 py-2 bg-secondary/30 border-t border-border flex items-center justify-between transition-colors">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono">
-              <span className="w-2 h-2 rounded-full bg-indigo-500/50 animate-pulse" />
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+              <span className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" />
               {selectionStart ? `Selecting block (starting at line ${selectionStart})...` : 'Click two lines to define a logical block'}
             </div>
           </div>
-          <div className="text-[10px] text-zinc-600 font-mono italic">
+          <div className="text-[10px] text-muted-foreground/60 font-mono italic">
             Visual Debug Mode: Active
           </div>
         </div>
