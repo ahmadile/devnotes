@@ -46,8 +46,8 @@
     --primary-foreground: #ffffff;
     --secondary: #18181b; /* zinc-900 */
     --secondary-foreground: #f4f4f5;
-    --muted: #27272a; /* zinc-800 */
-    --muted-foreground: #a1a1aa; /* zinc-400 */
+    --muted: #18181b; /* zinc-900 for dark mode secondary elements */
+    --muted-foreground: #71717a; /* zinc-500 */
     --accent: #6366f1;
     --accent-foreground: #ffffff;
     --destructive: #ef4444;
@@ -56,13 +56,18 @@
     --input: #18181b;
     --ring: #6366f1;
     --radius: 0.75rem;
+
+    /* Theme-aware non-shadcn variables */
+    --glass-bg: rgba(12, 12, 14, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   }
 
   .light {
     --background: #ffffff;
     --foreground: #09090b;
-    --card: #f8f8f8;
-    --card-foreground: #18181b;
+    --card: #ffffff;
+    --card-foreground: #09090b;
     --popover: #ffffff;
     --popover-foreground: #09090b;
     --primary: #4f46e5; /* indigo-600 */
@@ -70,7 +75,7 @@
     --secondary: #f4f4f5; /* zinc-100 */
     --secondary-foreground: #18181b;
     --muted: #f4f4f5; /* zinc-100 */
-    --muted-foreground: #71717a; /* zinc-500 */
+    --muted-foreground: #52525b; /* zinc-600 - darker for better contrast */
     --accent: #4f46e5;
     --accent-foreground: #ffffff;
     --destructive: #ef4444;
@@ -78,6 +83,11 @@
     --border: #e4e4e7; /* zinc-200 */
     --input: #f4f4f5;
     --ring: #4f46e5;
+
+    /* Light Mode special variables */
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(0, 0, 0, 0.05);
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -96,13 +106,13 @@
 }
 
 .font-mono {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 }
 
 .glass {
-  background: rgba(12, 12, 14, 0.7);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
 }
 
 .neon-glow {
@@ -118,11 +128,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: var(--border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: var(--muted-foreground);
 }
 
 /* Block Annotation Selection Animation */
@@ -134,11 +144,11 @@
 
 .active-block-selection {
   animation: block-pulse 2s infinite ease-in-out;
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid var(--primary);
 }
 
-/* Floating Card Animation */
 .floating-card {
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(63, 63, 70, 0.8);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border);
+  background: var(--popover);
 }

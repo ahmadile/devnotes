@@ -31,8 +31,8 @@ export interface Note {
 }
 
 export interface AppSettings {
-  theme: 'dark' | 'cyberpunk' | 'minimal';
+  theme: 'dark' | 'light';
   fontSize: number;
-  fontFamily: string;
-  syntaxTheme: string;
+  fontFamily: 'JetBrains Mono' | 'Inter' | 'Fira Code' | 'System';
+  syntaxTheme: 'vscDarkPlus' | 'atomDark' | 'prism' | 'tomorrow';
 }

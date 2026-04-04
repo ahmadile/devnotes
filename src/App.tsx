@@ -3,7 +3,7 @@ import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
 import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
-import { Note, CodeSnippet } from './types';
+import { Note, CodeSnippet, AppSettings } from './types';
 import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -59,6 +59,23 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => 
     (localStorage.getItem('theme') as 'dark' | 'light') || 'dark'
   );
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('devnotes_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse settings', e);
+      }
+    }
+    return {
+      theme: 'dark',
+      fontSize: 14,
+      fontFamily: 'JetBrains Mono',
+      syntaxTheme: 'vscDarkPlus'
+    };
+  });
+
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainContentRef = useRef<HTMLDivElement>(null);
   const didHydrate = useRef(false);
@@ -76,7 +93,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.documentElement.classList.toggle('light', theme === 'light');
+    setSettings(prev => ({ ...prev, theme }));
   }, [theme]);
+
+  // Settings persistence
+  useEffect(() => {
+    localStorage.setItem('devnotes_settings', JSON.stringify(settings));
+  }, [settings]);
+
+  const updateSettings = (updates: Partial<AppSettings>) => {
+    setSettings(prev => ({ ...prev, ...updates }));
+    if (updates.theme) setTheme(updates.theme);
+  };
 
   // Load data
   useEffect(() => {
@@ -354,13 +382,13 @@ export default function App() {
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="text-zinc-400 hover:text-zinc-200 p-1.5 hover:bg-zinc-800/50 rounded-md transition-all"
+                  className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-secondary rounded-md transition-all"
                 >
-                  <Layout className="w-5 h-5 text-zinc-500" stroke-width="1.5" />
+                  <Layout className="w-5 h-5" strokeWidth="1.5" />
                 </button>
                 <div className="flex items-center gap-3">
-                  <div className="w-px h-4 bg-zinc-800 mx-1 hidden md:block" />
-                  <h1 className="text-xl font-medium tracking-tight text-zinc-100 flex items-center gap-3">
+                  <div className="w-px h-4 bg-border mx-1 hidden md:block" />
+                  <h1 className="text-xl font-semibold tracking-tight text-foreground flex items-center gap-3">
                     {activeNote?.title || 'Untitled Note'}
                   </h1>
                 </div>
@@ -369,70 +397,70 @@ export default function App() {
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2 mr-4">
                   {isSaving ? (
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-indigo-400 animate-pulse">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-primary animate-pulse">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                       Saving...
                     </div>
                   ) : lastSaved ? (
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 hidden lg:block">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground hidden lg:block">
                       Last local save: {new Date(lastSaved).toLocaleTimeString()}
                     </div>
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-3 text-zinc-400 border-l border-border pl-6">
+                <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     className="hover:text-primary transition-colors p-1.5 hover:bg-secondary rounded-md"
                     title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                   >
-                    {theme === 'dark' ? <Sun className="w-4 h-4" stroke-width="1.5" /> : <Moon className="w-4 h-4" stroke-width="1.5" />}
+                    {theme === 'dark' ? <Sun className="w-4 h-4" strokeWidth="1.5" /> : <Moon className="w-4 h-4" strokeWidth="1.5" />}
                   </button>
                   <div className="w-px h-4 bg-border mx-1" />
                   <button 
                     onClick={manualSave}
-                    className="hover:text-zinc-100 transition-colors p-1.5 hover:bg-zinc-800/50 rounded-md"
+                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md"
                     title="Save locally"
                   >
-                    <Save className="w-4 h-4" stroke-width="1.5" />
+                    <Save className="w-4 h-4" strokeWidth="1.5" />
                   </button>
                   <button
                     onClick={syncToCloud}
                     disabled={isSyncing}
-                    className="hover:text-zinc-100 transition-colors p-1.5 hover:bg-zinc-800/50 rounded-md disabled:opacity-30"
+                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md disabled:opacity-30"
                     title="Sync to cloud"
                   >
-                    <CloudUpload className="w-4 h-4" stroke-width="1.5" />
+                    <CloudUpload className="w-4 h-4" strokeWidth="1.5" />
                   </button>
                   <button
                     onClick={loadFromCloud}
                     disabled={isSyncing}
-                    className="hover:text-zinc-100 transition-colors p-1.5 hover:bg-zinc-800/50 rounded-md disabled:opacity-30"
+                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md disabled:opacity-30"
                     title="Pull from cloud"
                   >
-                    <CloudDownload className="w-4 h-4" stroke-width="1.5" />
+                    <CloudDownload className="w-4 h-4" strokeWidth="1.5" />
                   </button>
-                  <div className="w-px h-4 bg-zinc-800 mx-1" />
+                  <div className="w-px h-4 bg-border mx-1" />
                   <button
                     onClick={exportAsJson}
-                    className="hover:text-zinc-100 transition-colors p-1.5 hover:bg-zinc-800/50 rounded-md"
+                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md"
                     title="Export backup"
                   >
-                    <Download className="w-4 h-4" stroke-width="1.5" />
+                    <Download className="w-4 h-4" strokeWidth="1.5" />
                   </button>
                   <button
                     onClick={() => importInputRef.current?.click()}
-                    className="hover:text-zinc-100 transition-colors p-1.5 hover:bg-zinc-800/50 rounded-md"
+                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md"
                     title="Import backup"
                   >
-                    <Upload className="w-4 h-4" stroke-width="1.5" />
+                    <Upload className="w-4 h-4" strokeWidth="1.5" />
                   </button>
                   <button 
                     onClick={() => activeNote && deleteNote(activeNote.id)}
-                    className="hover:text-red-400 transition-colors p-1.5 hover:bg-red-500/10 rounded-md ml-2"
+                    className="hover:text-destructive transition-colors p-1.5 hover:bg-destructive/10 rounded-md ml-2"
                     title="Delete Note"
                   >
-                    <Trash2 className="w-4 h-4" stroke-width="1.5" />
+                    <Trash2 className="w-4 h-4" strokeWidth="1.5" />
                   </button>
                 </div>
 
@@ -447,7 +475,7 @@ export default function App() {
             </header>
 
             {syncMessage && (
-              <div className="px-8 py-2 text-xs text-indigo-400/80 border-b border-border bg-indigo-500/2 backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-300">
+              <div className="px-8 py-2 text-xs text-primary/80 border-b border-border bg-primary/5 backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-300">
                 {syncMessage}
                 {lastCloudSyncAt ? ` • Last cloud sync: ${new Date(lastCloudSyncAt).toLocaleTimeString()}` : ''}
               </div>
@@ -469,31 +497,31 @@ export default function App() {
                         placeholder="Untitled Note"
                         value={activeNote.title}
                         onChange={(e) => updateNote({ ...activeNote, title: e.target.value })}
-                        className="w-full bg-transparent text-4xl font-bold tracking-tight focus:outline-none placeholder:text-zinc-800 border-none p-0 text-zinc-100"
+                        className="w-full bg-transparent text-4xl font-bold tracking-tight focus:outline-none placeholder:text-muted-foreground/30 border-none p-0 text-foreground"
                       />
 
                       <div className="flex flex-wrap items-center gap-3">
-                        <Tag className="w-4 h-4 text-zinc-600" stroke-width="2" />
+                        <Tag className="w-4 h-4 text-muted-foreground/50" strokeWidth="2" />
                         {activeNote.tags.map(tag => (
                           <span 
                             key={tag} 
-                            className="group flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs border border-indigo-500/20 shadow-sm"
+                            className="group flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20 shadow-sm"
                           >
                             #{tag}
                             <button 
                               onClick={() => removeTag(tag)} 
-                              className="hover:text-zinc-100 opacity-50 hover:opacity-100 transition-opacity"
+                              className="hover:text-foreground opacity-50 hover:opacity-100 transition-opacity"
                             >
                               &times;
                             </button>
                           </span>
                         ))}
-                        <div className="flex items-center gap-1 border-b border-dashed border-zinc-800 pb-0.5 focus-within:border-zinc-600 transition-colors">
+                        <div className="flex items-center gap-1 border-b border-dashed border-border pb-0.5 focus-within:border-primary/40 transition-colors">
                           <input
                             type="text"
                             placeholder="Add tag..."
                             value={tagInput}
-                            className="bg-transparent text-xs text-zinc-500 focus:outline-none w-24 h-6 px-1"
+                            className="bg-transparent text-xs text-foreground focus:outline-none w-24 h-6 px-1 placeholder:text-muted-foreground/40"
                             onChange={(e) => setTagInput(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
@@ -507,7 +535,7 @@ export default function App() {
                               addTag(tagInput);
                               setTagInput('');
                             }}
-                            className="p-0.5 text-zinc-600 hover:text-indigo-400 transition-colors"
+                            className="p-0.5 text-muted-foreground hover:text-primary transition-colors"
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -517,12 +545,12 @@ export default function App() {
 
                     {/* Content Section */}
                     <div className="relative group">
-                      <div className="absolute -left-4 inset-y-0 w-1 bg-zinc-800/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute -left-4 inset-y-0 w-1 bg-primary/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                       <textarea 
                         placeholder="Start writing your thoughts or paste code snippets below..."
                         value={activeNote.content}
                         onChange={(e) => updateNote({ ...activeNote, content: e.target.value })}
-                        className="w-full min-h-[48px] bg-transparent text-lg text-zinc-300 leading-relaxed focus:outline-none resize-none placeholder:text-zinc-800"
+                        className="w-full min-h-[48px] bg-transparent text-lg text-foreground/80 leading-relaxed focus:outline-none resize-none placeholder:text-muted-foreground/30"
                       />
                     </div>
 
@@ -532,6 +560,7 @@ export default function App() {
                         <CodeEditor 
                           key={snippet.id}
                           snippet={snippet}
+                          settings={settings}
                           onUpdate={(updated) => updateSnippet(snippet.id, updated)}
                           onDelete={() => deleteSnippet(snippet.id)}
                         />
@@ -539,12 +568,12 @@ export default function App() {
 
                       <button 
                         onClick={addSnippet}
-                        className="w-full py-12 border border-dashed border-zinc-800 hover:border-zinc-600 bg-zinc-900/10 hover:bg-zinc-900/30 rounded-2xl flex flex-col items-center justify-center gap-4 transition-all group"
+                        className="w-full py-12 border border-dashed border-border hover:border-primary/40 bg-secondary/20 hover:bg-secondary/50 rounded-2xl flex flex-col items-center justify-center gap-4 transition-all group"
                       >
-                        <div className="w-12 h-12 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-500 group-hover:text-indigo-400 group-hover:bg-indigo-500/10 transition-all border border-transparent group-hover:border-indigo-500/20">
-                          <Plus className="w-6 h-6" stroke-width="1.5" />
+                        <div className="w-12 h-12 rounded-full bg-background flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-all border border-border group-hover:border-primary/20 shadow-sm">
+                          <Plus className="w-6 h-6" strokeWidth="1.5" />
                         </div>
-                        <span className="text-sm font-medium text-zinc-500 group-hover:text-zinc-300">Add Code Snippet</span>
+                        <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">Add Code Snippet</span>
                       </button>
                     </div>
                   </>
@@ -552,14 +581,14 @@ export default function App() {
                   <div className="h-full flex flex-col space-y-12 pt-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <h2 className="text-3xl font-bold tracking-tight text-white">Your Note Vault</h2>
-                        <p className="text-zinc-500">Access all your developer insights and logic snippets.</p>
+                        <h2 className="text-3xl font-bold tracking-tight text-foreground">Your Note Vault</h2>
+                        <p className="text-muted-foreground">Access all your developer insights and logic snippets.</p>
                       </div>
                       <button 
                         onClick={createNote}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-lg shadow-indigo-900/20 flex items-center gap-2"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-indigo-900/20 flex items-center gap-2"
                       >
-                        <Plus className="w-5 h-5" stroke-width="2" />
+                        <Plus className="w-5 h-5" strokeWidth="2" />
                         New Note
                       </button>
                     </div>
@@ -570,28 +599,28 @@ export default function App() {
                           key={note.id}
                           whileHover={{ scale: 1.02, translateY: -4 }}
                           onClick={() => setActiveNoteId(note.id)}
-                          className="bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/60 hover:border-indigo-500/40 transition-all cursor-pointer group relative overflow-hidden shadow-sm"
+                          className="bg-secondary/30 p-6 rounded-2xl border border-border hover:border-primary/40 transition-all cursor-pointer group relative overflow-hidden shadow-sm"
                         >
                           <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Tag className="w-4 h-4 text-indigo-400" />
+                            <Tag className="w-4 h-4 text-primary" />
                           </div>
                           
-                          <h3 className="text-lg font-bold mb-2 group-hover:text-indigo-300 transition-colors truncate text-zinc-100">
+                          <h3 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors truncate text-foreground">
                             {note.title || 'Untitled Note'}
                           </h3>
-                          <p className="text-sm text-zinc-500 line-clamp-3 mb-4 h-15">
+                          <p className="text-sm text-muted-foreground line-clamp-3 mb-4 h-15">
                             {note.content || 'No description provided.'}
                           </p>
                           
-                          <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-800/40">
-                            <div className="flex gap-1.5">
+                          <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+                            <div className="flex gap-1.5 focus-within:ring-0">
                               {note.tags.slice(0, 2).map(tag => (
-                                <span key={tag} className="text-[10px] px-2 py-0.5 rounded bg-zinc-800/60 text-zinc-400 border border-zinc-800">
+                                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md bg-background text-muted-foreground border border-border transition-colors group-hover:border-primary/20 group-hover:text-primary/70">
                                   #{tag}
                                 </span>
                               ))}
                             </div>
-                            <span className="text-[10px] text-zinc-600 font-mono">
+                            <span className="text-[10px] text-muted-foreground/60 font-mono">
                               {new Date(note.updatedAt).toLocaleDateString()}
                             </span>
                           </div>
@@ -599,11 +628,11 @@ export default function App() {
                       ))}
 
                       {notes.length === 0 && (
-                        <div className="col-span-full h-64 flex flex-col items-center justify-center text-center space-y-4 border border-dashed border-zinc-800 rounded-3xl">
-                          <div className="w-16 h-16 rounded-2xl bg-zinc-900/50 flex items-center justify-center border border-zinc-800">
-                            <Plus className="w-8 h-8 text-zinc-700" />
+                        <div className="col-span-full h-64 flex flex-col items-center justify-center text-center space-y-4 border border-dashed border-border rounded-3xl bg-secondary/10">
+                          <div className="w-16 h-16 rounded-2xl bg-background flex items-center justify-center border border-border">
+                            <Plus className="w-8 h-8 text-muted-foreground/30" />
                           </div>
-                          <p className="text-zinc-600">No notes found. Create your first one!</p>
+                          <p className="text-muted-foreground">No notes found. Create your first one!</p>
                         </div>
                       )}
                     </div>
@@ -628,29 +657,31 @@ export default function App() {
             </AnimatePresence>
           </main>
 
-          {/* Settings Modal (Simplified) */}
+          {/* Settings Modal */}
           <AnimatePresence>
             {isSettingsOpen && (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
               >
                 <motion.div 
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.95, opacity: 0 }}
-                  className="w-full max-w-md bg-[#121214] border border-zinc-800 rounded-3xl p-8 space-y-8 shadow-2xl relative"
+                  className="w-full max-w-md bg-popover border border-border rounded-3xl p-8 space-y-8 shadow-2xl relative overflow-hidden"
                 >
+                  <div className="absolute top-0 inset-x-0 h-1.5 bg-primary" />
+                  
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <SettingsIcon className="w-5 h-5 text-indigo-400" />
-                      <h3 className="text-xl font-bold text-white">Developer Settings</h3>
+                      <SettingsIcon className="w-5 h-5 text-primary" />
+                      <h3 className="text-xl font-bold text-foreground">Developer Settings</h3>
                     </div>
                     <button 
                       onClick={() => setIsSettingsOpen(false)} 
-                      className="text-zinc-500 hover:text-zinc-200 transition-colors p-1"
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
                     >
                       &times;
                     </button>
@@ -658,28 +689,63 @@ export default function App() {
                   
                   <div className="space-y-6">
                     <div className="space-y-3">
-                      <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-500">Syntax Theme</label>
-                      <select className="w-full bg-[#09090b] border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 transition-colors">
-                        <option>VS Code Dark Plus</option>
-                        <option>Atom Dark</option>
-                        <option>Cyberpunk Neon</option>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Syntax Theme</label>
+                      <select 
+                        value={settings.syntaxTheme}
+                        onChange={(e) => updateSettings({ syntaxTheme: e.target.value as any })}
+                        className="w-full bg-secondary border border-border rounded-xl p-3 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                      >
+                        <option value="vscDarkPlus">VS Code Dark Plus</option>
+                        <option value="atomDark">Atom Dark</option>
+                        <option value="prism">Classic Prism</option>
+                        <option value="tomorrow">Tomorrow Night</option>
                       </select>
                     </div>
                     <div className="space-y-3">
-                      <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-500">Font Family</label>
-                      <select className="w-full bg-[#09090b] border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50 transition-colors font-mono">
-                        <option>JetBrains Mono</option>
-                        <option>Fira Code</option>
-                        <option>IBM Plex Mono</option>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Font Family</label>
+                      <select 
+                        value={settings.fontFamily}
+                        onChange={(e) => updateSettings({ fontFamily: e.target.value as any })}
+                        className="w-full bg-secondary border border-border rounded-xl p-3 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-mono cursor-pointer"
+                      >
+                        <option value="JetBrains Mono">JetBrains Mono</option>
+                        <option value="Fira Code">Fira Code</option>
+                        <option value="Inter">Inter (Sans)</option>
+                        <option value="System">System Mono</option>
                       </select>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">App Appearance</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button 
+                          onClick={() => updateSettings({ theme: 'dark' })}
+                          className={cn(
+                            "flex items-center justify-center gap-2 py-3 rounded-xl border transition-all",
+                            theme === 'dark' ? "bg-primary/10 border-primary text-primary" : "bg-secondary/50 border-border text-muted-foreground hover:border-border/80"
+                          )}
+                        >
+                          <Moon className="w-4 h-4" />
+                          <span className="text-xs font-semibold">Dark</span>
+                        </button>
+                        <button 
+                          onClick={() => updateSettings({ theme: 'light' })}
+                          className={cn(
+                            "flex items-center justify-center gap-2 py-3 rounded-xl border transition-all",
+                            theme === 'light' ? "bg-primary/10 border-primary text-primary" : "bg-secondary/50 border-border text-muted-foreground hover:border-border/80"
+                          )}
+                        >
+                          <Sun className="w-4 h-4" />
+                          <span className="text-xs font-semibold">Light</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   <button 
                     onClick={() => setIsSettingsOpen(false)}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl font-bold transition-all shadow-lg shadow-indigo-900/20"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-4 rounded-xl font-bold transition-all shadow-lg shadow-primary/20"
                   >
-                    Save Preferences
+                    Close Settings
                   </button>
                 </motion.div>
               </motion.div>
