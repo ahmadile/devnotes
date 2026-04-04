@@ -26,7 +26,17 @@ async function main() {
   
   // Security Middlewares
   app.use(helmet({
-    contentSecurityPolicy: false, 
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "script-src": ["'self'", "'unsafe-inline'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
+        "connect-src": ["'self'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
+        "img-src": ["'self'", "data:", "img.clerk.com"],
+        "worker-src": ["'self'", "blob:"],
+        "font-src": ["'self'", "fonts.gstatic.com"],
+        "style-src": ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      },
+    },
   }));
   app.use(cors());
   app.use(clerkMiddleware());
