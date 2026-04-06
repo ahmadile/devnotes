@@ -397,10 +397,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                 style={getSyntaxStyle()}
                 customStyle={{
                   margin: 0,
-                  padding: '1.5rem 1.5rem 12rem 1.5rem',
+                  padding: '24px 24px 200px 24px', // 1.5rem -> 24px, 12rem -> ~192px (buffered to 200)
                   background: 'transparent',
-                  fontSize: '0.85rem',
-                  lineHeight: '1.6',
+                  fontSize: '13.6px', // 0.85rem
+                  lineHeight: '22px', // 1.6 * 0.85rem = 21.76 -> 22px for perfect alignment
                   fontFamily: getFontFamily(),
                 }}
                 showLineNumbers
@@ -451,9 +451,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
                     const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
-                    // Match SyntaxHighlighter padding: 1.5rem, lineHeight: 1.6, fontSize: 0.85rem
-                    // math: 1.5 + (line-1) * (0.85 * 1.6)
-                    const topOffset = 1.35 + (ann.line - 1) * 1.36; 
+                    // Match SyntaxHighlighter padding: 24px, lineHeight: 22px
+                    // Using pixels for absolute precision over long blocks
+                    const topOffset = 24 + (ann.line - 1) * 22;
                     const isVisible = !isMinimizedMode || isActive;
 
                     return (
