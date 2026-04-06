@@ -473,7 +473,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                         )}
                         style={{ 
                           borderColor: ann.color || 'var(--primary)',
-                          top: `${topOffset}rem`,
+                          top: `${topOffset}px`,
                           zIndex: isActive ? 100 : (isExpanded ? 50 : 10 + index)
                         }}
                         onMouseEnter={() => setHoveredLine(ann.line)}
