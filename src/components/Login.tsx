@@ -1,7 +1,7 @@
 import React from 'react';
 import { SignIn } from '@clerk/clerk-react';
 import { motion } from 'motion/react';
-import { Hash } from 'lucide-react';
+import { Logo } from './Logo';
 
 export const Login: React.FC = () => {
   return (
@@ -17,7 +17,7 @@ export const Login: React.FC = () => {
           className="mb-8"
         >
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 neon-glow">
-            <Hash className="w-10 h-10 text-white" />
+            <Logo size={40} className="w-10 h-10" />
           </div>
           <h1 className="text-3xl font-black tracking-tight mb-2">DevNotes</h1>
           <p className="text-muted-foreground">Your futuristic developer workspace. <br/> Sign in to sync your notes across devices.</p>

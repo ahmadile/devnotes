@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, Plus, FileText, Hash, Clock, Settings as SettingsIcon } from 'lucide-react';
+import { Search, Plus, FileText, Clock, Settings as SettingsIcon } from 'lucide-react';
+import { Logo } from './Logo';
 import { UserButton } from '@clerk/clerk-react';
 import { Note } from '../types';
 import { cn } from '../lib/utils';
@@ -40,9 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* App Header */}
       <div className="h-16 flex items-center justify-between px-5 border-b border-border">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center text-white">
-            <Hash className="w-3.5 h-3.5" strokeWidth="2" />
-          </div>
+          <Logo size={24} className="w-6 h-6 rounded" />
           <span className="text-base font-semibold text-foreground tracking-tight">DevNotes</span>
         </div>
         <div className="flex items-center gap-2">

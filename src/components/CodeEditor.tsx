@@ -397,7 +397,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                 style={getSyntaxStyle()}
                 customStyle={{
                   margin: 0,
-                  padding: '1.5rem',
+                  padding: '1.5rem 1.5rem 12rem 1.5rem',
                   background: 'transparent',
                   fontSize: '0.85rem',
                   lineHeight: '1.6',
@@ -479,41 +479,43 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                         onMouseEnter={() => setHoveredLine(ann.line)}
                         onMouseLeave={() => setHoveredLine(null)}
                       >
-                        <div className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5">{getIcon(ann.type, ann.color)}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/60 font-mono">
-                                  Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
-                                </span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all">
-                                  <button 
-                                    onClick={() => handleEdit(ann)}
-                                    className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors"
-                                    title="Edit Note"
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                  </button>
-                                  <button 
-                                    onClick={() => removeAnnotation(ann.id)}
-                                    className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors"
-                                    title="Delete Note"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
+                        <div className="flex flex-col max-h-[400px]">
+                          <div className="p-4 overflow-y-auto custom-scrollbar">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 shrink-0">{getIcon(ann.type, ann.color)}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/60 font-mono">
+                                    Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
+                                  </span>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all">
+                                    <button 
+                                      onClick={() => handleEdit(ann)}
+                                      className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors"
+                                      title="Edit Note"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                    </button>
+                                    <button 
+                                      onClick={() => removeAnnotation(ann.id)}
+                                      className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors"
+                                      title="Delete Note"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 </div>
+                                <p className="text-xs text-foreground leading-relaxed font-semibold mb-2">{ann.text}</p>
+                                
+                                {ann.fullContext && (
+                                  <button 
+                                    onClick={() => setExpandedId(isExpanded ? null : ann.id)}
+                                    className="text-[10px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+                                  >
+                                    {isExpanded ? 'Show Less' : 'Read Full Context'}
+                                  </button>
+                                )}
                               </div>
-                              <p className="text-xs text-foreground leading-relaxed font-semibold mb-2">{ann.text}</p>
-                              
-                              {ann.fullContext && (
-                                <button 
-                                  onClick={() => setExpandedId(isExpanded ? null : ann.id)}
-                                  className="text-[10px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
-                                >
-                                  {isExpanded ? 'Show Less' : 'Read Full Context'}
-                                </button>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -526,7 +528,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                               exit={{ height: 0, opacity: 0 }}
                               className="border-t border-border bg-secondary/30 overflow-hidden"
                             >
-                              <div className="p-4 text-[11px] text-muted-foreground prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-primary max-h-[300px] overflow-y-auto">
+                              <div className="p-4 text-[11px] text-muted-foreground prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-primary max-h-[300px] overflow-y-auto custom-scrollbar">
                                 <ReactMarkdown>{ann.fullContext}</ReactMarkdown>
                               </div>
                             </motion.div>
