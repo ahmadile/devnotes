@@ -400,7 +400,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                   padding: '24px 24px 200px 24px', // 1.5rem -> 24px, 12rem -> ~192px (buffered to 200)
                   background: 'transparent',
                   fontSize: '13.6px', // 0.85rem
-                  lineHeight: '22px', // 1.6 * 0.85rem = 21.76 -> 22px for perfect alignment
+                  lineHeight: '24px', // STRICT 24px height for alignment
                   fontFamily: getFontFamily(),
                 }}
                 showLineNumbers
@@ -417,6 +417,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                     style: { 
                       display: 'block', 
                       cursor: 'text',
+                      height: '24px',
+                      lineHeight: '24px',
+                      boxSizing: 'border-box',
                       backgroundColor: isBeingSelected 
                         ? 'rgba(99, 102, 241, 0.2)' 
                         : isInActiveBlock 
@@ -451,9 +454,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
                     const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
-                    // Match SyntaxHighlighter padding: 24px, lineHeight: 22px
-                    // Using pixels for absolute precision over long blocks
-                    const topOffset = 24 + (ann.line - 1) * 22;
+                    // Match SyntaxHighlighter padding: 24px, strict lineHeight: 24px
+                    // Using pixels and enforcing line height on the spans prevents theme-induced drift
+                    const topOffset = 24 + (ann.line - 1) * 24;
                     const isVisible = !isMinimizedMode || isActive;
 
                     return (
@@ -538,7 +541,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                         {/* Connection Dot Trigger */}
                         <div 
                           className={cn(
-                            "absolute -left-[1.3rem] top-4 w-2.5 h-2.5 rounded-full cursor-pointer transition-all duration-300",
+                            "absolute -left-[1.3rem] top-3 w-2.5 h-2.5 rounded-full cursor-pointer transition-all duration-300",
                             isActive ? "scale-125 shadow-lg" : "opacity-60 hover:opacity-100"
                           )}
                           style={{ 
