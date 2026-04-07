@@ -10,6 +10,10 @@ import { getMongoClient, getMongoDbName } from './db.js';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
+if (!process.env.CLERK_PUBLISHABLE_KEY && process.env.VITE_CLERK_PUBLISHABLE_KEY) {
+  process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
