@@ -26,8 +26,8 @@ async function fetchRemoteNotes(token: string | null, signal?: AbortSignal): Pro
   }
 }
 
-async function putRemoteNotes(notes: Note[], token: string | null, signal?: AbortSignal): Promise<boolean> {
-  if (!token) return false;
+async function putRemoteNotes(notes: Note[], token: string | null, signal?: AbortSignal): Promise<{ok: boolean, msg?: string}> {
+  if (!token) return { ok: false, msg: 'No authentication token available' };
   try {
     const res = await fetch('/api/notes', {
       method: 'PUT',
@@ -38,9 +38,17 @@ async function putRemoteNotes(notes: Note[], token: string | null, signal?: Abor
       body: JSON.stringify({ notes }),
       signal,
     });
-    return res.ok;
-  } catch {
-    return false;
+    if (!res.ok) {
+      let errText = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body.error) errText = body.error;
+      } catch (e) {}
+      return { ok: false, msg: errText };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, msg: err.message || 'Network fetch failed' };
   }
 }
 
@@ -183,13 +191,13 @@ export default function App() {
     setIsSyncing(true);
     setSyncMessage(null);
     const token = await getToken();
-    const ok = await putRemoteNotes(notes, token);
+    const result = await putRemoteNotes(notes, token);
     setIsSyncing(false);
-    if (ok) {
+    if (result.ok) {
       setLastCloudSyncAt(Date.now());
       setSyncMessage('Cloud sync completed.');
     } else {
-      setSyncMessage('Cloud sync failed. Check API/Internet.');
+      setSyncMessage(`Sync failed: ${result.msg}`);
     }
   };
 
