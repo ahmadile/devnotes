@@ -29,10 +29,9 @@ type StoredNotesDoc = {
   updatedAt: number;
 };
 
-async function main() {
-  const app = express();
-  
-  // Security Middlewares
+const app = express();
+
+// Security Middlewares
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -100,28 +99,25 @@ async function main() {
     }
   });
 
-  // Serve static files in production
-  // We check if we are in 'dist' (compiled) or 'server' (source)
-  const isCompiled = __dirname.endsWith(path.join('server', 'dist'));
-  const distPath = isCompiled 
-    ? path.join(__dirname, '../../dist') 
-    : path.join(__dirname, '../dist');
-    
-  app.use(express.static(distPath));
+  // Serve static files when NOT running as a Vercel Serverless function
+  if (!process.env.VERCEL) {
+    const isCompiled = __dirname.endsWith(path.join('server', 'dist'));
+    const distPath = isCompiled 
+      ? path.join(__dirname, '../../dist') 
+      : path.join(__dirname, '../dist');
+      
+    app.use(express.static(distPath));
 
-  // Fallback for SPA (Single Page Application)
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
+    // Fallback for SPA (Single Page Application)
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
 
-  app.listen(PORT, () => {
-    console.log(`[devnotes-api] listening on http://localhost:${PORT}`);
-  });
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+    app.listen(PORT, () => {
+      console.log(`[devnotes-api] listening on http://localhost:${PORT}`);
+    });
+  }
+  
+export default app;
 
