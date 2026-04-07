@@ -6,6 +6,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
+import dns from 'dns';
+
+// Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
+try { dns.setDefaultResultOrder('ipv4first'); } catch (e) {}
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
