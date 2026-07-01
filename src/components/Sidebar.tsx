@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   return (
-    <aside className="w-72 border-r border-border bg-background flex flex-col shrink-0 overflow-hidden transition-colors duration-300">
+    <aside className="h-full w-72 border-r border-border bg-background flex flex-col shrink-0 overflow-hidden transition-colors duration-300">
       {/* App Header */}
       <div className="h-16 flex items-center justify-between px-5 border-b border-border">
         <div className="flex items-center gap-2">
