@@ -4,9 +4,11 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 import { cn } from './lib/utils';
+
 
 const STORAGE_KEY = 'devnotes_data';
 
@@ -56,6 +58,7 @@ export default function App() {
   const { getToken, isLoaded: isAuthLoaded } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [editorTab, setEditorTab] = useState<'write' | 'preview'>('write');
   const [tagInput, setTagInput] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -551,15 +554,68 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Content Section */}
-                    <div className="relative group">
-                      <div className="absolute -left-4 inset-y-0 w-1 bg-primary/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <textarea 
-                        placeholder="Start writing your thoughts or paste code snippets below..."
-                        value={activeNote.content}
-                        onChange={(e) => updateNote({ ...activeNote, content: e.target.value })}
-                        className="w-full min-h-[48px] bg-transparent text-lg text-foreground/80 leading-relaxed focus:outline-none resize-none placeholder:text-muted-foreground/30"
-                      />
+                    {/* Content Section (Markdown Editor with Write/Preview Tabs) */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Note Content</span>
+                        <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
+                          <button
+                            type="button"
+                            onClick={() => setEditorTab('write')}
+                            className={cn(
+                              "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                              editorTab === 'write' 
+                                ? "bg-background text-foreground shadow-sm border border-border/10" 
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            Write
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditorTab('preview')}
+                            className={cn(
+                              "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                              editorTab === 'preview' 
+                                ? "bg-background text-foreground shadow-sm border border-border/10" 
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Eye className="w-3 h-3" />
+                            Preview
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="relative group min-h-[100px] px-1">
+                        {editorTab === 'write' ? (
+                          <>
+                            <div className="absolute -left-4 inset-y-0 w-1 bg-primary/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <textarea 
+                              placeholder="Start writing your thoughts in Markdown or paste code snippets below..."
+                              value={activeNote.content}
+                              onChange={(e) => updateNote({ ...activeNote, content: e.target.value })}
+                              className="w-full min-h-[120px] bg-transparent text-lg text-foreground/80 leading-relaxed focus:outline-none resize-none placeholder:text-muted-foreground/30 font-sans"
+                              ref={(el) => {
+                                if (el) {
+                                  // Auto-grow height based on content
+                                  el.style.height = 'auto';
+                                  el.style.height = `${Math.max(el.scrollHeight, 120)}px`;
+                                }
+                              }}
+                            />
+                          </>
+                        ) : (
+                          <div className="prose prose-zinc dark:prose-invert max-w-none pb-4 animate-in fade-in duration-200">
+                            {activeNote.content ? (
+                              <ReactMarkdown>{activeNote.content}</ReactMarkdown>
+                            ) : (
+                              <p className="text-muted-foreground/30 italic text-sm">Nothing to preview. Write something in Markdown first!</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Snippets Region */}

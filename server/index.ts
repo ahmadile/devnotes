@@ -50,12 +50,20 @@ const app = express();
   
   app.use(express.json({ limit: '2mb' }));
 
+  function getAuthUserId(req: any): string | null {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey && process.env.AGENT_API_KEY && apiKey === process.env.AGENT_API_KEY) {
+      return process.env.AGENT_USER_ID || null;
+    }
+    return getAuth(req).userId || null;
+  }
+
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
 
   app.get('/api/notes', async (req, res) => {
-    const { userId } = getAuth(req);
+    const userId = getAuthUserId(req);
     if (!userId) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
@@ -72,7 +80,7 @@ const app = express();
   });
 
   app.put('/api/notes', async (req, res) => {
-    const { userId } = getAuth(req);
+    const userId = getAuthUserId(req);
     if (!userId) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
