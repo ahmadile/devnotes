@@ -56,6 +56,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dragRange, setDragRange] = useState<{ start: number, end: number } | null>(null);
   const [associationKeyword, setAssociationKeyword] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const prevCodeRef = React.useRef(snippet.code);
 
   useEffect(() => {
@@ -542,7 +543,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                             ann.fullContext || '',
                                             snippet.language
                                           );
-                                          alert(`Syntax definition for "${kw.trim()}" successfully saved!`);
+                                          setToastMessage(`Syntax definition for "${kw.trim()}" successfully saved!`);
+                                          setTimeout(() => setToastMessage(null), 3000);
                                         }
                                       }}
                                       className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-emerald-500 transition-colors"
@@ -750,7 +752,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                             newAnnotation.fullContext || '',
                             snippet.language || 'python'
                           );
-                          alert(`Syntax for "${associationKeyword.trim()}" saved to library!`);
+                          setToastMessage(`Syntax definition for "${associationKeyword.trim()}" successfully saved!`);
+                          setTimeout(() => setToastMessage(null), 3000);
+                          addAnnotation();
                         }
                       }}
                       disabled={!associationKeyword.trim() || !newAnnotation.text.trim()}
@@ -803,6 +807,20 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           </div>
         </div>
       )}
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-500 text-white font-sans text-xs font-bold px-4 py-3 rounded-xl shadow-xl border border-emerald-400/20"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
