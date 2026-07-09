@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, atomDark, prism, tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
-import { CodeSnippet, Annotation, AppSettings } from '../types';
+import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { CodeSnippet, Annotation, AppSettings, SyntaxDefinition } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -33,9 +33,18 @@ interface CodeEditorProps {
   settings: AppSettings;
   onUpdate: (updated: CodeSnippet) => void;
   onDelete: () => void;
+  syntaxDefinitions: Record<string, SyntaxDefinition>;
+  onSaveSyntaxDefinition: (keyword: string, text: string, fullContext?: string, language?: string) => void;
 }
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpdate, onDelete }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ 
+  snippet, 
+  settings, 
+  onUpdate, 
+  onDelete, 
+  syntaxDefinitions, 
+  onSaveSyntaxDefinition 
+}) => {
   const [isEditing, setIsEditing] = useState(!snippet.code);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false);
@@ -46,11 +55,32 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
   const [isMinimizedMode, setIsMinimizedMode] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dragRange, setDragRange] = useState<{ start: number, end: number } | null>(null);
+  const [associationKeyword, setAssociationKeyword] = useState('');
   const prevCodeRef = React.useRef(snippet.code);
 
   useEffect(() => {
     prevCodeRef.current = snippet.code;
   }, [snippet.code]);
+
+  useEffect(() => {
+    if (isAddingAnnotation && !editingId && dragRange && snippet.code) {
+      const lineText = snippet.code.split('\n')[dragRange.start - 1] || '';
+      const matchedKw = Object.keys(syntaxDefinitions || {}).find(kw => {
+        const regex = new RegExp(`\\b${kw}\\b`, 'i');
+        return regex.test(lineText);
+      });
+      if (matchedKw && syntaxDefinitions[matchedKw]) {
+        setNewAnnotation(prev => ({
+          ...prev,
+          text: syntaxDefinitions[matchedKw].text,
+          fullContext: syntaxDefinitions[matchedKw].fullContext || ''
+        }));
+        setAssociationKeyword(matchedKw);
+      } else {
+        setAssociationKeyword('');
+      }
+    }
+  }, [isAddingAnnotation, editingId, dragRange, snippet.code, syntaxDefinitions]);
 
   const handleCodeChange = (newCode: string) => {
     const oldCode = prevCodeRef.current;
@@ -225,6 +255,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
       color: ANNOTATION_COLORS[0].value, 
       accentColor: ANNOTATION_COLORS[0].value 
     });
+    setAssociationKeyword('');
     setIsAddingAnnotation(false);
   };
 
@@ -238,6 +269,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
       color: ann.color || ANNOTATION_COLORS[0].value,
       accentColor: ann.color || ANNOTATION_COLORS[0].value
     });
+    const matchedKw = Object.keys(syntaxDefinitions || {}).find(
+      kw => syntaxDefinitions[kw].text === ann.text
+    ) || '';
+    setAssociationKeyword(matchedKw);
     setEditingId(ann.id);
     setIsAddingAnnotation(true);
   };
@@ -643,6 +678,64 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ snippet, settings, onUpd
                     onChange={(e) => setNewAnnotation({ ...newAnnotation, fullContext: e.target.value })}
                     className="w-full h-32 bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors"
                   />
+                </div>
+
+                {/* Optional Syntax Library Link & Save */}
+                <div className="bg-secondary/40 border border-border/60 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/80 font-mono">
+                      Syntax Library Link
+                    </span>
+                    {Object.keys(syntaxDefinitions || {}).length > 0 && (
+                      <select
+                        onChange={(e) => {
+                          const kw = e.target.value;
+                          if (kw && syntaxDefinitions[kw]) {
+                            setNewAnnotation(prev => ({
+                              ...prev,
+                              text: syntaxDefinitions[kw].text,
+                              fullContext: syntaxDefinitions[kw].fullContext || ''
+                            }));
+                            setAssociationKeyword(kw);
+                          }
+                        }}
+                        className="bg-transparent text-[10px] font-bold text-primary focus:outline-none cursor-pointer hover:text-primary/80 transition-colors"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>-- Load Saved Syntax --</option>
+                        {Object.keys(syntaxDefinitions).map(kw => (
+                          <option key={kw} value={kw} className="bg-popover text-foreground">{kw}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Keyword/Tag Name (e.g. sorted, append, upper)"
+                      value={associationKeyword}
+                      onChange={(e) => setAssociationKeyword(e.target.value)}
+                      className="flex-1 bg-secondary border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (associationKeyword.trim() && newAnnotation.text.trim()) {
+                          onSaveSyntaxDefinition(
+                            associationKeyword.trim(),
+                            newAnnotation.text.trim(),
+                            newAnnotation.fullContext || '',
+                            snippet.language || 'python'
+                          );
+                          alert(`Syntax for "${associationKeyword.trim()}" saved to library!`);
+                        }
+                      }}
+                      disabled={!associationKeyword.trim() || !newAnnotation.text.trim()}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      Save Syntax
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between">

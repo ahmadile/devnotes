@@ -26,6 +26,7 @@ const PORT = Number(process.env.PORT || 3001);
 type StoredNotesDoc = {
   userId: string;
   notes: unknown[];
+  syntaxDefinitions?: Record<string, any>;
   updatedAt: number;
 };
 
@@ -73,7 +74,11 @@ const app = express();
       const client = await getMongoClient();
       const db = client.db(getMongoDbName());
       const doc = await db.collection<StoredNotesDoc>('app').findOne({ userId });
-      res.json({ notes: doc?.notes ?? [], updatedAt: doc?.updatedAt ?? null });
+      res.json({ 
+        notes: doc?.notes ?? [], 
+        syntaxDefinitions: doc?.syntaxDefinitions ?? {}, 
+        updatedAt: doc?.updatedAt ?? null 
+      });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
     }
@@ -86,7 +91,7 @@ const app = express();
       return;
     }
 
-    const body = req.body as { notes?: unknown };
+    const body = req.body as { notes?: unknown; syntaxDefinitions?: unknown };
     if (!body || !Array.isArray(body.notes)) {
       res.status(400).json({ error: 'Body must be { notes: [] }' });
       return;
@@ -98,7 +103,7 @@ const app = express();
       const updatedAt = Date.now();
       await db.collection<StoredNotesDoc>('app').updateOne(
         { userId },
-        { $set: { notes: body.notes, updatedAt } },
+        { $set: { notes: body.notes, syntaxDefinitions: body.syntaxDefinitions ?? {}, updatedAt } },
         { upsert: true },
       );
       res.json({ ok: true, updatedAt });

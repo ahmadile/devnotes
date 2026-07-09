@@ -3,8 +3,8 @@ import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
 import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
-import { Note, CodeSnippet, AppSettings } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye } from 'lucide-react';
+import { Note, CodeSnippet, AppSettings, SyntaxDefinition } from './types';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from './lib/utils';
@@ -12,7 +12,10 @@ import { cn } from './lib/utils';
 
 const STORAGE_KEY = 'devnotes_data';
 
-async function fetchRemoteNotes(token: string | null, signal?: AbortSignal): Promise<Note[] | null> {
+async function fetchRemoteNotes(
+  token: string | null, 
+  signal?: AbortSignal
+): Promise<{ notes: Note[]; syntaxDefinitions: Record<string, SyntaxDefinition> } | null> {
   if (!token) return null;
   try {
     const res = await fetch('/api/notes', {
@@ -20,15 +23,23 @@ async function fetchRemoteNotes(token: string | null, signal?: AbortSignal): Pro
       signal,
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { notes?: unknown };
+    const data = (await res.json()) as { notes?: unknown; syntaxDefinitions?: unknown };
     if (!data || !Array.isArray(data.notes)) return null;
-    return data.notes as Note[];
+    return {
+      notes: data.notes as Note[],
+      syntaxDefinitions: (data.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>,
+    };
   } catch {
     return null;
   }
 }
 
-async function putRemoteNotes(notes: Note[], token: string | null, signal?: AbortSignal): Promise<{ok: boolean, msg?: string}> {
+async function putRemoteNotes(
+  notes: Note[], 
+  syntaxDefinitions: Record<string, SyntaxDefinition>,
+  token: string | null, 
+  signal?: AbortSignal
+): Promise<{ok: boolean, msg?: string}> {
   if (!token) return { ok: false, msg: 'No authentication token available' };
   try {
     const res = await fetch('/api/notes', {
@@ -37,7 +48,7 @@ async function putRemoteNotes(notes: Note[], token: string | null, signal?: Abor
         'content-type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ notes }),
+      body: JSON.stringify({ notes, syntaxDefinitions }),
       signal,
     });
     if (!res.ok) {
@@ -57,6 +68,8 @@ async function putRemoteNotes(notes: Note[], token: string | null, signal?: Abor
 export default function App() {
   const { getToken, isLoaded: isAuthLoaded } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
+  const [syntaxDefinitions, setSyntaxDefinitions] = useState<Record<string, SyntaxDefinition>>({});
+  const [expandedSyntaxKeyword, setExpandedSyntaxKeyword] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [editorTab, setEditorTab] = useState<'write' | 'preview'>('write');
   const [tagInput, setTagInput] = useState('');
@@ -119,12 +132,24 @@ export default function App() {
 
   // Load data
   useEffect(() => {
-    const loadFromLocal = (): Note[] | null => {
+    const loadFromLocal = (): { notes: Note[]; syntaxDefinitions: Record<string, SyntaxDefinition> } | null => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return null;
       try {
         const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? (parsed as Note[]) : null;
+        if (parsed && typeof parsed === 'object' && 'notes' in parsed && Array.isArray(parsed.notes)) {
+          return {
+            notes: parsed.notes as Note[],
+            syntaxDefinitions: (parsed.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>
+          };
+        }
+        if (Array.isArray(parsed)) {
+          return {
+            notes: parsed as Note[],
+            syntaxDefinitions: {}
+          };
+        }
+        return null;
       } catch (e) {
         console.error('Failed to parse saved notes', e);
         return null;
@@ -155,15 +180,17 @@ export default function App() {
     };
 
     const local = loadFromLocal();
-    const nextNotes = (local && local.length > 0) ? local : [welcomeNote];
+    const nextNotes = (local && local.notes.length > 0) ? local.notes : [welcomeNote];
+    const nextSyntaxes = local ? local.syntaxDefinitions : {};
     setNotes(nextNotes);
+    setSyntaxDefinitions(nextSyntaxes);
     setActiveNoteId(nextNotes.length > 0 ? nextNotes[0].id : null);
     didHydrate.current = true;
   }, []);
 
-  const persistNotes = (data: Note[]) => {
+  const persistNotes = (data: Note[], syntaxes: Record<string, SyntaxDefinition>) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ notes: data, syntaxDefinitions: syntaxes }));
     } catch (err) {
       console.error('Failed to persist notes to localStorage', err);
     }
@@ -176,17 +203,17 @@ export default function App() {
 
     setIsSaving(true);
     const timeout = window.setTimeout(() => {
-      persistNotes(notes);
+      persistNotes(notes, syntaxDefinitions);
       setIsSaving(false);
     }, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [notes]);
+  }, [notes, syntaxDefinitions]);
 
   const manualSave = () => {
     if (!didHydrate.current) return;
     setIsSaving(true);
-    persistNotes(notes);
+    persistNotes(notes, syntaxDefinitions);
     window.setTimeout(() => setIsSaving(false), 800);
   };
 
@@ -194,7 +221,7 @@ export default function App() {
     setIsSyncing(true);
     setSyncMessage(null);
     const token = await getToken();
-    const result = await putRemoteNotes(notes, token);
+    const result = await putRemoteNotes(notes, syntaxDefinitions, token);
     setIsSyncing(false);
     if (result.ok) {
       setLastCloudSyncAt(Date.now());
@@ -215,23 +242,25 @@ export default function App() {
       return;
     }
 
-    if (!confirm('Replace local notes with cloud notes?')) {
+    if (!confirm('Replace local notes and syntax library with cloud version?')) {
       setIsSyncing(false);
       return;
     }
 
-    setNotes(remote);
-    setActiveNoteId(remote.length > 0 ? remote[0].id : null);
-    persistNotes(remote);
+    setNotes(remote.notes);
+    setSyntaxDefinitions(remote.syntaxDefinitions);
+    setActiveNoteId(remote.notes.length > 0 ? remote.notes[0].id : null);
+    persistNotes(remote.notes, remote.syntaxDefinitions);
     setLastCloudSyncAt(Date.now());
     setIsSyncing(false);
-    setSyncMessage('Cloud notes loaded.');
+    setSyncMessage('Cloud data loaded.');
   };
 
   const exportAsJson = () => {
     const payload = {
       exportedAt: new Date().toISOString(),
       notes,
+      syntaxDefinitions,
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -250,18 +279,20 @@ export default function App() {
 
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as { notes?: unknown };
+      const parsed = JSON.parse(text) as { notes?: unknown; syntaxDefinitions?: unknown };
       if (!parsed || !Array.isArray(parsed.notes)) {
         setSyncMessage('Invalid backup file format.');
         return;
       }
 
-      if (!confirm('Replace local notes with imported backup?')) return;
+      if (!confirm('Replace local database and syntax library with imported backup?')) return;
 
       const importedNotes = parsed.notes as Note[];
+      const importedSyntaxes = (parsed.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>;
       setNotes(importedNotes);
+      setSyntaxDefinitions(importedSyntaxes);
       setActiveNoteId(importedNotes.length > 0 ? importedNotes[0].id : null);
-      persistNotes(importedNotes);
+      persistNotes(importedNotes, importedSyntaxes);
       setSyncMessage('Backup imported successfully.');
     } catch {
       setSyncMessage('Could not import backup file.');
@@ -353,6 +384,31 @@ export default function App() {
     updateNote({
       ...activeNote,
       tags: activeNote.tags.filter(t => t !== tag)
+    });
+  };
+
+  const saveSyntaxDefinition = (keyword: string, text: string, fullContext?: string, language?: string) => {
+    setSyntaxDefinitions(prev => {
+      const updated = {
+        ...prev,
+        [keyword.toLowerCase().trim()]: {
+          keyword: keyword.trim(),
+          text: text.trim(),
+          fullContext: fullContext?.trim(),
+          language: language?.trim()
+        }
+      };
+      persistNotes(notes, updated);
+      return updated;
+    });
+  };
+
+  const deleteSyntaxDefinition = (keyword: string) => {
+    setSyntaxDefinitions(prev => {
+      const updated = { ...prev };
+      delete updated[keyword.toLowerCase().trim()];
+      persistNotes(notes, updated);
+      return updated;
     });
   };
 
@@ -513,20 +569,37 @@ export default function App() {
 
                       <div className="flex flex-wrap items-center gap-3">
                         <Tag className="w-4 h-4 text-muted-foreground/50" strokeWidth="2" />
-                        {activeNote.tags.map(tag => (
-                          <span 
-                            key={tag} 
-                            className="group flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20 shadow-sm"
-                          >
-                            #{tag}
-                            <button 
-                              onClick={() => removeTag(tag)} 
-                              className="hover:text-foreground opacity-50 hover:opacity-100 transition-opacity"
+                        {activeNote.tags.map(tag => {
+                          const hasSyntax = !!syntaxDefinitions[tag.toLowerCase().trim()];
+                          return (
+                            <span 
+                              key={tag} 
+                              onClick={() => {
+                                if (hasSyntax) {
+                                  setExpandedSyntaxKeyword(tag.toLowerCase().trim());
+                                }
+                              }}
+                              className={cn(
+                                "group flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shadow-sm select-none transition-all",
+                                hasSyntax 
+                                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 cursor-pointer"
+                                  : "bg-primary/10 text-primary border-primary/20"
+                              )}
+                              title={hasSyntax ? "Click to view syntax details" : undefined}
                             >
-                              &times;
-                            </button>
-                          </span>
-                        ))}
+                              #{tag}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeTag(tag);
+                                }} 
+                                className="hover:text-foreground opacity-50 hover:opacity-100 transition-opacity"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          );
+                        })}
                         <div className="flex items-center gap-1 border-b border-dashed border-border pb-0.5 focus-within:border-primary/40 transition-colors">
                           <input
                             type="text"
@@ -552,6 +625,107 @@ export default function App() {
                           </button>
                         </div>
                       </div>
+
+                      {/* Collapsible Syntax Panel */}
+                      {(() => {
+                        const matchingSyntaxes = activeNote.tags
+                          .map(tag => syntaxDefinitions[tag.toLowerCase().trim()])
+                          .filter((s): s is SyntaxDefinition => !!s);
+
+                        if (matchingSyntaxes.length === 0) return null;
+
+                        const isPanelOpen = expandedSyntaxKeyword !== null;
+
+                        return (
+                          <div className="border border-border rounded-2xl bg-secondary/25 p-5 transition-all duration-300">
+                            <div 
+                              className="flex items-center justify-between cursor-pointer select-none" 
+                              onClick={() => setExpandedSyntaxKeyword(isPanelOpen ? null : matchingSyntaxes[0].keyword.toLowerCase())}
+                            >
+                              <div className="flex items-center gap-2.5 text-xs font-bold text-foreground">
+                                <BookOpen className="w-4 h-4 text-emerald-500 animate-pulse" />
+                                <span>{matchingSyntaxes.length} Syntax reference{matchingSyntaxes.length > 1 ? 's' : ''} available for tags:</span>
+                                <div className="flex gap-1.5">
+                                  {matchingSyntaxes.map(s => (
+                                    <span key={s.keyword} className="px-2 py-0.5 rounded bg-emerald-500/10 text-[10px] text-emerald-500 font-mono font-bold">
+                                      #{s.keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <button className="text-[10px] font-bold text-primary uppercase tracking-widest hover:text-primary/80 transition-colors">
+                                {isPanelOpen ? 'Hide Reference' : 'Show Reference'}
+                              </button>
+                            </div>
+
+                            <AnimatePresence>
+                              {isPanelOpen && (
+                                <motion.div 
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="overflow-hidden mt-4 pt-4 border-t border-border space-y-4"
+                                >
+                                  {/* Tab selection headers */}
+                                  <div className="flex flex-wrap gap-2 border-b border-border/40 pb-2.5">
+                                    {matchingSyntaxes.map(s => {
+                                      const kwLower = s.keyword.toLowerCase();
+                                      const isSelected = expandedSyntaxKeyword === kwLower;
+                                      return (
+                                        <button
+                                          key={s.keyword}
+                                          onClick={() => setExpandedSyntaxKeyword(kwLower)}
+                                          className={cn(
+                                            "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
+                                            isSelected
+                                              ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                                              : "text-muted-foreground border-transparent hover:text-foreground hover:bg-secondary/60"
+                                          )}
+                                        >
+                                          {s.keyword}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Active tab detailed view */}
+                                  {(() => {
+                                    const activeSyntax = matchingSyntaxes.find(s => s.keyword.toLowerCase() === expandedSyntaxKeyword);
+                                    if (!activeSyntax) return null;
+                                    return (
+                                      <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <div className="flex items-start justify-between">
+                                          <div>
+                                            <h4 className="text-sm font-extrabold text-foreground font-mono">#{activeSyntax.keyword}</h4>
+                                            <p className="text-xs text-muted-foreground/80 font-semibold mt-1">{activeSyntax.text}</p>
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              if (confirm(`Remove syntax definition for "${activeSyntax.keyword}"?`)) {
+                                                deleteSyntaxDefinition(activeSyntax.keyword);
+                                                setExpandedSyntaxKeyword(null);
+                                              }
+                                            }}
+                                            className="text-[10px] font-bold text-destructive hover:text-destructive/80 transition-colors uppercase tracking-widest"
+                                          >
+                                            Delete definition
+                                          </button>
+                                        </div>
+
+                                        {activeSyntax.fullContext && (
+                                          <div className="bg-secondary/40 border border-border/50 rounded-xl p-4 text-xs text-foreground/80 leading-relaxed font-sans max-w-none prose prose-zinc dark:prose-invert prose-xs">
+                                            <ReactMarkdown>{activeSyntax.fullContext}</ReactMarkdown>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Content Section (Markdown Editor with Write/Preview Tabs) */}
@@ -627,6 +801,8 @@ export default function App() {
                           settings={settings}
                           onUpdate={(updated) => updateSnippet(snippet.id, updated)}
                           onDelete={() => deleteSnippet(snippet.id)}
+                          syntaxDefinitions={syntaxDefinitions}
+                          onSaveSyntaxDefinition={saveSyntaxDefinition}
                         />
                       ))}
 

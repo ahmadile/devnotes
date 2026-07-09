@@ -36,3 +36,10 @@ export interface AppSettings {
   fontFamily: 'JetBrains Mono' | 'Inter' | 'Fira Code' | 'System';
   syntaxTheme: 'vscDarkPlus' | 'atomDark' | 'prism' | 'tomorrow';
 }
+
+export interface SyntaxDefinition {
+  keyword: string;
+  text: string;
+  fullContext?: string;
+  language?: string;
+}
