@@ -531,7 +531,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                     <button 
                                       onClick={() => {
                                         const lineText = snippet.code.split('\n')[ann.line - 1] || '';
-                                        const words = lineText.match(/\b[a-zA-Z_]\w*\b/g) || [];
+                                        const words: string[] = lineText.match(/\b[a-zA-Z_]\w*\b/g) || [];
                                         const common = ['import', 'as', 'from', 'for', 'in', 'def', 'return', 'if', 'else', 'print', 'const', 'let', 'var', 'function'];
                                         const candidates = words.filter(w => w.length > 2 && !common.includes(w));
                                         const defaultKw = candidates[0] || '';
