@@ -528,6 +528,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                   </span>
                                   <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all">
                                     <button 
+                                      onClick={() => {
+                                        const lineText = snippet.code.split('\n')[ann.line - 1] || '';
+                                        const words = lineText.match(/\b[a-zA-Z_]\w*\b/g) || [];
+                                        const common = ['import', 'as', 'from', 'for', 'in', 'def', 'return', 'if', 'else', 'print', 'const', 'let', 'var', 'function'];
+                                        const candidates = words.filter(w => w.length > 2 && !common.includes(w));
+                                        const defaultKw = candidates[0] || '';
+                                        const kw = prompt(`Save this annotation to the Syntax Library under keyword/tag:`, defaultKw);
+                                        if (kw && kw.trim()) {
+                                          onSaveSyntaxDefinition(
+                                            kw.trim(),
+                                            ann.text,
+                                            ann.fullContext || '',
+                                            snippet.language
+                                          );
+                                          alert(`Syntax definition for "${kw.trim()}" successfully saved!`);
+                                        }
+                                      }}
+                                      className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-emerald-500 transition-colors"
+                                      title="Save to Syntax Library"
+                                    >
+                                      <BookOpen className="w-3 h-3" />
+                                    </button>
+                                    <button 
                                       onClick={() => handleEdit(ann)}
                                       className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors"
                                       title="Edit Note"

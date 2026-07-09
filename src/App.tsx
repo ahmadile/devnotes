@@ -580,14 +580,20 @@ export default function App() {
                                 }
                               }}
                               className={cn(
-                                "group flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shadow-sm select-none transition-all",
+                                "group flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shadow-sm select-none transition-all relative",
                                 hasSyntax 
                                   ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 cursor-pointer"
                                   : "bg-primary/10 text-primary border-primary/20"
                               )}
-                              title={hasSyntax ? "Click to view syntax details" : undefined}
                             >
                               #{tag}
+                              {hasSyntax && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 bg-popover text-foreground text-[10px] rounded-lg border border-border opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-30 font-sans">
+                                  <div className="font-bold border-b border-border pb-1 mb-1 font-mono text-emerald-500">#{tag} Reference</div>
+                                  <div className="line-clamp-2 text-muted-foreground">{syntaxDefinitions[tag.toLowerCase().trim()].text}</div>
+                                  <div className="text-[9px] text-primary mt-1 font-bold">Click to expand details</div>
+                                </div>
+                              )}
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
