@@ -9,7 +9,41 @@ interface MarkdownProps {
   className?: string;
 }
 
+export const autoFormatMarkdown = (text: string): string => {
+  if (!text) return '';
+
+  // Split text by protected contexts (HTML tags, markdown links/images, inline/block code, URLs, and emails)
+  const parts = text.split(/(<[^>]+>|!?\[[^\]]*\]\([^)]*\)|`{1,3}[^`]+`{1,3}|https?:\/\/[^\s/$.?#].[^\s]*|[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})/g);
+
+  // Combined regex to match programming terms:
+  // 1. Relative calls/properties: .add, .add(), .foo.bar()
+  // 2. Identifier-initiated property chains or function calls: obj.prop, obj.method(), func()
+  // 3. Generic type patterns: list[str], List[int], Union[A, B]
+  // 4. Standalone programming keywords (case-sensitive)
+  const codeTermsRegex = /(\.[a-zA-Z_][a-zA-Z0-9_]*(?:\((?:[^()]+|\([^()]*\))*\))?|[a-zA-Z_][a-zA-Z0-9_]*(?:\((?:[^()]+|\([^()]*\))*\))?(?:\.[a-zA-Z_][a-zA-Z0-9_]*(?:\((?:[^()]+|\([^()]*\))*\))?)+|[a-zA-Z_][a-zA-Z0-9_]*\((?:[^()]+|\([^()]*\))*\)|\b(?:list|set|dict|tuple|List|Set|Tuple|Dict|Union|Optional|Vector|Map|Array)\s*\[[^\]]+\]|\b(?:dict|tuple|int|float|str|bool|Counter|Pandas|DataFrame|Series)\b)/g;
+
+  const processedParts = parts.map((part, index) => {
+    // Even indices are plain text outside of protected blocks
+    if (index % 2 === 0) {
+      return part.replace(codeTermsRegex, (match) => {
+        // Exclude common abbreviations e.g. and i.e.
+        const normalized = match.toLowerCase();
+        if (normalized === 'e.g' || normalized === 'i.e') {
+          return match;
+        }
+        return `\`${match}\``;
+      });
+    }
+    // Odd indices are protected blocks, leave untouched
+    return part;
+  });
+
+  return processedParts.join('');
+};
+
 export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
+  const formattedContent = React.useMemo(() => autoFormatMarkdown(content), [content]);
+
   return (
     <div className={className}>
       <ReactMarkdown
@@ -109,7 +143,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
           ),
         }}
       >
-        {content}
+        {formattedContent}
       </ReactMarkdown>
     </div>
   );
