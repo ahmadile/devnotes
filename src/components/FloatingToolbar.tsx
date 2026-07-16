@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bold, Italic, Heading3, Paintbrush, Highlighter, X } from 'lucide-react';
 
 interface FloatingToolbarProps {
@@ -43,7 +44,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ x, y, onFormat
   const adjustedX = Math.max(10, Math.min(x, window.innerWidth - 320));
   const adjustedY = Math.max(10, y);
 
-  return (
+  return createPortal(
     <div
       ref={toolbarRef}
       style={{
@@ -188,6 +189,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ x, y, onFormat
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
