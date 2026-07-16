@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, atomDark, prism, tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal } from 'lucide-react';
 import { CodeSnippet, Annotation, AppSettings, SyntaxDefinition } from '../types';
 import { cn } from '../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
-import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
+import { Markdown } from './Markdown';
 
 const ANNOTATION_COLORS = [
   { name: 'Indigo', value: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.4)' },
@@ -26,6 +26,219 @@ const detectLanguage = (code: string): string => {
   if (lower.includes('body {') || lower.includes('.class {')) return 'css';
   if (lower.includes('fn main()') || lower.includes('let mut')) return 'rust';
   return 'javascript';
+};
+
+interface DraggableAnnotationFormProps {
+  formKey: string;
+  topOffset: number;
+  editingId: string | null;
+  newAnnotation: {
+    line: number;
+    endLine: number;
+    text: string;
+    fullContext: string;
+    type: Annotation['type'];
+    color: string;
+    accentColor: string;
+  };
+  setNewAnnotation: React.Dispatch<React.SetStateAction<DraggableAnnotationFormProps['newAnnotation']>>;
+  setIsAddingAnnotation: React.Dispatch<React.SetStateAction<boolean>>;
+  setEditingId: React.Dispatch<React.SetStateAction<string | null>>;
+  associationKeyword: string;
+  setAssociationKeyword: React.Dispatch<React.SetStateAction<string>>;
+  syntaxDefinitions: Record<string, SyntaxDefinition>;
+  onSaveSyntaxDefinition: (keyword: string, text: string, fullContext?: string, language?: string) => void;
+  snippet: CodeSnippet;
+  addAnnotation: () => void;
+  setToastMessage: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const DraggableAnnotationForm: React.FC<DraggableAnnotationFormProps> = ({
+  formKey, topOffset, editingId, newAnnotation, setNewAnnotation,
+  setIsAddingAnnotation, setEditingId, associationKeyword, setAssociationKeyword,
+  syntaxDefinitions, onSaveSyntaxDefinition, snippet, addAnnotation, setToastMessage
+}) => {
+  const dragControls = useDragControls();
+
+  return (
+    <motion.div
+      key={formKey}
+      drag
+      dragControls={dragControls}
+      dragListener={false}
+      dragMomentum={false}
+      initial={{ scale: 0.95, opacity: 0, y: 10 }}
+      animate={{ scale: 1, opacity: 1, y: 0 }}
+      exit={{ scale: 0.95, opacity: 0, y: 10 }}
+      className="absolute left-6 z-50 w-full max-w-lg bg-card/98 border border-primary/30 shadow-2xl rounded-2xl p-5 space-y-4 font-sans select-none"
+      style={{ top: `${topOffset}px` }}
+    >
+      {/* Popover Header / Drag Handle */}
+      <div
+        onPointerDown={(e) => dragControls.start(e)}
+        className="flex items-center justify-between pb-2 border-b border-border/60 cursor-grab active:cursor-grabbing hover:bg-secondary/20 p-1.5 rounded-lg transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <GripHorizontal className="w-4 h-4 text-muted-foreground/60 shrink-0" />
+          <span className="w-1.5 h-3 bg-primary rounded-full shrink-0" />
+          <h4 className="text-xs font-bold text-foreground">
+            {editingId ? 'Update Logical Note' : 'New Logical Note'}
+          </h4>
+        </div>
+        <button 
+          onClick={() => {
+            setIsAddingAnnotation(false);
+            setEditingId(null);
+          }}
+          className="text-muted-foreground hover:text-foreground text-sm leading-none transition-colors p-1 hover:bg-secondary rounded cursor-pointer"
+        >
+          &times;
+        </button>
+      </div>
+
+      {/* Category & Accent Color */}
+      <div className="grid grid-cols-2 gap-4 bg-secondary/35 p-3 rounded-xl border border-border/40">
+        <div>
+          <label className="block text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground/80 mb-1.5">Category</label>
+          <select 
+            value={newAnnotation.type}
+            onChange={(e) => setNewAnnotation({ ...newAnnotation, type: e.target.value as any })}
+            className="w-full bg-card border border-border rounded-lg px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-colors"
+          >
+            <option value="logic">Code Logic</option>
+            <option value="tip">Best Practice</option>
+            <option value="warning">Warning</option>
+            <option value="debug">Bug Fix</option>
+            <option value="important">Warning / Imp</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground/80 mb-1.5">Accent Color</label>
+          <div className="flex items-center gap-2 mt-0.5">
+            {ANNOTATION_COLORS.map(c => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setNewAnnotation({ ...newAnnotation, color: c.value, accentColor: c.value })}
+                className={cn(
+                  "w-4 h-4 rounded-full border transition-all p-0.5 cursor-pointer",
+                  newAnnotation.color === c.value ? "border-white scale-110" : "border-transparent opacity-60 hover:opacity-100"
+                )}
+              >
+                <div className="w-full h-full rounded-full" style={{ backgroundColor: c.value }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Short Logic Input */}
+      <div>
+        <label className="block text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground/80 mb-1.5">Short Logic (Visible directly)</label>
+        <textarea 
+          placeholder="Describe the logic behind this block..."
+          value={newAnnotation.text}
+          onChange={(e) => setNewAnnotation({ ...newAnnotation, text: e.target.value })}
+          className="w-full h-14 bg-secondary/40 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors"
+        />
+      </div>
+
+      {/* Detailed Context Input */}
+      <div>
+        <label className="block text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground/80 mb-1.5">Detailed Context (Optional, Markdown Supported)</label>
+        <textarea 
+          placeholder="Add in-depth details, code snippets, or external links..."
+          value={newAnnotation.fullContext}
+          onChange={(e) => setNewAnnotation({ ...newAnnotation, fullContext: e.target.value })}
+          className="w-full h-24 bg-secondary/40 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors font-mono"
+        />
+      </div>
+
+      {/* Optional Syntax Library Link & Save */}
+      <div className="bg-secondary/20 border border-border/40 rounded-xl p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground/75 font-mono">
+            Syntax Library Link
+          </span>
+          {Object.keys(syntaxDefinitions || {}).length > 0 && (
+            <select
+              onChange={(e) => {
+                const kw = e.target.value;
+                if (kw && syntaxDefinitions[kw]) {
+                  setNewAnnotation(prev => ({
+                    ...prev,
+                    text: syntaxDefinitions[kw].text,
+                    fullContext: syntaxDefinitions[kw].fullContext || ''
+                  }));
+                  setAssociationKeyword(kw);
+                }
+              }}
+              className="bg-transparent text-[9px] font-bold text-primary focus:outline-none cursor-pointer hover:text-primary/80 transition-colors"
+              defaultValue=""
+            >
+              <option value="" disabled>-- Load Saved Syntax --</option>
+              {Object.keys(syntaxDefinitions).map(kw => (
+                <option key={kw} value={kw} className="bg-popover text-foreground text-xs">{kw}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Keyword Name (e.g. sorted, append)"
+            value={associationKeyword}
+            onChange={(e) => setAssociationKeyword(e.target.value)}
+            className="flex-1 bg-card border border-border rounded-lg px-2.5 py-1 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-colors"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (associationKeyword.trim() && newAnnotation.text.trim()) {
+                onSaveSyntaxDefinition(
+                  associationKeyword.trim(),
+                  newAnnotation.text.trim(),
+                  newAnnotation.fullContext || '',
+                  snippet.language || 'python'
+                );
+                setToastMessage(`Syntax definition for "${associationKeyword.trim()}" successfully saved!`);
+                setTimeout(() => setToastMessage(null), 3000);
+                addAnnotation();
+              }
+            }}
+            disabled={!associationKeyword.trim() || !newAnnotation.text.trim()}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+          >
+            Save Syntax
+          </button>
+        </div>
+      </div>
+
+      {/* Action Buttons & Info */}
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-[9px] text-muted-foreground italic font-mono">
+          Block: Lines {newAnnotation.line} to {newAnnotation.endLine}
+        </p>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => {
+              setIsAddingAnnotation(false);
+              setEditingId(null);
+            }}
+            className="px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={addAnnotation}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+          >
+            {editingId ? 'Update Note' : 'Attach Note'}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
 };
 
 interface CodeEditorProps {
@@ -591,8 +804,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="border-t border-border bg-secondary/30 overflow-hidden"
                             >
-                              <div className="p-4 text-[11px] text-muted-foreground prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-primary max-h-[300px] overflow-y-auto custom-scrollbar">
-                                <ReactMarkdown>{ann.fullContext}</ReactMarkdown>
+                              <div className="p-4 text-xs text-muted-foreground max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <Markdown content={ann.fullContext || ''} />
                               </div>
                             </motion.div>
                           )}
@@ -615,6 +828,28 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   })}
                 </AnimatePresence>
               </div>
+
+              {/* Contextual Annotation Form (Absolute Floating / Draggable) */}
+              <AnimatePresence>
+                {isAddingAnnotation && (
+                  <DraggableAnnotationForm
+                    formKey={`${newAnnotation.line}-${newAnnotation.endLine}-${editingId || 'new'}`}
+                    topOffset={24 + (newAnnotation.endLine || newAnnotation.line) * 24}
+                    editingId={editingId}
+                    newAnnotation={newAnnotation}
+                    setNewAnnotation={setNewAnnotation}
+                    setIsAddingAnnotation={setIsAddingAnnotation}
+                    setEditingId={setEditingId}
+                    associationKeyword={associationKeyword}
+                    setAssociationKeyword={setAssociationKeyword}
+                    syntaxDefinitions={syntaxDefinitions}
+                    onSaveSyntaxDefinition={onSaveSyntaxDefinition}
+                    snippet={snippet}
+                    addAnnotation={addAnnotation}
+                    setToastMessage={setToastMessage}
+                  />
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
@@ -622,176 +857,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     )}
   </AnimatePresence>
 
-      {/* Contextual Annotation Form */}
-      <AnimatePresence>
-        {isAddingAnnotation && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-t border-border bg-secondary/50 backdrop-blur-md"
-          >
-            <div className="p-6 space-y-6 max-w-3xl mx-auto">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-primary rounded-full" />
-                  <h4 className="text-sm font-bold text-foreground">
-                    {editingId ? 'Update Logical Note' : 'New Logical Note'}
-                  </h4>
-                </div>
-                <button 
-                  onClick={() => {
-                    setIsAddingAnnotation(false);
-                    setEditingId(null);
-                  }}
-                  className="text-muted-foreground hover:text-foreground text-lg transition-colors"
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className="grid grid-cols-12 gap-5">
-                <div className="col-span-3">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Category</label>
-                  <select 
-                    value={newAnnotation.type}
-                    onChange={(e) => setNewAnnotation({ ...newAnnotation, type: e.target.value as any })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-colors"
-                  >
-                    <option value="logic">Code Logic</option>
-                    <option value="tip">Best Practice</option>
-                    <option value="important">Warning</option>
-                    <option value="debug">Bug Fix</option>
-                    <option value="info">General Info</option>
-                  </select>
-                </div>
-                <div className="col-span-9">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Accent Color</label>
-                  <div className="flex items-center gap-3">
-                    {ANNOTATION_COLORS.map(c => (
-                      <button
-                        key={c.value}
-                        onClick={() => setNewAnnotation({ ...newAnnotation, color: c.value, accentColor: c.value })}
-                        className={cn(
-                          "w-6 h-6 rounded-full border-2 transition-all p-0.5",
-                          newAnnotation.color === c.value ? "border-white" : "border-transparent opacity-40 hover:opacity-100"
-                        )}
-                      >
-                        <div className="w-full h-full rounded-full" style={{ backgroundColor: c.value }} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Short Logic (Visible directly)</label>
-                  <textarea 
-                    placeholder="Describe the logic behind this block..."
-                    value={newAnnotation.text}
-                    onChange={(e) => setNewAnnotation({ ...newAnnotation, text: e.target.value })}
-                    className="w-full h-20 bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Detailed Context (Optional, Markdown Supported)</label>
-                  <textarea 
-                    placeholder="Add in-depth details about libraries (Pandas, OS), functions, or external links..."
-                    value={newAnnotation.fullContext}
-                    onChange={(e) => setNewAnnotation({ ...newAnnotation, fullContext: e.target.value })}
-                    className="w-full h-32 bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors"
-                  />
-                </div>
-
-                {/* Optional Syntax Library Link & Save */}
-                <div className="bg-secondary/40 border border-border/60 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/80 font-mono">
-                      Syntax Library Link
-                    </span>
-                    {Object.keys(syntaxDefinitions || {}).length > 0 && (
-                      <select
-                        onChange={(e) => {
-                          const kw = e.target.value;
-                          if (kw && syntaxDefinitions[kw]) {
-                            setNewAnnotation(prev => ({
-                              ...prev,
-                              text: syntaxDefinitions[kw].text,
-                              fullContext: syntaxDefinitions[kw].fullContext || ''
-                            }));
-                            setAssociationKeyword(kw);
-                          }
-                        }}
-                        className="bg-transparent text-[10px] font-bold text-primary focus:outline-none cursor-pointer hover:text-primary/80 transition-colors"
-                        defaultValue=""
-                      >
-                        <option value="" disabled>-- Load Saved Syntax --</option>
-                        {Object.keys(syntaxDefinitions).map(kw => (
-                          <option key={kw} value={kw} className="bg-popover text-foreground">{kw}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Keyword/Tag Name (e.g. sorted, append, upper)"
-                      value={associationKeyword}
-                      onChange={(e) => setAssociationKeyword(e.target.value)}
-                      className="flex-1 bg-secondary border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (associationKeyword.trim() && newAnnotation.text.trim()) {
-                          onSaveSyntaxDefinition(
-                            associationKeyword.trim(),
-                            newAnnotation.text.trim(),
-                            newAnnotation.fullContext || '',
-                            snippet.language || 'python'
-                          );
-                          setToastMessage(`Syntax definition for "${associationKeyword.trim()}" successfully saved!`);
-                          setTimeout(() => setToastMessage(null), 3000);
-                          addAnnotation();
-                        }
-                      }}
-                      disabled={!associationKeyword.trim() || !newAnnotation.text.trim()}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                      Save Syntax
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-muted-foreground italic">
-                    Block: Lines {newAnnotation.line} to {newAnnotation.endLine}
-                  </p>
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => {
-                        setIsAddingAnnotation(false);
-                        setEditingId(null);
-                      }}
-                      className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={addAnnotation}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-lg"
-                    >
-                      {editingId ? 'Update Note' : 'Attach Note'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Footer Info */}
       {!isEditing && (

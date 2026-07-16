@@ -6,7 +6,7 @@ import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition } from './types';
 import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import ReactMarkdown from 'react-markdown';
+import { Markdown } from './components/Markdown';
 import { cn } from './lib/utils';
 
 
@@ -719,8 +719,8 @@ export default function App() {
                                         </div>
 
                                         {activeSyntax.fullContext && (
-                                          <div className="bg-secondary/40 border border-border/50 rounded-xl p-4 text-xs text-foreground/80 leading-relaxed font-sans max-w-none prose prose-zinc dark:prose-invert prose-xs">
-                                            <ReactMarkdown>{activeSyntax.fullContext}</ReactMarkdown>
+                                          <div className="bg-secondary/40 border border-border/50 rounded-xl p-4 text-xs text-foreground/80 leading-relaxed font-sans max-w-none">
+                                            <Markdown content={activeSyntax.fullContext} />
                                           </div>
                                         )}
                                       </div>
@@ -787,9 +787,9 @@ export default function App() {
                             />
                           </>
                         ) : (
-                          <div className="prose prose-zinc dark:prose-invert max-w-none pb-4 animate-in fade-in duration-200">
+                          <div className="max-w-none pb-4 animate-in fade-in duration-200">
                             {activeNote.content ? (
-                              <ReactMarkdown>{activeNote.content}</ReactMarkdown>
+                              <Markdown content={activeNote.content} />
                             ) : (
                               <p className="text-muted-foreground/30 italic text-sm">Nothing to preview. Write something in Markdown first!</p>
                             )}
