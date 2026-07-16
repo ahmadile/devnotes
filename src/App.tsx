@@ -7,6 +7,7 @@ import { Note, CodeSnippet, AppSettings, SyntaxDefinition } from './types';
 import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
+import { FloatingToolbar } from './components/FloatingToolbar';
 import { cn } from './lib/utils';
 
 
@@ -104,6 +105,97 @@ export default function App() {
   const mainContentRef = useRef<HTMLDivElement>(null);
   const didHydrate = useRef(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [selection, setSelection] = useState<{
+    start: number;
+    end: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleTextareaMouseUp = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start !== end) {
+      setSelection({
+        start,
+        end,
+        x: e.clientX,
+        y: e.clientY - 15,
+      });
+    } else {
+      setSelection(null);
+    }
+  };
+
+  const handleTextareaKeyUp = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start !== end) {
+      const rect = textarea.getBoundingClientRect();
+      setSelection({
+        start,
+        end,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10,
+      });
+    } else {
+      setSelection(null);
+    }
+  };
+
+  const handleTextareaScroll = () => {
+    setSelection(null);
+  };
+
+  const handleFormat = (type: string, param?: string) => {
+    if (!selection || !noteTextareaRef.current || !activeNote) return;
+    const textarea = noteTextareaRef.current;
+    const { start, end } = selection;
+    const text = textarea.value;
+    const selectedText = text.substring(start, end);
+
+    let replacement = '';
+    switch (type) {
+      case 'bold':
+        replacement = `**${selectedText}**`;
+        break;
+      case 'italic':
+        replacement = `*${selectedText}*`;
+        break;
+      case 'heading':
+        replacement = `\n### ${selectedText}`;
+        break;
+      case 'color':
+        replacement = `<span style="color: ${param}">${selectedText}</span>`;
+        break;
+      case 'color-reset':
+        replacement = selectedText;
+        break;
+      case 'highlight':
+        replacement = `<mark style="background-color: ${param}; color: inherit; padding: 2px 4px; border-radius: 4px;">${selectedText}</mark>`;
+        break;
+      case 'highlight-reset':
+        replacement = selectedText;
+        break;
+      default:
+        replacement = selectedText;
+    }
+
+    const newValue = text.substring(0, start) + replacement + text.substring(end);
+    updateNote({ ...activeNote, content: newValue });
+    setSelection(null);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + replacement.length);
+    }, 0);
+  };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setShowScrollTop(e.currentTarget.scrollTop > 400);
@@ -776,8 +868,12 @@ export default function App() {
                               placeholder="Start writing your thoughts in Markdown or paste code snippets below..."
                               value={activeNote.content}
                               onChange={(e) => updateNote({ ...activeNote, content: e.target.value })}
+                              onMouseUp={handleTextareaMouseUp}
+                              onKeyUp={handleTextareaKeyUp}
+                              onScroll={handleTextareaScroll}
                               className="w-full min-h-[120px] bg-transparent text-lg text-foreground/80 leading-relaxed focus:outline-none resize-none placeholder:text-muted-foreground/30 font-sans"
                               ref={(el) => {
+                                noteTextareaRef.current = el;
                                 if (el) {
                                   // Auto-grow height based on content
                                   el.style.height = 'auto';
@@ -785,6 +881,14 @@ export default function App() {
                                 }
                               }}
                             />
+                            {selection && (
+                              <FloatingToolbar 
+                                x={selection.x}
+                                y={selection.y}
+                                onFormat={handleFormat}
+                                onClose={() => setSelection(null)}
+                              />
+                            )}
                           </>
                         ) : (
                           <div className="max-w-none pb-4 animate-in fade-in duration-200">

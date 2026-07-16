@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle } from 'lucide-react';
@@ -20,7 +21,7 @@ export const autoFormatMarkdown = (text: string): string => {
   // 2. Identifier-initiated property chains or function calls: obj.prop, obj.method(), func()
   // 3. Generic type patterns: list[str], List[int], Union[A, B]
   // 4. Standalone programming keywords (case-sensitive)
-  const codeTermsRegex = /(\.[a-zA-Z_][a-zA-Z0-9_]*(?:\((?:[^()]+|\([^()]*\))*\))?|[a-zA-Z_][a-zA-Z0-9_]*(?:\((?:[^()]+|\([^()]*\))*\))?(?:\.[a-zA-Z_][a-zA-Z0-9_]*(?:\((?:[^()]+|\([^()]*\))*\))?)+|[a-zA-Z_][a-zA-Z0-9_]*\((?:[^()]+|\([^()]*\))*\)|\b(?:list|set|dict|tuple|List|Set|Tuple|Dict|Union|Optional|Vector|Map|Array)\s*\[[^\]]+\]|\b(?:dict|tuple|int|float|str|bool|Counter|Pandas|DataFrame|Series)\b)/g;
+  const codeTermsRegex = /(\.[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?|[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?(?:\.[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?)+|[a-zA-Z_][a-zA-Z0-9_]*\([^()]*(?:\([^()]*\)[^()]*)*\)|\b(?:list|set|dict|tuple|List|Set|Tuple|Dict|Union|Optional|Vector|Map|Array)\s*\[[^\]]+\]|\b(?:dict|tuple|int|float|str|bool|Counter|Pandas|DataFrame|Series)\b)/g;
 
   const processedParts = parts.map((part, index) => {
     // Even indices are plain text outside of protected blocks
@@ -47,6 +48,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
   return (
     <div className={className}>
       <ReactMarkdown
+        rehypePlugins={[rehypeRaw]}
         components={{
           code({ className: codeClassName, children, ...props }) {
             const match = /language-(\w+)/.exec(codeClassName || '');
