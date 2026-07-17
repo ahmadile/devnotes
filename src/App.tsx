@@ -75,6 +75,10 @@ export default function App() {
   const [syntaxDefinitions, setSyntaxDefinitions] = useState<Record<string, SyntaxDefinition>>({});
   const [expandedSyntaxKeyword, setExpandedSyntaxKeyword] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+
+  const activeNote = useMemo(() => 
+    notes.find(n => n.id === activeNoteId) || null
+  , [notes, activeNoteId]);
   const [editorTab, setEditorTab] = useState<'write' | 'preview'>('write');
   const [tagInput, setTagInput] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -508,9 +512,7 @@ export default function App() {
     return path.join(' / ');
   };
 
-  const activeNote = useMemo(() => 
-    notes.find(n => n.id === activeNoteId) || null
-  , [notes, activeNoteId]);
+
 
   useEffect(() => {
     if (notes.length > 0 && !activeNoteId) {
