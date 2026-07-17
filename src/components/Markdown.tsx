@@ -14,7 +14,7 @@ export const autoFormatMarkdown = (text: string): string => {
   if (!text) return '';
 
   // Split text by protected contexts (HTML tags, markdown links/images, inline/block code, URLs, and emails)
-  const parts = text.split(/(<[^>]+>|!?\[[^\]]*\]\([^)]*\)|`{1,3}[^`]+`{1,3}|https?:\/\/[^\s/$.?#].[^\s]*|[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})/g);
+  const parts = text.split(/(<[^>]+>|!?\[[^\]]*\]\([^)]*\)|```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s/$.?#].[^\s]*|[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})/g);
 
   // Combined regex to match programming terms:
   // 1. Relative calls/properties: .add, .add(), .foo.bar()

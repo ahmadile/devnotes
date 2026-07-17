@@ -27,6 +27,7 @@ type StoredNotesDoc = {
   userId: string;
   notes: unknown[];
   syntaxDefinitions?: Record<string, any>;
+  modules?: unknown[];
   updatedAt: number;
 };
 
@@ -77,6 +78,7 @@ const app = express();
       res.json({ 
         notes: doc?.notes ?? [], 
         syntaxDefinitions: doc?.syntaxDefinitions ?? {}, 
+        modules: doc?.modules ?? [],
         updatedAt: doc?.updatedAt ?? null 
       });
     } catch (err) {
@@ -91,7 +93,7 @@ const app = express();
       return;
     }
 
-    const body = req.body as { notes?: unknown; syntaxDefinitions?: unknown };
+    const body = req.body as { notes?: unknown; syntaxDefinitions?: unknown; modules?: unknown };
     if (!body || !Array.isArray(body.notes)) {
       res.status(400).json({ error: 'Body must be { notes: [] }' });
       return;
@@ -103,7 +105,7 @@ const app = express();
       const updatedAt = Date.now();
       await db.collection<StoredNotesDoc>('app').updateOne(
         { userId },
-        { $set: { notes: body.notes, syntaxDefinitions: body.syntaxDefinitions ?? {}, updatedAt } },
+        { $set: { notes: body.notes, syntaxDefinitions: body.syntaxDefinitions ?? {}, modules: Array.isArray(body.modules) ? body.modules : [], updatedAt } },
         { upsert: true },
       );
       res.json({ ok: true, updatedAt });

@@ -3,8 +3,8 @@ import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
 import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
-import { Note, CodeSnippet, AppSettings, SyntaxDefinition } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen } from 'lucide-react';
+import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -16,7 +16,7 @@ const STORAGE_KEY = 'devnotes_data';
 async function fetchRemoteNotes(
   token: string | null, 
   signal?: AbortSignal
-): Promise<{ notes: Note[]; syntaxDefinitions: Record<string, SyntaxDefinition> } | null> {
+): Promise<{ notes: Note[]; syntaxDefinitions: Record<string, SyntaxDefinition>; modules: Module[] } | null> {
   if (!token) return null;
   try {
     const res = await fetch('/api/notes', {
@@ -24,11 +24,12 @@ async function fetchRemoteNotes(
       signal,
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { notes?: unknown; syntaxDefinitions?: unknown };
+    const data = (await res.json()) as { notes?: unknown; syntaxDefinitions?: unknown; modules?: unknown };
     if (!data || !Array.isArray(data.notes)) return null;
     return {
       notes: data.notes as Note[],
       syntaxDefinitions: (data.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>,
+      modules: (data.modules || []) as Module[]
     };
   } catch {
     return null;
@@ -38,6 +39,7 @@ async function fetchRemoteNotes(
 async function putRemoteNotes(
   notes: Note[], 
   syntaxDefinitions: Record<string, SyntaxDefinition>,
+  modules: Module[],
   token: string | null, 
   signal?: AbortSignal
 ): Promise<{ok: boolean, msg?: string}> {
@@ -49,7 +51,7 @@ async function putRemoteNotes(
         'content-type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ notes, syntaxDefinitions }),
+      body: JSON.stringify({ notes, syntaxDefinitions, modules }),
       signal,
     });
     if (!res.ok) {
@@ -69,6 +71,7 @@ async function putRemoteNotes(
 export default function App() {
   const { getToken, isLoaded: isAuthLoaded } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
   const [syntaxDefinitions, setSyntaxDefinitions] = useState<Record<string, SyntaxDefinition>>({});
   const [expandedSyntaxKeyword, setExpandedSyntaxKeyword] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
@@ -153,6 +156,95 @@ export default function App() {
     setSelection(null);
   };
 
+  const handleTextareaPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (!pastedText) return;
+
+    // Detect markdown code blocks: ```[language]\n[code]```
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const matches: { language: string; code: string }[] = [];
+    let match;
+    
+    while ((match = codeBlockRegex.exec(pastedText)) !== null) {
+      matches.push({
+        language: match[1] || 'javascript',
+        code: match[2].trim()
+      });
+    }
+
+    if (matches.length > 0 && activeNote) {
+      e.preventDefault();
+      const confirmExtract = window.confirm(
+        `Des blocs de code ont été détectés dans votre texte collé. Souhaitez-vous les extraire en tant que snippets de code interactifs (supportant les annotations) ?`
+      );
+
+      if (confirmExtract) {
+        // Extract code blocks and add them as CodeSnippets
+        const newSnippets: CodeSnippet[] = matches.map(m => ({
+          id: Math.random().toString(36).substr(2, 9),
+          title: `${m.language.toUpperCase()} Snippet`,
+          language: m.language,
+          code: m.code,
+          annotations: [],
+          highlightedLines: []
+        }));
+
+        // Remove the code blocks from the pasted text to clean it up
+        const cleanedText = pastedText.replace(codeBlockRegex, (match, lang) => {
+          return `\n*(${lang || 'Code'} snippet extrait ci-dessous)*\n`;
+        });
+
+        // Insert the cleaned text at the current cursor position
+        const textarea = e.currentTarget;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = textarea.value;
+        const newValue = value.substring(0, start) + cleanedText + value.substring(end);
+
+        updateNote({
+          ...activeNote,
+          content: newValue,
+          snippets: [...activeNote.snippets, ...newSnippets]
+        });
+
+        // Focus and set selection
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start + cleanedText.length, start + cleanedText.length);
+        }, 0);
+      } else {
+        // Standard insert if user cancels
+        const textarea = e.currentTarget;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = textarea.value;
+        const newValue = value.substring(0, start) + pastedText + value.substring(end);
+        updateNote({ ...activeNote, content: newValue });
+
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start + pastedText.length, start + pastedText.length);
+        }, 0);
+      }
+    }
+  };
+
+  // Auto-grow note content textarea height and prevent scroll jumping
+  useEffect(() => {
+    const textarea = noteTextareaRef.current;
+    if (textarea) {
+      const parent = mainContentRef.current;
+      const scrollTop = parent ? parent.scrollTop : 0;
+      
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(textarea.scrollHeight, 120)}px`;
+      
+      if (parent && parent.scrollTop !== scrollTop) {
+        parent.scrollTop = scrollTop;
+      }
+    }
+  }, [activeNote?.content, activeNoteId, editorTab]);
+
   const handleFormat = (type: string, param?: string) => {
     if (!selection || !noteTextareaRef.current || !activeNote) return;
     const textarea = noteTextareaRef.current;
@@ -224,7 +316,7 @@ export default function App() {
 
   // Load data
   useEffect(() => {
-    const loadFromLocal = (): { notes: Note[]; syntaxDefinitions: Record<string, SyntaxDefinition> } | null => {
+    const loadFromLocal = (): { notes: Note[]; syntaxDefinitions: Record<string, SyntaxDefinition>; modules: Module[] } | null => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return null;
       try {
@@ -232,13 +324,15 @@ export default function App() {
         if (parsed && typeof parsed === 'object' && 'notes' in parsed && Array.isArray(parsed.notes)) {
           return {
             notes: parsed.notes as Note[],
-            syntaxDefinitions: (parsed.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>
+            syntaxDefinitions: (parsed.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>,
+            modules: (parsed.modules || []) as Module[]
           };
         }
         if (Array.isArray(parsed)) {
           return {
             notes: parsed as Note[],
-            syntaxDefinitions: {}
+            syntaxDefinitions: {},
+            modules: []
           };
         }
         return null;
@@ -274,15 +368,17 @@ export default function App() {
     const local = loadFromLocal();
     const nextNotes = (local && local.notes.length > 0) ? local.notes : [welcomeNote];
     const nextSyntaxes = local ? local.syntaxDefinitions : {};
+    const nextModules = local ? local.modules : [];
     setNotes(nextNotes);
     setSyntaxDefinitions(nextSyntaxes);
+    setModules(nextModules);
     setActiveNoteId(nextNotes.length > 0 ? nextNotes[0].id : null);
     didHydrate.current = true;
   }, []);
 
-  const persistNotes = (data: Note[], syntaxes: Record<string, SyntaxDefinition>) => {
+  const persistNotes = (data: Note[], syntaxes: Record<string, SyntaxDefinition>, modulesList: Module[]) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ notes: data, syntaxDefinitions: syntaxes }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ notes: data, syntaxDefinitions: syntaxes, modules: modulesList }));
     } catch (err) {
       console.error('Failed to persist notes to localStorage', err);
     }
@@ -295,17 +391,17 @@ export default function App() {
 
     setIsSaving(true);
     const timeout = window.setTimeout(() => {
-      persistNotes(notes, syntaxDefinitions);
+      persistNotes(notes, syntaxDefinitions, modules);
       setIsSaving(false);
     }, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [notes, syntaxDefinitions]);
+  }, [notes, syntaxDefinitions, modules]);
 
   const manualSave = () => {
     if (!didHydrate.current) return;
     setIsSaving(true);
-    persistNotes(notes, syntaxDefinitions);
+    persistNotes(notes, syntaxDefinitions, modules);
     window.setTimeout(() => setIsSaving(false), 800);
   };
 
@@ -313,7 +409,7 @@ export default function App() {
     setIsSyncing(true);
     setSyncMessage(null);
     const token = await getToken();
-    const result = await putRemoteNotes(notes, syntaxDefinitions, token);
+    const result = await putRemoteNotes(notes, syntaxDefinitions, modules, token);
     setIsSyncing(false);
     if (result.ok) {
       setLastCloudSyncAt(Date.now());
@@ -341,8 +437,9 @@ export default function App() {
 
     setNotes(remote.notes);
     setSyntaxDefinitions(remote.syntaxDefinitions);
+    setModules(remote.modules);
     setActiveNoteId(remote.notes.length > 0 ? remote.notes[0].id : null);
-    persistNotes(remote.notes, remote.syntaxDefinitions);
+    persistNotes(remote.notes, remote.syntaxDefinitions, remote.modules);
     setLastCloudSyncAt(Date.now());
     setIsSyncing(false);
     setSyncMessage('Cloud data loaded.');
@@ -353,6 +450,7 @@ export default function App() {
       exportedAt: new Date().toISOString(),
       notes,
       syntaxDefinitions,
+      modules,
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -371,7 +469,7 @@ export default function App() {
 
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as { notes?: unknown; syntaxDefinitions?: unknown };
+      const parsed = JSON.parse(text) as { notes?: unknown; syntaxDefinitions?: unknown; modules?: unknown };
       if (!parsed || !Array.isArray(parsed.notes)) {
         setSyncMessage('Invalid backup file format.');
         return;
@@ -381,16 +479,33 @@ export default function App() {
 
       const importedNotes = parsed.notes as Note[];
       const importedSyntaxes = (parsed.syntaxDefinitions || {}) as Record<string, SyntaxDefinition>;
+      const importedModules = (parsed.modules || []) as Module[];
       setNotes(importedNotes);
       setSyntaxDefinitions(importedSyntaxes);
+      setModules(importedModules);
       setActiveNoteId(importedNotes.length > 0 ? importedNotes[0].id : null);
-      persistNotes(importedNotes, importedSyntaxes);
+      persistNotes(importedNotes, importedSyntaxes, importedModules);
       setSyncMessage('Backup imported successfully.');
     } catch {
       setSyncMessage('Could not import backup file.');
     } finally {
       event.target.value = '';
     }
+  };
+
+  const getModulePathName = (module: Module): string => {
+    const path: string[] = [module.name];
+    let parentId = module.parentId;
+    while (parentId) {
+      const parent = modules.find(m => m.id === parentId);
+      if (parent) {
+        path.unshift(parent.name);
+        parentId = parent.parentId;
+      } else {
+        break;
+      }
+    }
+    return path.join(' / ');
   };
 
   const activeNote = useMemo(() => 
@@ -403,7 +518,7 @@ export default function App() {
     }
   }, [notes, activeNoteId]);
 
-  const createNote = () => {
+  const createNote = (moduleId?: string | null) => {
     const newNote: Note = {
       id: Math.random().toString(36).substr(2, 9),
       title: '',
@@ -411,7 +526,8 @@ export default function App() {
       snippets: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      tags: []
+      tags: [],
+      moduleId: moduleId || null
     };
     setNotes((prev) => [newNote, ...prev]);
     setActiveNoteId(newNote.id);
@@ -428,6 +544,39 @@ export default function App() {
     if (activeNoteId === id) {
       setActiveNoteId(newNotes.length > 0 ? newNotes[0].id : null);
     }
+  };
+
+  const createModule = (name: string, parentId?: string | null) => {
+    const newModule: Module = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      parentId: parentId || null,
+      createdAt: Date.now()
+    };
+    const nextModules = [...modules, newModule];
+    setModules(nextModules);
+    persistNotes(notes, syntaxDefinitions, nextModules);
+  };
+
+  const renameModule = (id: string, name: string) => {
+    const nextModules = modules.map(m => m.id === id ? { ...m, name } : m);
+    setModules(nextModules);
+    persistNotes(notes, syntaxDefinitions, nextModules);
+  };
+
+  const deleteModule = (id: string) => {
+    const targetModule = modules.find(m => m.id === id);
+    const parentId = targetModule ? targetModule.parentId : null;
+
+    const nextModules = modules
+      .filter(m => m.id !== id)
+      .map(m => m.parentId === id ? { ...m, parentId } : m);
+
+    const nextNotes = notes.map(n => n.moduleId === id ? { ...n, moduleId: parentId } : n);
+
+    setModules(nextModules);
+    setNotes(nextNotes);
+    persistNotes(nextNotes, syntaxDefinitions, nextModules);
   };
 
   const addSnippet = () => {
@@ -525,9 +674,13 @@ export default function App() {
               >
                 <Sidebar 
                   notes={notes}
+                  modules={modules}
                   activeNoteId={activeNoteId}
                   onSelectNote={setActiveNoteId}
                   onNewNote={createNote}
+                  onNewModule={createModule}
+                  onRenameModule={renameModule}
+                  onDeleteModule={deleteModule}
                   onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               </motion.div>
@@ -658,6 +811,26 @@ export default function App() {
                         onChange={(e) => updateNote({ ...activeNote, title: e.target.value })}
                         className="w-full bg-transparent text-4xl font-bold tracking-tight focus:outline-none placeholder:text-muted-foreground/30 border-none p-0 text-foreground"
                       />
+
+                      <div className="flex items-center gap-2.5 text-xs text-muted-foreground bg-secondary/20 py-1.5 px-3 rounded-lg border border-border/40 w-fit select-none">
+                        <Folder className="w-3.5 h-3.5 text-primary" strokeWidth="2" />
+                        <span className="font-medium text-muted-foreground/80">Folder:</span>
+                        <select
+                          value={activeNote.moduleId || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateNote({ ...activeNote, moduleId: val || null });
+                          }}
+                          className="bg-transparent border-none focus:outline-none text-foreground font-bold hover:text-primary transition-colors cursor-pointer"
+                        >
+                          <option value="" className="bg-popover text-foreground">Uncategorized</option>
+                          {modules.map(m => (
+                            <option key={m.id} value={m.id} className="bg-popover text-foreground">
+                              {getModulePathName(m)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
                       <div className="flex flex-wrap items-center gap-3">
                         <Tag className="w-4 h-4 text-muted-foreground/50" strokeWidth="2" />
@@ -871,15 +1044,9 @@ export default function App() {
                               onMouseUp={handleTextareaMouseUp}
                               onKeyUp={handleTextareaKeyUp}
                               onScroll={handleTextareaScroll}
+                              onPaste={handleTextareaPaste}
                               className="w-full min-h-[120px] bg-transparent text-lg text-foreground/80 leading-relaxed focus:outline-none resize-none placeholder:text-muted-foreground/30 font-sans"
-                              ref={(el) => {
-                                noteTextareaRef.current = el;
-                                if (el) {
-                                  // Auto-grow height based on content
-                                  el.style.height = 'auto';
-                                  el.style.height = `${Math.max(el.scrollHeight, 120)}px`;
-                                }
-                              }}
+                              ref={noteTextareaRef}
                             />
                             {selection && (
                               <FloatingToolbar 

@@ -28,6 +28,7 @@ export interface Note {
   createdAt: number;
   updatedAt: number;
   tags: string[];
+  moduleId?: string | null;
 }
 
 export interface AppSettings {
@@ -42,4 +43,11 @@ export interface SyntaxDefinition {
   text: string;
   fullContext?: string;
   language?: string;
+}
+
+export interface Module {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  createdAt: number;
 }
