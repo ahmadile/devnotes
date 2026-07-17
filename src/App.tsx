@@ -639,7 +639,7 @@ export default function App() {
           language: language?.trim()
         }
       };
-      persistNotes(notes, updated);
+      persistNotes(notes, updated, modules);
       return updated;
     });
   };
@@ -648,7 +648,7 @@ export default function App() {
     setSyntaxDefinitions(prev => {
       const updated = { ...prev };
       delete updated[keyword.toLowerCase().trim()];
-      persistNotes(notes, updated);
+      persistNotes(notes, updated, modules);
       return updated;
     });
   };
