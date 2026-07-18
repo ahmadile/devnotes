@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, atomDark, prism, tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal, Upload } from 'lucide-react';
 import { CodeSnippet, Annotation, AppSettings, SyntaxDefinition } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence, useDragControls } from 'motion/react';
@@ -619,7 +619,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             className="p-2 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-primary"
             title="Import/Replace Code from Clipboard"
           >
-            <Plus className="w-4 h-4" />
+            <Upload className="w-4 h-4" />
           </button>
           <button 
             onClick={() => setIsMinimizedMode(!isMinimizedMode)}
@@ -681,7 +681,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 style={getSyntaxStyle()}
                 customStyle={{
                   margin: 0,
-                  padding: `24px 24px ${Math.max(200, (cardPositions.maxBottom || 0) + 80)}px 24px`,
+                  padding: `24px 24px ${snippet.annotations.length > 0 ? Math.max(24, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 24) : 24}px 24px`,
                   background: 'transparent',
                   fontSize: '13.6px', // 0.85rem
                   lineHeight: '24px', // STRICT 24px height for alignment

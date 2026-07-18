@@ -206,12 +206,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       setRenamingModuleId(null);
                     }
                   }}
-                  onBlur={() => {
-                    if (renameModuleName.trim()) {
-                      onRenameModule(module.id, renameModuleName.trim(), renameParentId);
-                    }
-                    setRenamingModuleId(null);
-                  }}
                 />
                 {/* Parent folder selector */}
                 <div className="flex items-center gap-1">
@@ -227,6 +221,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <option key={m.id} value={m.id}>{getModuleLabel(m)}</option>
                     ))}
                   </select>
+                </div>
+                {/* Explicit Action Buttons */}
+                <div className="flex items-center justify-end gap-1.5 mt-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenamingModuleId(null);
+                    }}
+                    className="px-2 py-0.5 hover:bg-secondary rounded text-[10px] font-medium text-muted-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (renameModuleName.trim()) {
+                        onRenameModule(module.id, renameModuleName.trim(), renameParentId);
+                        setRenamingModuleId(null);
+                      }
+                    }}
+                    className="px-2 py-0.5 bg-primary text-primary-foreground hover:bg-primary/95 rounded text-[10px] font-bold transition-all shadow"
+                  >
+                    Save
+                  </button>
                 </div>
               </div>
             ) : (
