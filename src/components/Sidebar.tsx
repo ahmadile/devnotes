@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, FileText, Clock, Settings as SettingsIcon, Folder, FolderOpen, FolderPlus, ChevronRight, ChevronDown, Trash2, Edit3 } from 'lucide-react';
+import { Search, Plus, FileText, Clock, Settings as SettingsIcon, Folder, FolderOpen, FolderPlus, ChevronRight, ChevronDown, Trash2, Edit3, CornerDownRight } from 'lucide-react';
 import { Logo } from './Logo';
 import { UserButton } from '@clerk/clerk-react';
 import { Note, Module } from '../types';
@@ -13,7 +13,7 @@ interface SidebarProps {
   onSelectNote: (id: string) => void;
   onNewNote: (moduleId?: string | null) => void;
   onNewModule: (name: string, parentId?: string | null) => void;
-  onRenameModule: (id: string, name: string) => void;
+  onRenameModule: (id: string, name: string, parentId?: string | null) => void;
   onDeleteModule: (id: string) => void;
   onOpenSettings: () => void;
 }
@@ -35,9 +35,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [renamingModuleId, setRenamingModuleId] = React.useState<string | null>(null);
   const [newModuleName, setNewModuleName] = React.useState('');
   const [renameModuleName, setRenameModuleName] = React.useState('');
+  const [renameParentId, setRenameParentId] = React.useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedModules(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  /** Check if `candidateId` is a descendant of `ancestorId` (prevents cycle when moving folders). */
+  const isDescendant = (ancestorId: string, candidateId: string): boolean => {
+    let current = candidateId;
+    const visited = new Set<string>();
+    while (current) {
+      if (current === ancestorId) return true;
+      if (visited.has(current)) return false;
+      visited.add(current);
+      const parent = modules.find(m => m.id === current);
+      current = parent?.parentId || '';
+    }
+    return false;
   };
 
   const filteredNotes = notes.filter(n => {
@@ -53,18 +68,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   });
 
-  const renderNoteRow = (note: Note, depth: number) => {
+  const renderNoteRow = (note: Note) => {
     return (
       <button
         key={note.id}
         onClick={() => onSelectNote(note.id)}
         className={cn(
-          "w-full text-left py-1.5 pr-3 rounded-lg border transition-all group relative flex items-center justify-between",
+          "w-full text-left py-1.5 pl-6 pr-3 rounded-lg border transition-all group relative flex items-center justify-between",
           activeNoteId === note.id 
             ? "bg-secondary border-primary/10 shadow-sm" 
             : "hover:bg-secondary/40 border-transparent"
         )}
-        style={{ paddingLeft: `${depth * 12 + 28}px` }}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <FileText className={cn(
@@ -82,12 +96,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const renderInlineCreateForm = (parentId: string | null, depth: number) => {
+  const renderInlineCreateForm = (parentId: string | null) => {
     return (
-      <div 
-        className="flex items-center gap-2 py-1.5 px-2"
-        style={{ paddingLeft: `${depth * 12 + 28}px` }}
-      >
+      <div className="flex items-center gap-2 py-1.5 pl-6 pr-2">
         <Folder className="w-4 h-4 text-primary/40 shrink-0" />
         <input
           type="text"
@@ -117,7 +128,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const renderModule = (module: Module, depth: number) => {
+  /** Build a flat list of valid parent folder options for a module being renamed/moved. */
+  const getValidParentOptions = (moduleId: string): Module[] => {
+    return modules.filter(m => {
+      if (m.id === moduleId) return false;          // can't be its own parent
+      if (isDescendant(moduleId, m.id)) return false; // can't move into a descendant
+      return true;
+    });
+  };
+
+  /** Build a readable path label for a module. */
+  const getModuleLabel = (m: Module): string => {
+    const parts: string[] = [m.name];
+    let pid = m.parentId;
+    const visited = new Set<string>();
+    while (pid) {
+      if (visited.has(pid)) break;
+      visited.add(pid);
+      const parent = modules.find(mod => mod.id === pid);
+      if (parent) {
+        parts.unshift(parent.name);
+        pid = parent.parentId;
+      } else break;
+    }
+    return parts.join(' / ');
+  };
+
+  const renderModule = (module: Module) => {
     const isExpanded = !!expandedModules[module.id];
     const childModules = modules.filter(m => m.parentId === module.id);
     const childNotes = notes.filter(n => n.moduleId === module.id);
@@ -128,10 +165,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Module Folder Row */}
         <div 
           className={cn(
-            "flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-secondary/40 group/module cursor-pointer text-sm font-medium",
+            "flex items-center justify-between py-1.5 pl-2 pr-2 rounded-lg hover:bg-secondary/40 group/module cursor-pointer text-sm font-medium",
             "transition-all duration-200"
           )}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={() => toggleExpand(module.id)}
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -151,32 +187,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
             
             {isRenaming ? (
-              <input
-                type="text"
-                value={renameModuleName}
-                autoFocus
-                className="bg-background border border-border rounded px-1.5 py-0.5 text-xs text-foreground focus:outline-none w-full"
-                onChange={(e) => setRenameModuleName(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.stopPropagation();
-                    if (renameModuleName.trim()) {
-                      onRenameModule(module.id, renameModuleName.trim());
+              <div className="flex flex-col gap-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={renameModuleName}
+                  autoFocus
+                  className="bg-background border border-border rounded px-1.5 py-0.5 text-xs text-foreground focus:outline-none w-full"
+                  onChange={(e) => setRenameModuleName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.stopPropagation();
+                      if (renameModuleName.trim()) {
+                        onRenameModule(module.id, renameModuleName.trim(), renameParentId);
+                        setRenamingModuleId(null);
+                      }
+                    } else if (e.key === 'Escape') {
+                      e.stopPropagation();
                       setRenamingModuleId(null);
                     }
-                  } else if (e.key === 'Escape') {
-                    e.stopPropagation();
+                  }}
+                  onBlur={() => {
+                    if (renameModuleName.trim()) {
+                      onRenameModule(module.id, renameModuleName.trim(), renameParentId);
+                    }
                     setRenamingModuleId(null);
-                  }
-                }}
-                onBlur={() => {
-                  if (renameModuleName.trim()) {
-                    onRenameModule(module.id, renameModuleName.trim());
-                  }
-                  setRenamingModuleId(null);
-                }}
-              />
+                  }}
+                />
+                {/* Parent folder selector */}
+                <div className="flex items-center gap-1">
+                  <CornerDownRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+                  <select
+                    value={renameParentId || ''}
+                    onChange={(e) => setRenameParentId(e.target.value || null)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-background border border-border rounded px-1 py-0.5 text-[10px] text-foreground focus:outline-none w-full cursor-pointer"
+                  >
+                    <option value="">— Root (no parent) —</option>
+                    {getValidParentOptions(module.id).map(m => (
+                      <option key={m.id} value={m.id}>{getModuleLabel(m)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             ) : (
               <span className="truncate text-foreground/80 hover:text-foreground">{module.name}</span>
             )}
@@ -212,9 +264,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   e.stopPropagation();
                   setRenamingModuleId(module.id);
                   setRenameModuleName(module.name);
+                  setRenameParentId(module.parentId || null);
                 }}
                 className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground"
-                title="Rename Folder"
+                title="Rename / Move Folder"
               >
                 <Edit3 className="w-3.5 h-3.5" />
               </button>
@@ -234,17 +287,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Expanded Children */}
+        {/* Expanded Children — with indentation guide line */}
         {isExpanded && (
-          <div className="mt-0.5 space-y-0.5">
+          <div className="ml-[18px] pl-3 border-l border-border/30 space-y-0.5">
             {/* Subfolders */}
-            {childModules.map(child => renderModule(child, depth + 1))}
+            {childModules.map(child => renderModule(child))}
 
             {/* Inline creation field if active in this module */}
-            {creatingModuleInId === module.id && renderInlineCreateForm(module.id, depth + 1)}
+            {creatingModuleInId === module.id && renderInlineCreateForm(module.id)}
 
             {/* Notes inside this module */}
-            {childNotes.map(note => renderNoteRow(note, depth + 1))}
+            {childNotes.map(note => renderNoteRow(note))}
           </div>
         )}
       </div>
@@ -377,13 +430,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             
             <div className="flex flex-col gap-0.5">
               {/* Root folder inline create form */}
-              {creatingModuleInId === 'root' && renderInlineCreateForm(null, 0)}
+              {creatingModuleInId === 'root' && renderInlineCreateForm(null)}
               
               {/* Render root modules */}
-              {modules.filter(m => !m.parentId).map(module => renderModule(module, 0))}
+              {modules.filter(m => !m.parentId).map(module => renderModule(module))}
 
               {/* Render root notes */}
-              {notes.filter(n => !n.moduleId).map(note => renderNoteRow(note, 0))}
+              {notes.filter(n => !n.moduleId).map(note => renderNoteRow(note))}
 
               {modules.length === 0 && notes.filter(n => !n.moduleId).length === 0 && creatingModuleInId !== 'root' && (
                 <div className="px-2 py-8 text-center bg-secondary/15 rounded-xl border border-dashed border-border/40">

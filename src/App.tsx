@@ -560,8 +560,12 @@ export default function App() {
     persistNotes(notes, syntaxDefinitions, nextModules);
   };
 
-  const renameModule = (id: string, name: string) => {
-    const nextModules = modules.map(m => m.id === id ? { ...m, name } : m);
+  const renameModule = (id: string, name: string, parentId?: string | null) => {
+    const nextModules = modules.map(m => 
+      m.id === id 
+        ? { ...m, name, parentId: parentId !== undefined ? parentId : m.parentId } 
+        : m
+    );
     setModules(nextModules);
     persistNotes(notes, syntaxDefinitions, nextModules);
   };
@@ -1104,7 +1108,7 @@ export default function App() {
                         <p className="text-muted-foreground">Access all your developer insights and logic snippets.</p>
                       </div>
                       <button 
-                        onClick={createNote}
+                        onClick={() => createNote()}
                         className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-indigo-900/20 flex items-center gap-2"
                       >
                         <Plus className="w-5 h-5" strokeWidth="2" />

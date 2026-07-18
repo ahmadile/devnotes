@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, atomDark, prism, tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal } from 'lucide-react';
@@ -383,6 +383,41 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
+  /** Estimate the rendered height of an annotation card (in px). */
+  const estimateCardHeight = (ann: Annotation, isExpanded: boolean): number => {
+    // Base: padding (16+16) + header (~18) + text (~20 per ~60 chars) + button (~20 if fullContext)
+    const textLines = Math.ceil((ann.text?.length || 20) / 50);
+    let h = 48 + textLines * 18;
+    if (ann.fullContext) h += 22; // "Read Full Context" button
+    if (isExpanded && ann.fullContext) {
+      const contextLines = Math.ceil((ann.fullContext.length || 40) / 50);
+      h += 32 + contextLines * 16; // border-t + padding + content
+      h = Math.min(h, 400); // max-h-[400px] on the card
+    }
+    return h;
+  };
+
+  /** Compute collision-resolved card positions so cards don't overlap. */
+  const cardPositions = useMemo(() => {
+    const GAP = 8; // min vertical gap between cards
+    const sorted = [...snippet.annotations].sort((a, b) => a.line - b.line);
+    const positions: Record<string, number> = {};
+    let prevBottom = 0;
+    let maxBottom = 0;
+
+    for (const ann of sorted) {
+      const idealTop = 24 + (ann.line - 1) * 24;
+      const resolvedTop = Math.max(idealTop, prevBottom + GAP);
+      positions[ann.id] = resolvedTop;
+
+      const height = estimateCardHeight(ann, expandedId === ann.id);
+      prevBottom = resolvedTop + height;
+      maxBottom = Math.max(maxBottom, prevBottom);
+    }
+
+    return { positions, maxBottom };
+  }, [snippet.annotations, expandedId]);
+
   const handlePaste = async () => {
     if (snippet.code && snippet.code.trim().length > 0) {
       const confirmPaste = window.confirm("This will replace your current code and may affect your existing notes. Continue?");
@@ -646,7 +681,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 style={getSyntaxStyle()}
                 customStyle={{
                   margin: 0,
-                  padding: '24px 24px 200px 24px', // 1.5rem -> 24px, 12rem -> ~192px (buffered to 200)
+                  padding: `24px 24px ${Math.max(200, (cardPositions.maxBottom || 0) + 80)}px 24px`,
                   background: 'transparent',
                   fontSize: '13.6px', // 0.85rem
                   lineHeight: '24px', // STRICT 24px height for alignment
@@ -703,9 +738,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
                     const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
-                    // Match SyntaxHighlighter padding: 24px, strict lineHeight: 24px
-                    // Using pixels and enforcing line height on the spans prevents theme-induced drift
-                    const topOffset = 24 + (ann.line - 1) * 24;
+                    // Use collision-resolved position instead of raw line offset
+                    const topOffset = cardPositions.positions[ann.id] ?? (24 + (ann.line - 1) * 24);
                     const isVisible = !isMinimizedMode || isActive;
 
                     return (
