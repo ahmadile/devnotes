@@ -11,6 +11,53 @@ interface MarkdownProps {
   className?: string;
 }
 
+// Code terms detection regex for render-time visual highlighting
+const CODE_TERMS_REGEX = /(\bdefaultdict(?:\s*\[[^\]]+\]|\s*\([^)]*\))?|\b[a-zA-Z_][a-zA-Z0-9_]*\([^()]*\)|\.[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*\))?|\b(?:list|set|dict|tuple|List|Set|Tuple|Dict|Union|Optional)\s*\[[^\]]+\]|\b(?:dict|tuple|int|float|str|bool|Counter|Pandas|DataFrame|Series)\b)/g;
+
+// Renders text nodes with automatic code term badges without mutating raw note content
+export const renderTextWithCodeHighlights = (node: React.ReactNode): React.ReactNode => {
+  if (typeof node === 'string') {
+    if (!node.trim()) return node;
+    const parts = node.split(CODE_TERMS_REGEX);
+    if (parts.length <= 1) return node;
+
+    return parts.map((part, index) => {
+      if (!part) return null;
+      if (index % 2 === 1) {
+        const lower = part.toLowerCase();
+        if (lower === 'e.g' || lower === 'i.e') {
+          return part;
+        }
+        return (
+          <code 
+            key={index}
+            className="font-mono text-[11px] bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded-md font-semibold tracking-tight shadow-sm inline-block my-0.5"
+          >
+            {part}
+          </code>
+        );
+      }
+      return part;
+    });
+  }
+
+  if (Array.isArray(node)) {
+    return React.Children.map(node, child => renderTextWithCodeHighlights(child));
+  }
+
+  if (React.isValidElement(node)) {
+    if (node.type === 'code' || node.type === 'a') {
+      return node;
+    }
+    const props = node.props as { children?: React.ReactNode };
+    if (props && props.children) {
+      return React.cloneElement(node, {}, renderTextWithCodeHighlights(props.children));
+    }
+  }
+
+  return node;
+};
+
 // Preserve raw text as authored or pasted by the user without destructive regex backtick insertion
 export const autoFormatMarkdown = (text: string): string => {
   return text || '';
@@ -42,7 +89,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             return <CodeBlock language={match[1]} value={codeString} />;
           },
           blockquote({ children }) {
-            return <Callout>{children}</Callout>;
+            return <Callout>{renderTextWithCodeHighlights(children)}</Callout>;
           },
           h1: ({ children }) => (
             <h1 className="text-xl font-extrabold text-indigo-400 border-b border-indigo-500/20 pb-1.5 mt-6 mb-4 font-sans tracking-wide">
@@ -61,7 +108,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
           ),
           p: ({ children }) => (
             <p className="leading-relaxed text-foreground/90 my-3 text-sm font-sans whitespace-pre-line">
-              {children}
+              {renderTextWithCodeHighlights(children)}
             </p>
           ),
           ul: ({ children }) => (
@@ -76,7 +123,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
           ),
           li: ({ children }) => (
             <li className="leading-relaxed text-foreground/90 font-sans marker:text-indigo-400">
-              {children}
+              {renderTextWithCodeHighlights(children)}
             </li>
           ),
           a: ({ href, children }) => (
@@ -91,7 +138,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
           ),
           strong: ({ children }) => (
             <strong className="font-bold text-indigo-200">
-              {children}
+              {renderTextWithCodeHighlights(children)}
             </strong>
           ),
           table: ({ children }) => (
@@ -113,7 +160,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
           ),
           td: ({ children }) => (
             <td className="px-4 py-2.5 border-t border-border/40 text-foreground/90 align-top">
-              {children}
+              {renderTextWithCodeHighlights(children)}
             </td>
           ),
           tr: ({ children }) => (
