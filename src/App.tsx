@@ -160,77 +160,9 @@ export default function App() {
     setSelection(null);
   };
 
-  const handleTextareaPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const pastedText = e.clipboardData.getData('text');
-    if (!pastedText) return;
-
-    // Detect markdown code blocks: ```[language]\n[code]```
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-    const matches: { language: string; code: string }[] = [];
-    let match;
-    
-    while ((match = codeBlockRegex.exec(pastedText)) !== null) {
-      matches.push({
-        language: match[1] || 'javascript',
-        code: match[2].trim()
-      });
-    }
-
-    if (matches.length > 0 && activeNote) {
-      e.preventDefault();
-      const confirmExtract = window.confirm(
-        `Des blocs de code ont été détectés dans votre texte collé. Souhaitez-vous les extraire en tant que snippets de code interactifs (supportant les annotations) ?`
-      );
-
-      if (confirmExtract) {
-        // Extract code blocks and add them as CodeSnippets
-        const newSnippets: CodeSnippet[] = matches.map(m => ({
-          id: Math.random().toString(36).substr(2, 9),
-          title: `${m.language.toUpperCase()} Snippet`,
-          language: m.language,
-          code: m.code,
-          annotations: [],
-          highlightedLines: []
-        }));
-
-        // Remove the code blocks from the pasted text to clean it up
-        const cleanedText = pastedText.replace(codeBlockRegex, (match, lang) => {
-          return `\n*(${lang || 'Code'} snippet extrait ci-dessous)*\n`;
-        });
-
-        // Insert the cleaned text at the current cursor position
-        const textarea = e.currentTarget;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const value = textarea.value;
-        const newValue = value.substring(0, start) + cleanedText + value.substring(end);
-
-        updateNote({
-          ...activeNote,
-          content: newValue,
-          snippets: [...activeNote.snippets, ...newSnippets]
-        });
-
-        // Focus and set selection
-        setTimeout(() => {
-          textarea.focus();
-          textarea.setSelectionRange(start + cleanedText.length, start + cleanedText.length);
-        }, 0);
-      } else {
-        // Standard insert if user cancels
-        const textarea = e.currentTarget;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const value = textarea.value;
-        const newValue = value.substring(0, start) + pastedText + value.substring(end);
-        updateNote({ ...activeNote, content: newValue });
-
-        setTimeout(() => {
-          textarea.focus();
-          textarea.setSelectionRange(start + pastedText.length, start + pastedText.length);
-        }, 0);
-      }
-    }
+  // Standard paste behavior keeps pasted content intact inside Note Content
+  const handleTextareaPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // Default native paste behavior preserves all pasted text, markdown, code blocks, spaces and formatting without interruption
   };
 
   // Auto-grow note content textarea height and prevent scroll jumping

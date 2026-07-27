@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle } from 'lucide-react';
@@ -10,44 +11,16 @@ interface MarkdownProps {
   className?: string;
 }
 
+// Preserve raw text as authored or pasted by the user without destructive regex backtick insertion
 export const autoFormatMarkdown = (text: string): string => {
-  if (!text) return '';
-
-  // Split text by protected contexts (HTML tags, markdown links/images, inline/block code, URLs, and emails)
-  const parts = text.split(/(<[^>]+>|!?\[[^\]]*\]\([^)]*\)|```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s/$.?#].[^\s]*|[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,})/g);
-
-  // Combined regex to match programming terms:
-  // 1. Relative calls/properties: .add, .add(), .foo.bar()
-  // 2. Identifier-initiated property chains or function calls: obj.prop, obj.method(), func()
-  // 3. Generic type patterns: list[str], List[int], Union[A, B]
-  // 4. Standalone programming keywords (case-sensitive)
-  const codeTermsRegex = /(\.[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?|[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?(?:\.[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?)+|[a-zA-Z_][a-zA-Z0-9_]*\([^()]*(?:\([^()]*\)[^()]*)*\)|\b(?:list|set|dict|tuple|List|Set|Tuple|Dict|Union|Optional|Vector|Map|Array)\s*\[[^\]]+\]|\b(?:dict|tuple|int|float|str|bool|Counter|Pandas|DataFrame|Series)\b)/g;
-
-  const processedParts = parts.map((part, index) => {
-    // Even indices are plain text outside of protected blocks
-    if (index % 2 === 0) {
-      return part.replace(codeTermsRegex, (match) => {
-        // Exclude common abbreviations e.g. and i.e.
-        const normalized = match.toLowerCase();
-        if (normalized === 'e.g' || normalized === 'i.e') {
-          return match;
-        }
-        return `\`${match}\``;
-      });
-    }
-    // Odd indices are protected blocks, leave untouched
-    return part;
-  });
-
-  return processedParts.join('');
+  return text || '';
 };
 
 export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
-  const formattedContent = React.useMemo(() => autoFormatMarkdown(content), [content]);
-
   return (
     <div className={className}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
           code({ className: codeClassName, children, ...props }) {
@@ -58,7 +31,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             if (isInline) {
               return (
                 <code 
-                  className="font-mono text-xs bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-1.5 py-0.5 rounded"
+                  className="font-mono text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 px-1.5 py-0.5 rounded font-semibold"
                   {...props}
                 >
                   {children}
@@ -72,7 +45,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             return <Callout>{children}</Callout>;
           },
           h1: ({ children }) => (
-            <h1 className="text-xl font-extrabold text-indigo-400 border-b border-indigo-500/10 pb-1 mt-6 mb-4 font-sans tracking-wide">
+            <h1 className="text-xl font-extrabold text-indigo-400 border-b border-indigo-500/20 pb-1.5 mt-6 mb-4 font-sans tracking-wide">
               {children}
             </h1>
           ),
@@ -87,17 +60,17 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </h3>
           ),
           p: ({ children }) => (
-            <p className="leading-relaxed text-foreground/85 my-3 text-sm font-sans">
+            <p className="leading-relaxed text-foreground/90 my-3 text-sm font-sans whitespace-pre-line">
               {children}
             </p>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-foreground/80 text-sm font-sans">
+            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-foreground/85 text-sm font-sans">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-foreground/80 text-sm font-sans">
+            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-foreground/85 text-sm font-sans">
               {children}
             </ol>
           ),
@@ -122,30 +95,35 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </strong>
           ),
           table: ({ children }) => (
-            <div className="overflow-x-auto my-4 rounded-xl border border-border/60">
-              <table className="min-w-full divide-y divide-border/60 bg-secondary/20 text-xs font-sans">
+            <div className="overflow-x-auto my-5 rounded-xl border border-border/80 shadow-md">
+              <table className="min-w-full divide-y divide-border/60 bg-secondary/30 text-xs font-sans">
                 {children}
               </table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-secondary/60">
+            <thead className="bg-secondary/80 text-foreground font-semibold">
               {children}
             </thead>
           ),
           th: ({ children }) => (
-            <th className="px-4 py-2 text-left font-bold text-muted-foreground uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-bold text-muted-foreground uppercase tracking-wider border-b border-border/60">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="px-4 py-2 border-t border-border/40 text-foreground/80">
+            <td className="px-4 py-2.5 border-t border-border/40 text-foreground/90 align-top">
               {children}
             </td>
           ),
+          tr: ({ children }) => (
+            <tr className="hover:bg-secondary/40 transition-colors">
+              {children}
+            </tr>
+          ),
         }}
       >
-        {formattedContent}
+        {content}
       </ReactMarkdown>
     </div>
   );
