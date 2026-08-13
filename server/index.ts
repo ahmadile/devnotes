@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
+import { processNoteWithAI, chatWithAI } from './aiService.js';
 import dns from 'dns';
 
 // Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
@@ -113,6 +114,37 @@ const app = express();
       res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
     }
   });
+
+  app.post('/api/ai/process-note', async (req, res) => {
+    try {
+      const { input, modules, syntaxDefinitions, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!input || typeof input !== 'string') {
+        res.status(400).json({ error: 'Input text is required' });
+        return;
+      }
+
+      const result = await processNoteWithAI({ input, modules: modules || [], syntaxDefinitions, provider, apiKey, model, ollamaUrl });
+      res.json({ ok: true, note: result });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'AI Processing error' });
+    }
+  });
+
+  app.post('/api/ai/chat', async (req, res) => {
+    try {
+      const { messages, notesContext, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!Array.isArray(messages) || messages.length === 0) {
+        res.status(400).json({ error: 'Messages array is required' });
+        return;
+      }
+
+      const reply = await chatWithAI({ messages, notesContext, provider, apiKey, model, ollamaUrl });
+      res.json({ ok: true, reply });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'AI Chat error' });
+    }
+  });
+
 
   // Serve static files when NOT running as a Vercel Serverless function
   if (!process.env.VERCEL) {

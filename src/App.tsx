@@ -4,10 +4,11 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
+import { AiAssistantModal } from './components/AiAssistantModal';
 import { cn } from './lib/utils';
 
 
@@ -83,6 +84,7 @@ export default function App() {
   const [tagInput, setTagInput] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -467,6 +469,22 @@ export default function App() {
     setActiveNoteId(newNote.id);
   };
 
+  const handleSaveAiNote = (noteData: Partial<Note>, targetModuleId?: string | null) => {
+    const newNote: Note = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: noteData.title || 'Nouvelle note IA',
+      content: noteData.content || '',
+      snippets: noteData.snippets || [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      tags: noteData.tags || [],
+      moduleId: targetModuleId || null,
+    };
+    setNotes((prev) => [newNote, ...prev]);
+    setActiveNoteId(newNote.id);
+    persistNotes([newNote, ...notes], syntaxDefinitions, modules);
+  };
+
   const updateNote = (updated: Note) => {
     setNotes((prev) => prev.map((n) => (n.id === updated.id ? { ...updated, updatedAt: Date.now() } : n)));
   };
@@ -659,6 +677,14 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
+                  <button
+                    onClick={() => setIsAiModalOpen(true)}
+                    className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer mr-2"
+                    title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Assistant IA</span>
+                  </button>
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     className="hover:text-primary transition-colors p-1.5 hover:bg-secondary rounded-md"
@@ -1206,6 +1232,17 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* AI Assistant Modal */}
+          <AiAssistantModal
+            isOpen={isAiModalOpen}
+            onClose={() => setIsAiModalOpen(false)}
+            modules={modules}
+            notes={notes}
+            activeNote={activeNote}
+            syntaxDefinitions={syntaxDefinitions}
+            onSaveNote={handleSaveAiNote}
+          />
         </div>
       </SignedIn>
     </>
