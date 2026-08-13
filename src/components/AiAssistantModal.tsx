@@ -1,6 +1,35 @@
 import React, { useState } from 'react';
 import { Note, Module, CodeSnippet, Annotation, SyntaxDefinition } from '../types';
-import { Sparkles, MessageSquare, Plus, Check, Folder, Tag, Code, Eye, RefreshCw, X, AlertCircle, FileText, Send, HelpCircle, Layers, Lightbulb, ChevronRight, Settings, Cpu, Globe, Server } from 'lucide-react';
+import {
+  Sparkles,
+  MessageSquare,
+  Plus,
+  Check,
+  Folder,
+  Tag,
+  Code,
+  Eye,
+  RefreshCw,
+  X,
+  AlertCircle,
+  FileText,
+  Send,
+  HelpCircle,
+  Layers,
+  Lightbulb,
+  ChevronRight,
+  Settings,
+  Cpu,
+  Globe,
+  Server,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  Eraser,
+  Bot,
+  Zap,
+  Brain
+} from 'lucide-react';
 import { Markdown } from './Markdown';
 import { cn } from '../lib/utils';
 
@@ -34,6 +63,23 @@ interface ProcessedAiResult {
     }[];
   }[];
 }
+
+// Custom DevNotes AI Emblem
+const DevNotesAiEmblem = ({ isThinking = false }: { isThinking?: boolean }) => (
+  <div className="relative group">
+    <div className={cn(
+      "w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-sky-400 p-0.5 shadow-lg shadow-indigo-500/25 flex items-center justify-center transition-all duration-300",
+      isThinking && "animate-pulse scale-105 shadow-indigo-500/50"
+    )}>
+      <div className="w-full h-full bg-slate-950/80 backdrop-blur-sm rounded-[10px] flex items-center justify-center">
+        <Brain className={cn("w-5 h-5 text-indigo-300 transition-transform", isThinking && "animate-spin text-sky-300")} />
+      </div>
+    </div>
+    {isThinking && (
+      <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900 animate-ping" />
+    )}
+  </div>
+);
 
 const DEFAULT_EXAMPLE_INPUT = `🔵 Titre
 Les fonctions en tant qu'objets (les bases avant les décorateurs)
@@ -132,6 +178,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // AI Provider & Key Settings
   const [aiProvider, setAiProvider] = useState<'openrouter' | 'gemini' | 'ollama' | 'openai'>(
@@ -157,6 +204,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   if (!isOpen) return null;
 
   const activeApiKey = aiProvider === 'openrouter' ? openRouterKey : geminiApiKey;
+
+  const handleClearInput = () => {
+    setInputContent('');
+    setAiResult(null);
+  };
 
   const handleSaveSettings = () => {
     localStorage.setItem('devnotes_ai_provider', aiProvider);
@@ -277,20 +329,25 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-hidden">
-      <div className="bg-card border border-primary/30 w-full max-w-5xl h-[88vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden font-sans">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-all duration-300">
+      <div
+        className={cn(
+          "bg-card border border-indigo-500/30 shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-300",
+          isMaximized
+            ? "w-full h-full rounded-none max-w-none"
+            : "w-full max-w-6xl h-[90vh] rounded-2xl"
+        )}
+      >
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-secondary/30">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-slate-900/50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/15 rounded-xl border border-indigo-500/30">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-            </div>
+            <DevNotesAiEmblem isThinking={isProcessing || isChatSending} />
             <div>
               <h2 className="text-base font-extrabold text-foreground flex items-center gap-2">
-                DevNotes AI Assistant
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono uppercase">
-                  {aiProvider === 'openrouter' ? 'OpenRouter API' : aiProvider === 'ollama' ? 'Ollama IA' : 'Gemini 2.5'}
+                DevNotes AI Engine
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-semibold">
+                  {aiProvider === 'openrouter' ? 'OpenRouter' : aiProvider === 'ollama' ? 'Ollama Local' : 'Gemini 2.5'}
                 </span>
               </h2>
               <p className="text-xs text-muted-foreground">
@@ -299,19 +356,19 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs & Close */}
+          {/* Navigation Tabs & Window Controls */}
           <div className="flex items-center gap-3">
-            <div className="flex bg-secondary p-1 rounded-xl border border-border/60">
+            <div className="flex bg-secondary/80 p-1 rounded-xl border border-border/60">
               <button
                 onClick={() => setActiveTab('generator')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
                   activeTab === 'generator'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Zap className="w-3.5 h-3.5" />
                 Générateur de Note
               </button>
               <button
@@ -319,7 +376,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
                   activeTab === 'chat'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -331,7 +388,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
                   activeTab === 'settings'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -340,12 +397,22 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               </button>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Window Resizing & Close controls */}
+            <div className="flex items-center gap-1 pl-2 border-l border-border/60">
+              <button
+                onClick={() => setIsMaximized(!isMaximized)}
+                title={isMaximized ? "Réduire la fenêtre" : "Agrandir en plein écran"}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+              >
+                {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -359,24 +426,36 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <FileText className="w-4 h-4 text-indigo-400" />
-                    Format / Texte de la Note
+                    Texte Brut / Format de la Note
                   </label>
 
-                  <button
-                    type="button"
-                    onClick={() => setInputContent(DEFAULT_EXAMPLE_INPUT)}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Charger l'exemple de note structurée
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInputContent(DEFAULT_EXAMPLE_INPUT)}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Exemple
+                    </button>
+                    {inputContent && (
+                      <button
+                        type="button"
+                        onClick={handleClearInput}
+                        className="text-xs text-rose-400 hover:text-rose-300 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eraser className="w-3 h-3" />
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <textarea
                   placeholder="Collez votre contenu de note, le format 🔵 Titre 🟡 Tags 🟢 Résumé 🔴 Code ⚫ Ligne ..., ou du texte brut..."
                   value={inputContent}
                   onChange={(e) => setInputContent(e.target.value)}
-                  className="flex-1 w-full min-h-[220px] bg-secondary/35 border border-border/80 rounded-xl p-4 text-xs font-mono text-foreground focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
+                  className="flex-1 w-full min-h-[240px] bg-secondary/35 border border-border/80 rounded-xl p-4 text-xs font-mono text-foreground focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
                 />
 
                 {/* Destination Folder Selector */}
@@ -412,7 +491,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" />
+                      <Zap className="w-4 h-4" />
                       Générer et Structurer la Note avec l'IA
                     </>
                   )}
@@ -438,10 +517,33 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   )}
                 </div>
 
-                {!aiResult ? (
+                {/* AI Processing / Thinking Animation */}
+                {isProcessing ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center animate-pulse">
+                        <Brain className="w-8 h-8 text-indigo-400 animate-spin" />
+                      </div>
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500 to-sky-400 blur-xl opacity-30 animate-pulse" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-foreground flex items-center justify-center gap-2">
+                        L'IA analyse et réfléchit à votre note...
+                        <span className="inline-flex gap-1">
+                          <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                          <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                          <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                        </span>
+                      </h4>
+                      <p className="text-xs text-muted-foreground max-w-sm">
+                        Séparation du code pur, création des sous-notes de ligne et croisement des syntaxes en cours.
+                      </p>
+                    </div>
+                  </div>
+                ) : !aiResult ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground space-y-3">
                     <div className="p-4 bg-secondary/50 rounded-full border border-border">
-                      <Sparkles className="w-8 h-8 text-indigo-400 opacity-60" />
+                      <Brain className="w-8 h-8 text-indigo-400 opacity-60" />
                     </div>
                     <p className="text-xs max-w-sm">
                       Cliquez sur <strong>"Générer et Structurer la Note"</strong> pour prévisualiser le titre, les tags, le résumé visuel et les sous-notes de code.
@@ -507,7 +609,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                             </div>
 
                             {/* Code lines preview */}
-                            <div className="bg-black/40 p-3 rounded-lg font-mono text-[11px] text-foreground/90 overflow-x-auto max-h-48 leading-relaxed">
+                            <div className="bg-black/40 p-3 rounded-lg font-mono text-[11px] text-foreground/90 overflow-x-auto max-h-56 leading-relaxed">
                               {snip.code.split('\n').map((lineText, lIdx) => {
                                 const lineNum = lIdx + 1;
                                 const matchingAnn = snip.annotations.find(a => a.line === lineNum);
@@ -591,13 +693,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   >
                     <div
                       className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold',
+                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold shadow-md',
                         m.role === 'user'
                           ? 'bg-primary text-primary-foreground'
-                          : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40'
+                          : 'bg-indigo-600 text-white'
                       )}
                     >
-                      {m.role === 'user' ? 'Vous' : 'IA'}
+                      {m.role === 'user' ? 'Vous' : <Brain className="w-4 h-4" />}
                     </div>
 
                     <div
@@ -612,6 +714,23 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     </div>
                   </div>
                 ))}
+
+                {/* AI Chat Thinking Indicator */}
+                {isChatSending && (
+                  <div className="flex gap-3 mr-auto items-center animate-pulse">
+                    <div className="w-8 h-8 rounded-full bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-indigo-300">
+                      <Brain className="w-4 h-4 animate-spin" />
+                    </div>
+                    <div className="bg-secondary/40 border border-border/80 px-4 py-3 rounded-2xl rounded-tl-none text-xs text-muted-foreground flex items-center gap-2 font-mono">
+                      <span>L'IA réfléchit</span>
+                      <span className="inline-flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Chat Input Bar */}
@@ -627,7 +746,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <button
                   onClick={handleSendChat}
                   disabled={!chatInput.trim() || isChatSending}
-                  className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5" />
                   Envoyer
@@ -782,7 +901,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <div className="flex items-center justify-end pt-3">
                   <button
                     onClick={handleSaveSettings}
-                    className="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
                   >
                     Enregistrer les Paramètres
                   </button>
