@@ -85,30 +85,29 @@ interface ProcessedAiResult {
 // Custom DevNotes AI Emblem
 export const DevNotesAiEmblem = ({ isThinking = false, size = "md" }: { isThinking?: boolean; size?: "sm" | "md" | "lg" }) => {
   const containerSize = {
-    sm: "w-6 h-6 rounded-lg",
-    md: "w-9 h-9 rounded-xl",
-    lg: "w-11 h-11 rounded-2xl",
+    sm: "w-5 h-5 rounded-md",
+    md: "w-8 h-8 rounded-lg",
+    lg: "w-10 h-10 rounded-xl",
   }[size];
 
   const iconSize = {
-    sm: "w-3.5 h-3.5",
-    md: "w-5 h-5",
-    lg: "w-6 h-6",
+    sm: "w-3 h-3",
+    md: "w-4 h-4",
+    lg: "w-5 h-5",
   }[size];
 
   return (
-    <div className="relative group flex items-center justify-center shrink-0">
+    <div className="relative inline-flex items-center justify-center shrink-0">
       <div className={cn(
-        "bg-gradient-to-br from-indigo-500 via-purple-600 to-sky-400 p-0.5 shadow-md shadow-indigo-500/25 flex items-center justify-center transition-all duration-300",
+        "flex items-center justify-center transition-all duration-300",
+        "bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 group-hover:border-indigo-500/40",
         containerSize,
-        isThinking && "animate-pulse scale-105 shadow-indigo-500/50"
+        isThinking && "animate-pulse shadow-sm shadow-indigo-500/30 border-indigo-500/50"
       )}>
-        <div className="w-full h-full bg-slate-950/80 backdrop-blur-sm rounded-[inherit] flex items-center justify-center">
-          <Brain className={cn(iconSize, "text-indigo-300 transition-transform", isThinking && "animate-spin text-sky-300")} />
-        </div>
+        <Brain className={cn(iconSize, "transition-transform", isThinking && "animate-spin text-indigo-500")} />
       </div>
       {isThinking && (
-        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900 animate-ping" />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background animate-ping" />
       )}
     </div>
   );
@@ -502,13 +501,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       >
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-slate-900/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-muted/30">
           <div className="flex items-center gap-3">
             <DevNotesAiEmblem isThinking={isProcessing || isChatSending} />
             <div>
               <h2 className="text-base font-extrabold text-foreground flex items-center gap-2">
                 DevNotes AI Engine
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-semibold">
+                <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-semibold">
                   {aiProvider === 'openrouter' ? 'OpenRouter' : aiProvider === 'ollama' ? 'Ollama Local' : 'Gemini 2.5'}
                 </span>
               </h2>
@@ -891,12 +890,12 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
               {/* History Drawer Dropdown */}
               {isHistoryOpen && (
-                <div className="absolute top-12 left-4 z-30 w-80 max-h-96 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-y-auto p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between border-b border-slate-800">
+                <div className="absolute top-12 left-4 z-30 w-80 max-h-96 bg-card border border-border shadow-2xl rounded-2xl overflow-y-auto p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between border-b border-border">
                     <span>Dernières conversations ({conversations.length})</span>
                     <button
                       onClick={() => setIsHistoryOpen(false)}
-                      className="text-slate-400 hover:text-white"
+                      className="text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -921,17 +920,17 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         className={cn(
                           "p-3 rounded-xl cursor-pointer transition-all flex items-start justify-between gap-2 group",
                           isActive
-                            ? "bg-indigo-600/20 border border-indigo-500/50 text-indigo-200"
-                            : "hover:bg-slate-800/80 text-slate-300 border border-transparent"
+                            ? "bg-indigo-500/15 border border-indigo-500/40 text-indigo-700 dark:text-indigo-300"
+                            : "hover:bg-secondary/70 text-foreground border border-transparent"
                         )}
                       >
                         <div className="space-y-1 overflow-hidden">
-                          <div className="text-xs font-bold truncate group-hover:text-indigo-300">
+                          <div className="text-xs font-bold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                             {c.title}
                           </div>
-                          <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-2">
                             <span className="flex items-center gap-1 font-mono">
-                              <Clock className="w-3 h-3 text-slate-500" />
+                              <Clock className="w-3 h-3 opacity-70" />
                               {dateStr}
                             </span>
                             <span>•</span>
@@ -942,7 +941,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         {conversations.length > 1 && (
                           <button
                             onClick={(e) => handleDeleteConversation(c.id, e)}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 transition-opacity"
+                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-opacity cursor-pointer"
                             title="Supprimer cette discussion"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

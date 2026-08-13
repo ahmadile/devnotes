@@ -679,11 +679,11 @@ export default function App() {
                 <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
                   <button
                     onClick={() => setIsAiModalOpen(true)}
-                    className="bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 flex items-center gap-2 cursor-pointer mr-2 group border border-indigo-400/30"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground bg-secondary/50 hover:bg-secondary border border-border/80 hover:border-indigo-500/40 dark:hover:border-indigo-400/40 transition-all cursor-pointer mr-1 group"
                     title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
                   >
                     <DevNotesAiEmblem size="sm" />
-                    <span>Assistant IA</span>
+                    <span className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Assistant IA</span>
                   </button>
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
