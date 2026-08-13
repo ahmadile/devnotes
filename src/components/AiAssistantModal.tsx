@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Note, Module, CodeSnippet, Annotation, SyntaxDefinition } from '../types';
 import {
   Sparkles,
@@ -28,10 +28,28 @@ import {
   Eraser,
   Bot,
   Zap,
-  Brain
+  Brain,
+  History,
+  Trash2,
+  Clock,
+  ChevronDown
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { cn } from '../lib/utils';
+
+export interface AiConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+
+export interface AiConversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: AiConversationMessage[];
+}
 
 interface AiAssistantModalProps {
   isOpen: boolean;
@@ -65,21 +83,36 @@ interface ProcessedAiResult {
 }
 
 // Custom DevNotes AI Emblem
-const DevNotesAiEmblem = ({ isThinking = false }: { isThinking?: boolean }) => (
-  <div className="relative group">
-    <div className={cn(
-      "w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-sky-400 p-0.5 shadow-lg shadow-indigo-500/25 flex items-center justify-center transition-all duration-300",
-      isThinking && "animate-pulse scale-105 shadow-indigo-500/50"
-    )}>
-      <div className="w-full h-full bg-slate-950/80 backdrop-blur-sm rounded-[10px] flex items-center justify-center">
-        <Brain className={cn("w-5 h-5 text-indigo-300 transition-transform", isThinking && "animate-spin text-sky-300")} />
+export const DevNotesAiEmblem = ({ isThinking = false, size = "md" }: { isThinking?: boolean; size?: "sm" | "md" | "lg" }) => {
+  const containerSize = {
+    sm: "w-6 h-6 rounded-lg",
+    md: "w-9 h-9 rounded-xl",
+    lg: "w-11 h-11 rounded-2xl",
+  }[size];
+
+  const iconSize = {
+    sm: "w-3.5 h-3.5",
+    md: "w-5 h-5",
+    lg: "w-6 h-6",
+  }[size];
+
+  return (
+    <div className="relative group flex items-center justify-center shrink-0">
+      <div className={cn(
+        "bg-gradient-to-br from-indigo-500 via-purple-600 to-sky-400 p-0.5 shadow-md shadow-indigo-500/25 flex items-center justify-center transition-all duration-300",
+        containerSize,
+        isThinking && "animate-pulse scale-105 shadow-indigo-500/50"
+      )}>
+        <div className="w-full h-full bg-slate-950/80 backdrop-blur-sm rounded-[inherit] flex items-center justify-center">
+          <Brain className={cn(iconSize, "text-indigo-300 transition-transform", isThinking && "animate-spin text-sky-300")} />
+        </div>
       </div>
+      {isThinking && (
+        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900 animate-ping" />
+      )}
     </div>
-    {isThinking && (
-      <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900 animate-ping" />
-    )}
-  </div>
-);
+  );
+};
 
 const DEFAULT_EXAMPLE_INPUT = `🔵 Titre
 Les fonctions en tant qu'objets (les bases avant les décorateurs)
@@ -191,15 +224,105 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Chat state
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
-    {
-      role: 'assistant',
-      content: 'Bonjour ! Je suis l\'assistant IA DevNotes (OpenRouter & Multi-modèles). Posez-moi des questions sur vos notes, votre code, ou demandez-moi d\'expliquer un snippet !',
-    },
-  ]);
+  // Persistent Chat History state
+  const [conversations, setConversations] = useState<AiConversation[]>(() => {
+    try {
+      const saved = localStorage.getItem('devnotes_ai_conversations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse AI conversations from storage', e);
+    }
+    return [{
+      id: 'conv_default',
+      title: 'Accueil & Assistant DevNotes',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          role: 'assistant',
+          content: "Bonjour ! Je suis l'assistant IA DevNotes (OpenRouter & Multi-modèles). Posez-moi des questions sur vos notes, votre code, ou demandez-moi d'expliquer un snippet !",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ],
+    }];
+  });
+
+  const [activeConvId, setActiveConvId] = useState<string>(() => {
+    const savedLast = localStorage.getItem('devnotes_ai_last_conv_id');
+    if (savedLast) return savedLast;
+    return conversations[0]?.id || 'conv_default';
+  });
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isChatSending, setIsChatSending] = useState(false);
+
+  // Active conversation & messages
+  const activeConv = conversations.find(c => c.id === activeConvId) || conversations[0] || {
+    id: 'conv_default',
+    title: 'Accueil & Assistant DevNotes',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    messages: [],
+  };
+  const messages = activeConv.messages || [];
+
+  const saveConversations = (updatedConvs: AiConversation[]) => {
+    setConversations(updatedConvs);
+    try {
+      localStorage.setItem('devnotes_ai_conversations', JSON.stringify(updatedConvs));
+    } catch (e) {
+      console.error('Failed to save conversations to localStorage', e);
+    }
+  };
+
+  const handleNewConversation = () => {
+    const newConv: AiConversation = {
+      id: `conv_${Date.now()}`,
+      title: `Discussion #${conversations.length + 1}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          role: 'assistant',
+          content: "Nouvelle discussion démarrée ! Posez votre question ou collez votre extrait de code.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ],
+    };
+    const updated = [newConv, ...conversations];
+    saveConversations(updated);
+    setActiveConvId(newConv.id);
+    localStorage.setItem('devnotes_ai_last_conv_id', newConv.id);
+    setIsHistoryOpen(false);
+  };
+
+  const handleDeleteConversation = (convId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const filtered = conversations.filter(c => c.id !== convId);
+    const fallbackConv: AiConversation = {
+      id: `conv_${Date.now()}`,
+      title: 'Nouvelle discussion',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          role: 'assistant',
+          content: "Bonjour ! Comment puis-je vous aider ?",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ],
+    };
+    const nextList = filtered.length > 0 ? filtered : [fallbackConv];
+    saveConversations(nextList);
+    if (activeConvId === convId) {
+      setActiveConvId(nextList[0].id);
+      localStorage.setItem('devnotes_ai_last_conv_id', nextList[0].id);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -289,10 +412,30 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const handleSendChat = async () => {
     if (!chatInput.trim() || isChatSending) return;
 
-    const userMessage = chatInput.trim();
+    const userMessageText = chatInput.trim();
     setChatInput('');
-    const updatedMessages = [...messages, { role: 'user' as const, content: userMessage }];
-    setMessages(updatedMessages);
+    const userMsg: AiConversationMessage = {
+      role: 'user',
+      content: userMessageText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const updatedMessages = [...messages, userMsg];
+    
+    let newTitle = activeConv.title;
+    if (activeConv.title.startsWith('Discussion #') || activeConv.title.startsWith('Accueil &') || activeConv.title === 'Nouvelle discussion') {
+      newTitle = userMessageText.length > 32 ? userMessageText.slice(0, 32) + '...' : userMessageText;
+    }
+
+    const updatedConv: AiConversation = {
+      ...activeConv,
+      title: newTitle,
+      updatedAt: new Date().toISOString(),
+      messages: updatedMessages,
+    };
+
+    const updatedConvs = conversations.map(c => c.id === activeConv.id ? updatedConv : c);
+    saveConversations(updatedConvs);
     setIsChatSending(true);
 
     try {
@@ -304,7 +447,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: updatedMessages,
+          messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
           notesContext: notesSummary,
           provider: aiProvider,
           apiKey: activeApiKey.trim() || undefined,
@@ -316,13 +459,32 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.ok && data.reply) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+        const assistantMsg: AiConversationMessage = {
+          role: 'assistant',
+          content: data.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        const finalMessages = [...updatedMessages, assistantMsg];
+        const finalConv: AiConversation = {
+          ...updatedConv,
+          updatedAt: new Date().toISOString(),
+          messages: finalMessages,
+        };
+        saveConversations(conversations.map(c => c.id === activeConv.id ? finalConv : c));
       }
     } catch (err: any) {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: `Désolé, une erreur est survenue: ${err.message}` },
-      ]);
+      const errorMsg: AiConversationMessage = {
+        role: 'assistant',
+        content: `Désolé, une erreur est survenue: ${err.message || 'Erreur réseau'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      const finalMessages = [...updatedMessages, errorMsg];
+      const finalConv: AiConversation = {
+        ...updatedConv,
+        updatedAt: new Date().toISOString(),
+        messages: finalMessages,
+      };
+      saveConversations(conversations.map(c => c.id === activeConv.id ? finalConv : c));
     } finally {
       setIsChatSending(false);
     }
@@ -681,7 +843,118 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
           {/* Chat Tab */}
           {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-card">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-card relative">
+              {/* Chat Sub-Header / History Bar */}
+              <div className="px-5 py-3 border-b border-border/80 bg-secondary/30 flex items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                    className="flex items-center gap-2 text-xs font-bold text-indigo-300 hover:text-indigo-200 bg-indigo-500/15 border border-indigo-500/30 px-3 py-1.5 rounded-xl transition-all cursor-pointer hover:bg-indigo-500/25"
+                    title="Afficher vos conversations précédentes"
+                  >
+                    <History className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Dernières conversations</span>
+                    <span className="bg-indigo-500/40 text-indigo-200 text-[10px] font-mono px-1.5 py-0.5 rounded-full">
+                      {conversations.length}
+                    </span>
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", isHistoryOpen && "rotate-180")} />
+                  </button>
+
+                  <div className="h-4 w-px bg-border hidden sm:block" />
+
+                  <span className="text-xs font-semibold text-foreground truncate max-w-[200px] sm:max-w-[300px] hidden sm:inline-block">
+                    {activeConv.title}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleNewConversation}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
+                    title="Démarrer une nouvelle discussion"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Nouvelle conversation</span>
+                  </button>
+
+                  {conversations.length > 1 && (
+                    <button
+                      onClick={(e) => handleDeleteConversation(activeConv.id, e)}
+                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
+                      title="Supprimer la conversation actuelle"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* History Drawer Dropdown */}
+              {isHistoryOpen && (
+                <div className="absolute top-12 left-4 z-30 w-80 max-h-96 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-y-auto p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between border-b border-slate-800">
+                    <span>Dernières conversations ({conversations.length})</span>
+                    <button
+                      onClick={() => setIsHistoryOpen(false)}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {conversations.map((c) => {
+                    const isActive = c.id === activeConv.id;
+                    const dateStr = new Date(c.updatedAt).toLocaleDateString([], {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => {
+                          setActiveConvId(c.id);
+                          localStorage.setItem('devnotes_ai_last_conv_id', c.id);
+                          setIsHistoryOpen(false);
+                        }}
+                        className={cn(
+                          "p-3 rounded-xl cursor-pointer transition-all flex items-start justify-between gap-2 group",
+                          isActive
+                            ? "bg-indigo-600/20 border border-indigo-500/50 text-indigo-200"
+                            : "hover:bg-slate-800/80 text-slate-300 border border-transparent"
+                        )}
+                      >
+                        <div className="space-y-1 overflow-hidden">
+                          <div className="text-xs font-bold truncate group-hover:text-indigo-300">
+                            {c.title}
+                          </div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                            <span className="flex items-center gap-1 font-mono">
+                              <Clock className="w-3 h-3 text-slate-500" />
+                              {dateStr}
+                            </span>
+                            <span>•</span>
+                            <span>{c.messages.length} msg</span>
+                          </div>
+                        </div>
+
+                        {conversations.length > 1 && (
+                          <button
+                            onClick={(e) => handleDeleteConversation(c.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 transition-opacity"
+                            title="Supprimer cette discussion"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {messages.map((m, idx) => (
                   <div
@@ -711,6 +984,14 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       )}
                     >
                       <Markdown content={m.content} />
+                      {m.timestamp && (
+                        <div className={cn(
+                          "text-[9px] font-mono mt-1 opacity-60 text-right",
+                          m.role === 'user' ? "text-primary-foreground/70" : "text-muted-foreground"
+                        )}>
+                          {m.timestamp}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

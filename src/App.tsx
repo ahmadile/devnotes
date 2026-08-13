@@ -8,7 +8,7 @@ import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, 
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
-import { AiAssistantModal } from './components/AiAssistantModal';
+import { AiAssistantModal, DevNotesAiEmblem } from './components/AiAssistantModal';
 import { cn } from './lib/utils';
 
 
@@ -679,10 +679,10 @@ export default function App() {
                 <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
                   <button
                     onClick={() => setIsAiModalOpen(true)}
-                    className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer mr-2"
+                    className="bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 flex items-center gap-2 cursor-pointer mr-2 group border border-indigo-400/30"
                     title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <DevNotesAiEmblem size="sm" />
                     <span>Assistant IA</span>
                   </button>
                   <button 
