@@ -385,21 +385,21 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   /** Estimate the rendered height of an annotation card (in px). */
   const estimateCardHeight = (ann: Annotation, isExpanded: boolean): number => {
-    // Base: padding (16+16) + header (~18) + text (~20 per ~60 chars) + button (~20 if fullContext)
-    const textLines = Math.ceil((ann.text?.length || 20) / 50);
-    let h = 48 + textLines * 18;
-    if (ann.fullContext) h += 22; // "Read Full Context" button
+    // Base: padding (16+16) + header (~26) + text (~20 per ~36 chars) + button (~26 if fullContext)
+    const textLines = Math.max(1, Math.ceil((ann.text?.length || 20) / 36));
+    let h = 58 + textLines * 20;
+    if (ann.fullContext) h += 28; // "Read Full Context" button
     if (isExpanded && ann.fullContext) {
-      const contextLines = Math.ceil((ann.fullContext.length || 40) / 50);
-      h += 32 + contextLines * 16; // border-t + padding + content
-      h = Math.min(h, 400); // max-h-[400px] on the card
+      const contextLines = Math.max(2, Math.ceil((ann.fullContext.length || 40) / 36));
+      h += 36 + contextLines * 18; // border-t + padding + content
+      h = Math.min(h, 450); // max-h on the card
     }
     return h;
   };
 
   /** Compute collision-resolved card positions so cards don't overlap. */
   const cardPositions = useMemo(() => {
-    const GAP = 8; // min vertical gap between cards
+    const GAP = 10; // min vertical gap between cards
     const sorted = [...snippet.annotations].sort((a, b) => a.line - b.line);
     const positions: Record<string, number> = {};
     let prevBottom = 0;
@@ -681,7 +681,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 style={getSyntaxStyle()}
                 customStyle={{
                   margin: 0,
-                  padding: `24px 24px ${snippet.annotations.length > 0 ? Math.max(24, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 24) : 24}px 24px`,
+                  padding: `24px 24px ${snippet.annotations.length > 0 ? Math.max(64, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 120) : 24}px 24px`,
                   background: 'transparent',
                   fontSize: '13.6px', // 0.85rem
                   lineHeight: '24px', // STRICT 24px height for alignment
@@ -747,15 +747,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                         key={ann.id}
                         initial={{ opacity: 0, x: 20, scale: 0.95 }}
                         animate={{ 
-                          opacity: isVisible ? (hoveredLine === null || isActive ? 1 : 0.2) : 0, 
-                          x: isActive ? -5 : 0,
-                          scale: isActive ? 1 : 0.98,
+                          opacity: isVisible ? (hoveredLine === null || isActive ? 1 : 0.35) : 0, 
+                          x: isActive ? -6 : 0,
+                          scale: isActive ? 1.02 : 0.98,
                           pointerEvents: isVisible ? 'auto' : 'none'
                         }}
                         exit={{ opacity: 0, x: 20, scale: 0.95 }}
                         className={cn(
-                          "absolute right-0 w-full floating-card rounded-xl border-l-[3px] shadow-2xl group/card overflow-hidden transition-all duration-300",
-                          isActive ? "shadow-primary/20 ring-1 ring-primary/20" : "grayscale-[0.5] opacity-90"
+                          "absolute right-0 w-full floating-card rounded-xl border-l-[3px] shadow-xl group/card overflow-hidden transition-all duration-200",
+                          isActive ? "ring-2 ring-primary/40 shadow-primary/20 z-50 opacity-100 grayscale-0" : "grayscale-[0.2] opacity-95"
                         )}
                         style={{ 
                           borderColor: ann.color || 'var(--primary)',

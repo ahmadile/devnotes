@@ -58,7 +58,7 @@ interface AiAssistantModalProps {
   notes: Note[];
   activeNote: Note | null;
   syntaxDefinitions?: Record<string, SyntaxDefinition>;
-  onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null) => void;
+  onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null, updateExistingId?: string | null) => void;
 }
 
 interface ProcessedAiResult {
@@ -374,7 +374,33 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     }
   };
 
-  const handleCreateNoteFromAi = () => {
+  const handleLoadActiveNote = () => {
+    if (!activeNote) return;
+
+    let formatted = `🔵 Titre\n${activeNote.title}\n\n`;
+    if (activeNote.tags && activeNote.tags.length > 0) {
+      formatted += `🟡 Tags\n${activeNote.tags.join(', ')}\n\n`;
+    }
+    if (activeNote.content) {
+      formatted += `🟢 Résumé\n${activeNote.content}\n\n`;
+    }
+    if (activeNote.snippets && activeNote.snippets.length > 0) {
+      const s = activeNote.snippets[0];
+      formatted += `🔴 Bloc logique du code\n⚪ Titre : ${s.title || 'Bloc de code'}\n\`\`\`${s.language || 'python'}\n${s.code || ''}\n\`\`\`\n\n`;
+      if (s.annotations && s.annotations.length > 0) {
+        formatted += s.annotations
+          .map(a => `⚫ Ligne ${a.line} : ${a.text}${a.fullContext && a.fullContext !== a.text ? ` — ${a.fullContext}` : ''}`)
+          .join('\n');
+      }
+    }
+
+    setInputContent(formatted.trim());
+    if (activeNote.moduleId) {
+      setSelectedModuleId(activeNote.moduleId);
+    }
+  };
+
+  const handleCreateNoteFromAi = (isUpdate: boolean = false) => {
     if (!aiResult) return;
 
     const formattedSnippets: CodeSnippet[] = (aiResult.snippets || []).map((s, index) => ({
@@ -395,15 +421,28 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       })),
     }));
 
-    onSaveNote(
-      {
-        title: aiResult.title,
-        tags: aiResult.tags,
-        content: aiResult.content,
-        snippets: formattedSnippets,
-      },
-      selectedModuleId
-    );
+    if (isUpdate && activeNote) {
+      onSaveNote(
+        {
+          title: aiResult.title,
+          tags: aiResult.tags,
+          content: aiResult.content,
+          snippets: formattedSnippets,
+        },
+        selectedModuleId || activeNote.moduleId,
+        activeNote.id
+      );
+    } else {
+      onSaveNote(
+        {
+          title: aiResult.title,
+          tags: aiResult.tags,
+          content: aiResult.content,
+          snippets: formattedSnippets,
+        },
+        selectedModuleId
+      );
+    }
 
     onClose();
   };
@@ -584,6 +623,29 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               
               {/* Left Column: Input Prompt & Controls */}
               <div className="p-6 flex flex-col h-full bg-secondary/10 space-y-4 overflow-y-auto">
+                {/* Active Note Banner if available */}
+                {activeNote && (
+                  <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-indigo-400 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">Note active : {activeNote.title}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {activeNote.snippets?.length ? `${activeNote.snippets[0].annotations?.length || 0} sous-notes de code` : 'Aucun code'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLoadActiveNote}
+                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 transition-colors shadow-sm cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      📥 Charger la note active
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <FileText className="w-4 h-4 text-indigo-400" />
@@ -613,7 +675,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 </div>
 
                 <textarea
-                  placeholder="Collez votre contenu de note, le format 🔵 Titre 🟡 Tags 🟢 Résumé 🔴 Code ⚫ Ligne ..., ou du texte brut..."
+                  placeholder="Collez votre contenu de note, le format 🔵 Titre 🟡 Tags 🟢 Résumé 🔴 Code ⚫ Ligne ..., ou chargez la note active pour la restructurer..."
                   value={inputContent}
                   onChange={(e) => setInputContent(e.target.value)}
                   className="flex-1 w-full min-h-[240px] bg-secondary/35 border border-border/80 rounded-xl p-4 text-xs font-mono text-foreground focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
@@ -668,13 +730,26 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </span>
 
                   {aiResult && (
-                    <button
-                      onClick={handleCreateNoteFromAi}
-                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Check className="w-4 h-4" />
-                      Enregistrer dans DevNotes
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {activeNote && (
+                        <button
+                          onClick={() => handleCreateNoteFromAi(true)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                          title="Met à jour la note actuellement ouverte"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Mettre à jour la note active
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleCreateNoteFromAi(false)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                        title="Créer une nouvelle note distincte"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        {activeNote ? 'Créer comme nouvelle' : 'Enregistrer dans DevNotes'}
+                      </button>
+                    </div>
                   )}
                 </div>
 

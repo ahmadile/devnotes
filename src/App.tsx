@@ -469,7 +469,32 @@ export default function App() {
     setActiveNoteId(newNote.id);
   };
 
-  const handleSaveAiNote = (noteData: Partial<Note>, targetModuleId?: string | null) => {
+  const handleSaveAiNote = (
+    noteData: Partial<Note>,
+    targetModuleId?: string | null,
+    updateExistingId?: string | null
+  ) => {
+    if (updateExistingId) {
+      const updatedNotes = notes.map((n) => {
+        if (n.id === updateExistingId) {
+          return {
+            ...n,
+            title: noteData.title || n.title,
+            content: noteData.content !== undefined ? noteData.content : n.content,
+            snippets: noteData.snippets || n.snippets,
+            tags: noteData.tags || n.tags,
+            moduleId: targetModuleId !== undefined ? targetModuleId : n.moduleId,
+            updatedAt: Date.now(),
+          };
+        }
+        return n;
+      });
+      setNotes(updatedNotes);
+      setActiveNoteId(updateExistingId);
+      persistNotes(updatedNotes, syntaxDefinitions, modules);
+      return;
+    }
+
     const newNote: Note = {
       id: Math.random().toString(36).substr(2, 9),
       title: noteData.title || 'Nouvelle note IA',
@@ -480,9 +505,10 @@ export default function App() {
       tags: noteData.tags || [],
       moduleId: targetModuleId || null,
     };
-    setNotes((prev) => [newNote, ...prev]);
+    const nextNotes = [newNote, ...notes];
+    setNotes(nextNotes);
     setActiveNoteId(newNote.id);
-    persistNotes([newNote, ...notes], syntaxDefinitions, modules);
+    persistNotes(nextNotes, syntaxDefinitions, modules);
   };
 
   const updateNote = (updated: Note) => {

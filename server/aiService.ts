@@ -161,8 +161,7 @@ export function fallbackProcessNote(
   }
 
   // Generate precision Annotations mapped to line numbers in codeText
-  const annotations: GeneratedAnnotation[] = [];
-  const codeLinesArray = codeText.split('\n');
+  const rawAnnotations: GeneratedAnnotation[] = [];
 
   for (let idx = 0; idx < rawLineAnnotations.length; idx++) {
     const item = rawLineAnnotations[idx];
@@ -170,35 +169,26 @@ export function fallbackProcessNote(
     let shortTitle = fullText;
     let fullContext = '';
 
-    if (fullText.includes(' : ')) {
+    // Handle "code — explanation" or "Ligne X : code — explanation" or "code : explanation"
+    if (fullText.includes(' — ')) {
+      const parts = fullText.split(' — ');
+      shortTitle = parts[0].trim();
+      fullContext = parts.slice(1).join(' — ').trim();
+    } else if (fullText.includes(' : ')) {
       const parts = fullText.split(' : ');
       shortTitle = parts[0].trim();
       fullContext = parts.slice(1).join(' : ').trim();
     }
 
-    let targetLine = -1;
-    let targetEndLine: number | undefined = undefined;
+    let explicitLine: number | undefined = undefined;
+    let explicitEndLine: number | undefined = undefined;
 
     const lineNumMatch = shortTitle.match(/Ligne\s+(\d+)(?:\s*-\s*(\d+))?/i);
     if (lineNumMatch) {
-      targetLine = parseInt(lineNumMatch[1], 10);
+      explicitLine = parseInt(lineNumMatch[1], 10);
       if (lineNumMatch[2]) {
-        targetEndLine = parseInt(lineNumMatch[2], 10);
+        explicitEndLine = parseInt(lineNumMatch[2], 10);
       }
-    } else {
-      const cleanSnippetTarget = shortTitle.replace(/^Ligne\s*/i, '').split(':')[0].trim();
-      if (cleanSnippetTarget) {
-        for (let l = 0; l < codeLinesArray.length; l++) {
-          if (codeLinesArray[l].includes(cleanSnippetTarget) || (cleanSnippetTarget.length > 5 && codeLinesArray[l].toLowerCase().includes(cleanSnippetTarget.toLowerCase()))) {
-            targetLine = l + 1;
-            break;
-          }
-        }
-      }
-    }
-
-    if (targetLine === -1 || targetLine > codeLinesArray.length) {
-      targetLine = Math.min(Math.max(1, (idx + 1) * Math.floor(codeLinesArray.length / (rawLineAnnotations.length + 1))), Math.max(1, codeLinesArray.length));
     }
 
     let type: GeneratedAnnotation['type'] = 'logic';
@@ -210,15 +200,18 @@ export function fallbackProcessNote(
       type = 'tip';
     }
 
-    annotations.push({
-      line: targetLine,
-      endLine: targetEndLine || targetLine,
+    rawAnnotations.push({
+      line: explicitLine || (idx + 1),
+      endLine: explicitEndLine || explicitLine || (idx + 1),
       text: shortTitle,
       fullContext: fullContext || fullText,
       type,
       color: ANNOTATION_COLORS[type],
     });
   }
+
+  // Align annotations with exact line numbers in codeText
+  const annotations = alignAnnotationsWithCode(rawAnnotations, codeText);
 
   // Cross-reference existing syntax definitions to auto-add green tag references
   const syntaxKeys = Object.keys(syntaxDefinitions || {});
@@ -253,6 +246,130 @@ export function fallbackProcessNote(
 }
 
 /**
+ * Intelligent line locator to match annotations to actual code lines.
+ * Automatically aligns annotations with exact line numbers in the code.
+ */
+export function alignAnnotationsWithCode(
+  annotations: GeneratedAnnotation[],
+  codeText: string
+): GeneratedAnnotation[] {
+  if (!codeText || !annotations || annotations.length === 0) return annotations;
+  const codeLines = codeText.split('\n');
+
+  return annotations.map((ann, idx) => {
+    let candidates: string[] = [];
+    
+    if (ann.text) {
+      if (ann.text.includes(' — ')) {
+        candidates.push(ann.text.split(' — ')[0].trim());
+      } else if (ann.text.includes(' - ')) {
+        candidates.push(ann.text.split(' - ')[0].trim());
+      } else if (ann.text.includes(' : ')) {
+        candidates.push(ann.text.split(' : ')[0].trim());
+      } else if (ann.text.includes(':')) {
+        candidates.push(ann.text.split(':')[0].trim());
+      }
+      candidates.push(ann.text.trim());
+    }
+
+    if (ann.fullContext) {
+      if (ann.fullContext.includes(' — ')) {
+        candidates.push(ann.fullContext.split(' — ')[0].trim());
+      }
+    }
+
+    // Clean candidates: remove leading markers like "⚫", "Ligne X", etc.
+    candidates = candidates
+      .map(c => c.replace(/^(?:⚫\s*)?(?:Ligne\s*\d+\s*[-:]?\s*|Line\s*\d+\s*[-:]?\s*)/i, '').trim())
+      .filter(Boolean);
+
+    let matchedLine = -1;
+
+    // 1. Direct substring search
+    for (const cand of candidates) {
+      if (!cand || cand.length < 2) continue;
+      const cleanCand = cand.replace(/#.*$/, '').trim();
+      if (!cleanCand) continue;
+
+      for (let l = 0; l < codeLines.length; l++) {
+        const lineContent = codeLines[l].trim();
+        if (lineContent.includes(cleanCand) || (cleanCand.length > 5 && lineContent.length > 3 && cleanCand.includes(lineContent))) {
+          matchedLine = l + 1;
+          break;
+        }
+      }
+      if (matchedLine !== -1) break;
+    }
+
+    // 2. Token-based matching
+    if (matchedLine === -1) {
+      for (const cand of candidates) {
+        const tokens = cand.match(/[a-zA-Z_@]\w*(?:\.[a-zA-Z_]\w*)?/g) || [];
+        const validTokens = tokens.filter(t => t.length > 2 && !['def', 'return', 'import', 'from', 'for', 'in', 'if', 'else'].includes(t.toLowerCase()));
+        
+        if (validTokens.length > 0) {
+          let bestScore = 0;
+          let bestLine = -1;
+
+          for (let l = 0; l < codeLines.length; l++) {
+            const lineContent = codeLines[l];
+            let score = 0;
+            for (const tok of validTokens) {
+              if (lineContent.includes(tok)) {
+                score += tok.length;
+              }
+            }
+            if (score > bestScore) {
+              bestScore = score;
+              bestLine = l + 1;
+            }
+          }
+
+          if (bestScore >= 3 && bestLine !== -1) {
+            matchedLine = bestLine;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: check if original ann.line is within bounds and reasonable
+    if (matchedLine === -1) {
+      if (ann.line >= 1 && ann.line <= codeLines.length) {
+        matchedLine = ann.line;
+      } else {
+        matchedLine = Math.min(Math.max(1, (idx + 1) * Math.floor(codeLines.length / (annotations.length + 1))), codeLines.length);
+      }
+    }
+
+    const span = (ann.endLine && ann.endLine >= ann.line) ? (ann.endLine - ann.line) : 0;
+    const endLine = Math.min(codeLines.length, matchedLine + span);
+
+    return {
+      ...ann,
+      line: matchedLine,
+      endLine: endLine >= matchedLine ? endLine : matchedLine,
+    };
+  });
+}
+
+function sanitizeAndAlignNoteResult(parsed: GeneratedNoteResult): GeneratedNoteResult {
+  if (parsed.snippets && Array.isArray(parsed.snippets)) {
+    parsed.snippets.forEach(s => {
+      if (s.annotations && Array.isArray(s.annotations)) {
+        s.annotations.forEach(a => {
+          if (!a.color) a.color = ANNOTATION_COLORS[a.type] || '#6366f1';
+        });
+        if (s.code) {
+          s.annotations = alignAnnotationsWithCode(s.annotations, s.code);
+        }
+      }
+    });
+  }
+  return parsed;
+}
+
+/**
  * Process a note using Gemini, OpenRouter, Ollama, or OpenAI-compatible APIs.
  */
 export async function processNoteWithAI(req: ProcessNoteRequest): Promise<GeneratedNoteResult> {
@@ -279,6 +396,7 @@ Directives de réponse :
 3. Code Snippet & Annotations de ligne (Sous-notes de code) :
    - Extraire le code source exact.
    - Pour CHAQUE explication de ligne (ex: "⚫ Ligne x = my_function ..."), calcule la ligne EXACTE (1-indexed) où ce code apparaît dans le snippet de code.
+   - Le champ 'text' de l'annotation doit mentionner le code exact (ex: "@functools.wraps(func) — préserve les métadonnées").
    - Crée une annotation avec 'line', 'endLine', 'text' (résumé court), 'fullContext' (explication détaillée), et 'type' ('logic'|'warning'|'tip'|'important'|'debug').
 
 Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
@@ -330,7 +448,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
         if (text) {
           const parsed = JSON.parse(text) as GeneratedNoteResult;
           if (parsed && parsed.title && parsed.content) {
-            return parsed;
+            return sanitizeAndAlignNoteResult(parsed);
           }
         }
       }
@@ -360,7 +478,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
         if (text) {
           const parsed = JSON.parse(text) as GeneratedNoteResult;
           if (parsed && parsed.title && parsed.content) {
-            return parsed;
+            return sanitizeAndAlignNoteResult(parsed);
           }
         }
       }
@@ -383,16 +501,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
       if (responseText) {
         const parsed = JSON.parse(responseText) as GeneratedNoteResult;
         if (parsed && parsed.title && parsed.content) {
-          if (parsed.snippets) {
-            parsed.snippets.forEach(s => {
-              if (s.annotations) {
-                s.annotations.forEach(a => {
-                  if (!a.color) a.color = ANNOTATION_COLORS[a.type] || '#6366f1';
-                });
-              }
-            });
-          }
-          return parsed;
+          return sanitizeAndAlignNoteResult(parsed);
         }
       }
     } catch (err) {
