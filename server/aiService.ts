@@ -191,6 +191,12 @@ export function fallbackProcessNote(
       }
     }
 
+    // Clean leading markers from shortTitle
+    shortTitle = shortTitle
+      .replace(/^(?:⚫\s*)?(?:Ligne\s*\d+(?:\s*-\s*\d+)?\s*[-:]?\s*|Line\s*\d+(?:\s*-\s*\d+)?\s*[-:]?\s*)/i, '')
+      .trim();
+    if (!shortTitle) shortTitle = fullText;
+
     let type: GeneratedAnnotation['type'] = 'logic';
     if (fullText.toLowerCase().includes('piège') || fullText.toLowerCase().includes('erreur') || fullText.toLowerCase().includes('attention')) {
       type = 'warning';
