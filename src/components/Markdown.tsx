@@ -141,30 +141,35 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
               {renderTextWithCodeHighlights(children)}
             </strong>
           ),
+          pre: ({ children }) => (
+            <div className="my-4 overflow-hidden rounded-xl border border-border/70 bg-secondary/40 shadow-md">
+              {children}
+            </div>
+          ),
           table: ({ children }) => (
-            <div className="overflow-x-auto my-5 rounded-xl border border-border/80 shadow-md">
-              <table className="min-w-full divide-y divide-border/60 bg-secondary/30 text-xs font-sans">
+            <div className="overflow-x-auto my-5 rounded-xl border border-border/80 bg-secondary/20 shadow-md backdrop-blur-sm">
+              <table className="min-w-full divide-y divide-border/60 text-xs font-sans">
                 {children}
               </table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-secondary/80 text-foreground font-semibold">
+            <thead className="bg-secondary/80 border-b border-indigo-500/30 text-foreground font-semibold">
               {children}
             </thead>
           ),
           th: ({ children }) => (
-            <th className="px-4 py-3 text-left font-bold text-muted-foreground uppercase tracking-wider border-b border-border/60">
+            <th className="px-4 py-3 text-left font-bold text-indigo-300 uppercase tracking-wider text-[11px]">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="px-4 py-2.5 border-t border-border/40 text-foreground/90 align-top">
+            <td className="px-4 py-3 border-t border-border/30 text-foreground/90 align-middle">
               {renderTextWithCodeHighlights(children)}
             </td>
           ),
           tr: ({ children }) => (
-            <tr className="hover:bg-secondary/40 transition-colors">
+            <tr className="even:bg-secondary/15 hover:bg-indigo-500/10 transition-colors">
               {children}
             </tr>
           ),

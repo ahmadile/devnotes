@@ -796,7 +796,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                     style={getSyntaxStyle()}
                     customStyle={{
                       margin: 0,
-                      padding: `24px 24px ${snippet.annotations.length > 0 ? Math.max(64, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 120) : 24}px 24px`,
+                      padding: `24px ${snippet.annotations.length > 0 ? 'min(360px, 45%)' : '24px'} ${snippet.annotations.length > 0 ? Math.max(64, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 120) : 24}px 24px`,
                       background: 'transparent',
                       fontSize: '13.6px', // 0.85rem
                       lineHeight: '24px', // STRICT 24px height for alignment
@@ -823,7 +823,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                             ? 'rgba(99, 102, 241, 0.2)' 
                             : isInActiveBlock 
                               ? isHovered 
-                                ? (ANNOTATION_COLORS.find(c => c.value === activeAnnotation?.color)?.bg.replace('0.1', '0.2') || 'rgba(99, 102, 241, 0.1)')
+                                ? (ANNOTATION_COLORS.find(c => c.value === activeAnnotation?.color)?.bg.replace('0.1', '0.2') || 'rgba(99, 102, 241, 0.2)')
                                 : (ANNOTATION_COLORS.find(c => c.value === activeAnnotation?.color)?.bg || 'rgba(99, 102, 241, 0.05)')
                               : 'transparent',
                           borderLeft: isBeingSelected 
@@ -831,21 +831,49 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                             : isInActiveBlock 
                               ? `3px solid ${activeAnnotation?.color || '#6366f1'}`
                               : '3px solid transparent',
-                          transition: 'all 0.15s ease',
-                          opacity: isDragging && !isBeingSelected ? 0.6 : 1
+                          paddingLeft: '8px',
+                          transition: 'background-color 0.15s ease, border-color 0.15s ease',
                         },
                         onMouseDown: () => handleMouseDown(lineNumber),
-                        onMouseEnter: () => handleMouseEnterLine(lineNumber),
+                        onMouseEnter: () => setHoveredLine(lineNumber),
                         onMouseLeave: () => setHoveredLine(null),
-                        className: cn(
-                          'relative select-none',
-                          isInActiveBlock && 'group/line'
-                        )
                       };
                     }}
                   >
                     {snippet.code || '// No code provided'}
                   </SyntaxHighlighter>
+
+                  {/* Mobile / Small Screen Inline Fallback when in lateral mode (< lg) */}
+                  {snippet.annotations.length > 0 && (
+                    <div className="lg:hidden p-4 border-t border-border bg-secondary/15 space-y-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
+                        <span>Sous-notes ({snippet.annotations.length})</span>
+                        <span className="text-[10px] text-primary">Vue responsive</span>
+                      </div>
+                      {snippet.annotations.map(ann => (
+                        <div 
+                          key={`mobile-ann-${ann.id}`}
+                          className="p-3 rounded-xl border border-border/70 bg-card/80 shadow-sm"
+                          style={{ borderLeftColor: ann.color || '#6366f1', borderLeftWidth: '3px' }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span 
+                              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md"
+                              style={{ backgroundColor: `${ann.color || '#6366f1'}20`, color: ann.color || '#6366f1' }}
+                            >
+                              L{ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
+                            </span>
+                            <span className="text-xs font-semibold text-foreground flex-1 truncate">{ann.text}</span>
+                          </div>
+                          {ann.fullContext && (
+                            <div className="mt-2 text-xs text-muted-foreground border-t border-border/40 pt-2">
+                              <Markdown content={ann.fullContext} />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* SVG Laser Beam Connectors for Active/Hovered Annotation */}
                   <svg className="absolute inset-0 pointer-events-none w-full h-full z-20 overflow-visible hidden lg:block">
@@ -868,7 +896,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                             className="animate-pulse"
                             style={{ filter: `drop-shadow(0 0 6px ${ann.color || '#6366f1'})` }}
                           />
-                          <circle cx="120" cy={lineY} r="3.5" fill={ann.color || '#6366f1'} />
                         </g>
                       );
                     })}
@@ -898,45 +925,58 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                             exit={{ opacity: 0, x: 20, scale: 0.95 }}
                             className={cn(
                               "absolute right-0 w-full floating-card rounded-xl border-l-[3px] shadow-xl group/card overflow-hidden transition-all duration-200",
-                              isActive ? "ring-2 ring-primary/40 shadow-primary/20 z-50 opacity-100 grayscale-0" : "grayscale-[0.1] opacity-95",
-                              isCardCompact ? "h-8 py-0" : ""
+                              isCardCompact ? "h-8 py-0.5 px-3 flex items-center justify-between" : "p-3.5",
+                              isActive 
+                                ? "ring-2 ring-primary/80 ring-offset-2 ring-offset-background shadow-2xl scale-[1.03] z-30" 
+                                : "hover:border-primary/50 opacity-90 hover:opacity-100 z-10"
                             )}
-                            style={{ 
-                              borderColor: ann.color || 'var(--primary)',
+                            style={{
                               top: `${topOffset}px`,
-                              zIndex: isActive ? 100 : (isExpanded ? 50 : 10 + index)
+                              borderLeftColor: ann.color || '#6366f1',
+                              backgroundColor: 'var(--card)',
+                              backdropFilter: 'blur(16px)',
                             }}
                             onMouseEnter={() => setHoveredLine(ann.line)}
                             onMouseLeave={() => setHoveredLine(null)}
                           >
                             {isCardCompact ? (
-                              /* COMPACT RIBBON PILL: Keeps consecutive lines perfectly aligned */
-                              <div 
-                                className="flex items-center justify-between px-3 h-8 gap-2 cursor-pointer bg-card/90"
-                                onClick={() => setExpandedId(ann.id)}
-                              >
+                              /* COMPACT PILL MODE: Minimal ribbon pill to prevent visual clutter */
+                              <div className="flex items-center justify-between w-full gap-2 text-xs select-none">
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <span 
-                                    className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-secondary/80 shrink-0" 
-                                    style={{ color: ann.color || 'var(--primary)' }}
+                                    className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 shadow-sm"
+                                    style={{ 
+                                      backgroundColor: `${ann.color || '#6366f1'}25`, 
+                                      color: ann.color || '#6366f1' 
+                                    }}
                                   >
                                     L{ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
                                   </span>
-                                  <div className="shrink-0">{getIcon(ann.type, ann.color)}</div>
-                                  <span className="text-xs font-semibold text-foreground truncate">{ann.text}</span>
+                                  <span className="font-semibold text-foreground/90 truncate text-[11px]">
+                                    {ann.text}
+                                  </span>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleEdit(ann); }}
-                                    className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                                    title="Edit Note"
+                                <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover/card:opacity-100 transition-opacity">
+                                  {ann.fullContext && (
+                                    <button
+                                      onClick={() => setExpandedId(ann.id)}
+                                      className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                      title="Développer la note"
+                                    >
+                                      <ChevronDown className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleEdit(ann)}
+                                    className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    title="Éditer"
                                   >
                                     <Edit3 className="w-3 h-3" />
                                   </button>
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
+                                  <button
+                                    onClick={() => removeAnnotation(ann.id)}
                                     className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                                    title="Delete Note"
+                                    title="Supprimer"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                   </button>
@@ -1024,19 +1064,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                 </AnimatePresence>
                               </div>
                             )}
-                            
-                            {/* Connection Dot Trigger */}
-                            <div 
-                              className={cn(
-                                "absolute -left-[1.3rem] top-2.5 w-2.5 h-2.5 rounded-full cursor-pointer transition-all duration-300",
-                                isActive ? "scale-125 shadow-lg" : "opacity-60 hover:opacity-100"
-                              )}
-                              style={{ 
-                                backgroundColor: ann.color || 'var(--primary)', 
-                                boxShadow: `0 0 10px ${ann.color || 'var(--primary)'}` 
-                              }}
-                              onMouseEnter={() => setHoveredLine(ann.line)}
-                            />
                           </motion.div>
                         );
                       })}
