@@ -393,6 +393,7 @@ Directives de réponse :
    - Rends le texte clair et structuré avec indentation.
    - Utilise des blocs d'alerte GitHub (ex: > [!NOTE] pour l'idée centrale, > [!TIP] pour les astuces, > [!WARNING] pour les pièges).
    - Met en gras les concepts clés.
+   - Tableaux & Synthèses : Si des comparaisons ou tableaux sont pertinents, utilise TOUJOURS la syntaxe standard Markdown GFM (| Colonne 1 | Colonne 2 |) sans caractères de boîtes ASCII.
 3. Code Snippet & Annotations de ligne (Sous-notes de code) :
    - Extraire le code source exact.
    - Pour CHAQUE explication de ligne (ex: "⚫ Ligne x = my_function ..."), calcule la ligne EXACTE (1-indexed) où ce code apparaît dans le snippet de code.
