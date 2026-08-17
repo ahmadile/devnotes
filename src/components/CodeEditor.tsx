@@ -387,15 +387,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const estimateCardHeight = (ann: Annotation, isExpanded: boolean): number => {
     if (isExpanded && ann.fullContext) {
       const contextLines = Math.max(2, Math.ceil((ann.fullContext.length || 40) / 36));
-      return Math.min(450, 48 + contextLines * 18 + 48);
+      return Math.min(450, 60 + contextLines * 18 + 48);
     }
-    // Compact resting height (padding + header + single-line text)
-    return 42;
+    // Compact resting height (padding 16px + header 20px + text 18px + buffer)
+    return 56;
   };
 
   /** Compute collision-resolved card positions so cards don't overlap. */
   const cardPositions = useMemo(() => {
-    const GAP = 6; // min vertical gap between cards
+    const GAP = 8; // min vertical gap between cards
     const sorted = [...snippet.annotations].sort((a, b) => a.line - b.line);
     const positions: Record<string, number> = {};
     let prevBottom = 0;
@@ -762,15 +762,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                         onMouseLeave={() => setHoveredLine(null)}
                       >
                         <div className="flex flex-col">
-                          <div className="p-2.5 px-3">
-                            <div className="flex items-start gap-2.5">
+                          <div className="p-2 px-2.5">
+                            <div className="flex items-start gap-2">
                               <div className="mt-0.5 shrink-0">{getIcon(ann.type, ann.color)}</div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-0.5">
-                                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/70 font-mono">
-                                    Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
-                                  </span>
-                                  <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/70 font-mono shrink-0">
+                                      Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
+                                    </span>
+                                    {ann.fullContext && (
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedId(isExpanded ? null : ann.id);
+                                        }}
+                                        className="text-[10px] font-bold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 shrink-0"
+                                        title={isExpanded ? 'Réduire les détails' : 'Voir les détails complets'}
+                                      >
+                                        {isExpanded ? 'Réduire' : 'Voir plus'}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all shrink-0">
                                     <button 
                                       onClick={() => {
                                         const lineText = snippet.code.split('\n')[ann.line - 1] || '';
@@ -813,19 +827,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                 </div>
                                 <p className={cn(
                                   "text-xs text-foreground leading-snug font-medium transition-all",
-                                  !isActive && !isExpanded && "line-clamp-1"
+                                  !isExpanded && "line-clamp-1"
                                 )}>
                                   {ann.text}
                                 </p>
-                                
-                                {ann.fullContext && (isActive || isExpanded) && (
-                                  <button 
-                                    onClick={() => setExpandedId(isExpanded ? null : ann.id)}
-                                    className="mt-1 text-[10px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
-                                  >
-                                    {isExpanded ? 'Show Less' : 'Read Full Context'}
-                                  </button>
-                                )}
                               </div>
                             </div>
                           </div>
