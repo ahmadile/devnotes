@@ -383,19 +383,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
-  /** Estimate the rendered height of an annotation card (in px). */
-  const estimateCardHeight = (ann: Annotation, isExpanded: boolean): number => {
-    if (isExpanded && ann.fullContext) {
-      const contextLines = Math.max(2, Math.ceil((ann.fullContext.length || 40) / 36));
-      return Math.min(450, 60 + contextLines * 18 + 48);
-    }
-    // Compact resting height (padding 16px + header 20px + text 18px + buffer)
-    return 56;
+  /** Estimate the rendered resting height of an annotation card (in px). */
+  const estimateCardHeight = (_ann: Annotation): number => {
+    // Ultra compact resting height: py-2 + header + 1-line text
+    return 46;
   };
 
-  /** Compute collision-resolved card positions so cards don't overlap. */
+  /** Compute collision-resolved card positions so cards stay neatly anchored to their code lines. */
   const cardPositions = useMemo(() => {
-    const GAP = 8; // min vertical gap between cards
+    const GAP = 4; // Tight vertical gap between consecutive cards
     const sorted = [...snippet.annotations].sort((a, b) => a.line - b.line);
     const positions: Record<string, number> = {};
     let prevBottom = 0;
@@ -406,13 +402,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       const resolvedTop = Math.max(idealTop, prevBottom + GAP);
       positions[ann.id] = resolvedTop;
 
-      const height = estimateCardHeight(ann, expandedId === ann.id);
+      const height = estimateCardHeight(ann);
       prevBottom = resolvedTop + height;
       maxBottom = Math.max(maxBottom, prevBottom);
     }
 
     return { positions, maxBottom };
-  }, [snippet.annotations, expandedId]);
+  }, [snippet.annotations]);
 
   const handlePaste = async () => {
     if (snippet.code && snippet.code.trim().length > 0) {

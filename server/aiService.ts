@@ -353,12 +353,49 @@ export function alignAnnotationsWithCode(
   });
 }
 
+function enrichAnnotationCodeTerms(text: string, codeTokens: string[]): string {
+  if (!text) return text;
+  let enriched = text;
+  
+  // Sort tokens by length descending so longer tokens match first (e.g. 'run_n_times' before 'n')
+  const sortedTokens = [...new Set(codeTokens)].filter(t => t.length >= 2).sort((a, b) => b.length - a.length);
+
+  for (const token of sortedTokens) {
+    // Only wrap if token is not already inside backticks `token`
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?<!\`)\\b(${escaped})\\b(?!\`)`, 'g');
+    enriched = enriched.replace(regex, '`$1`');
+  }
+  return enriched;
+}
+
 function sanitizeAndAlignNoteResult(parsed: GeneratedNoteResult): GeneratedNoteResult {
   if (parsed.snippets && Array.isArray(parsed.snippets)) {
     parsed.snippets.forEach(s => {
+      // Extract function names, parameters, and identifiers from snippet code
+      const codeTokens: string[] = [];
+      if (s.code) {
+        const funcMatches = s.code.match(/def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)/g) || [];
+        for (const fm of funcMatches) {
+          const m = fm.match(/def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)/);
+          if (m) {
+            codeTokens.push(m[1]); // function name
+            const params = m[2].split(',').map(p => p.trim().replace(/^[*]+/, '')).filter(Boolean);
+            codeTokens.push(...params);
+          }
+        }
+        const decMatches = s.code.match(/@([a-zA-Z_]\w*)/g) || [];
+        for (const dm of decMatches) {
+          codeTokens.push(dm.replace(/^@/, ''));
+        }
+      }
+
       if (s.annotations && Array.isArray(s.annotations)) {
         s.annotations.forEach(a => {
           if (!a.color) a.color = ANNOTATION_COLORS[a.type] || '#6366f1';
+          if (a.fullContext && codeTokens.length > 0) {
+            a.fullContext = enrichAnnotationCodeTerms(a.fullContext, codeTokens);
+          }
         });
         if (s.code) {
           s.annotations = alignAnnotationsWithCode(s.annotations, s.code);
@@ -393,11 +430,13 @@ Directives de réponse :
    - Rends le texte clair et structuré avec indentation.
    - Utilise des blocs d'alerte GitHub (ex: > [!NOTE] pour l'idée centrale, > [!TIP] pour les astuces, > [!WARNING] pour les pièges).
    - Met en gras les concepts clés.
+   - Entoure SYSTÉMATIQUEMENT les noms de fonctions, méthodes, paramètres, variables et décorateurs par des backticks (ex: \`run_n_times\`, \`decorator(func)\`, \`func\`, \`in_range\`, \`foo\`, \`@functools.wraps\`) pour activer la mise en valeur syntaxique colorée.
    - Tableaux & Synthèses : Si des comparaisons ou tableaux sont pertinents, utilise TOUJOURS la syntaxe standard Markdown GFM (| Colonne 1 | Colonne 2 |) sans caractères de boîtes ASCII.
 3. Code Snippet & Annotations de ligne (Sous-notes de code) :
    - Extraire le code source exact.
    - Pour CHAQUE explication de ligne (ex: "⚫ Ligne x = my_function ..."), calcule la ligne EXACTE (1-indexed) où ce code apparaît dans le snippet de code.
    - Le champ 'text' de l'annotation doit mentionner le code exact (ex: "@functools.wraps(func) — préserve les métadonnées").
+   - Dans 'fullContext', explique le fonctionnement en entourant tous les identifiants et termes de code par des backticks.
    - Crée une annotation avec 'line', 'endLine', 'text' (résumé court), 'fullContext' (explication détaillée), et 'type' ('logic'|'warning'|'tip'|'important'|'debug').
 
 Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
@@ -416,7 +455,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
           "line": 6,
           "endLine": 6,
           "text": "Titre court de l'annotation",
-          "fullContext": "Explication détaillée de la sous-note",
+          "fullContext": "Explication détaillée de la sous-note avec \`identifiants\`",
           "type": "warning",
           "color": "#fbbf24"
         }

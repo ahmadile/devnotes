@@ -11,8 +11,46 @@ interface MarkdownProps {
   className?: string;
 }
 
-// Identity helper preserved for compatibility
+// Pattern matching functions (e.g. foo(x)), decorators (@decorator), snake_case variables (in_range, run_n_times), and args/kwargs
+const CODE_TOKEN_REGEX = /(@[a-zA-Z_][\w.]*|\b[a-zA-Z_]\w*\([^)]*\)|\b[a-zA-Z_]\w*_[a-zA-Z0-9_]+\b|\b(?:\*args|\*\*kwargs|defaultdict|Counter|DataFrame|Series)\b)/g;
+
 export const renderTextWithCodeHighlights = (node: React.ReactNode): React.ReactNode => {
+  if (typeof node === 'string') {
+    if (!node.trim()) return node;
+    const parts = node.split(CODE_TOKEN_REGEX);
+    if (parts.length <= 1) return node;
+
+    return parts.map((part, index) => {
+      if (!part) return null;
+      if (index % 2 === 1) {
+        return (
+          <code 
+            key={index}
+            className="font-mono text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 px-1.5 py-0.5 rounded font-semibold inline-block mx-0.5 my-0.5"
+          >
+            {part}
+          </code>
+        );
+      }
+      return part;
+    });
+  }
+
+  if (Array.isArray(node)) {
+    return React.Children.map(node, child => renderTextWithCodeHighlights(child));
+  }
+
+  if (React.isValidElement(node)) {
+    // Never rewrite inside existing code tags or links
+    if (node.type === 'code' || node.type === 'a') {
+      return node;
+    }
+    const props = node.props as { children?: React.ReactNode };
+    if (props && props.children) {
+      return React.cloneElement(node, {}, renderTextWithCodeHighlights(props.children));
+    }
+  }
+
   return node;
 };
 
