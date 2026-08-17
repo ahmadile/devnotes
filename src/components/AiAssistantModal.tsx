@@ -32,9 +32,11 @@ import {
   History,
   Trash2,
   Clock,
-  ChevronDown
+  ChevronDown,
+  GraduationCap
 } from 'lucide-react';
 import { Markdown } from './Markdown';
+import { RevisionView } from './RevisionView';
 import { cn } from '../lib/utils';
 
 export interface AiConversationMessage {
@@ -59,6 +61,8 @@ interface AiAssistantModalProps {
   activeNote: Note | null;
   syntaxDefinitions?: Record<string, SyntaxDefinition>;
   onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null, updateExistingId?: string | null) => void;
+  initialTab?: 'generator' | 'chat' | 'revision' | 'settings';
+  initialTopic?: string;
 }
 
 interface ProcessedAiResult {
@@ -204,8 +208,16 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   activeNote,
   syntaxDefinitions = {},
   onSaveNote,
+  initialTab = 'generator',
+  initialTopic,
 }) => {
-  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'settings'>('generator');
+  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'revision' | 'settings'>(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   const [inputContent, setInputContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
@@ -582,6 +594,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 Assistant Chat
+              </button>
+              <button
+                onClick={() => setActiveTab('revision')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  activeTab === 'revision'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                Révision & Pratique
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
@@ -1269,6 +1293,21 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 )}
               </div>
             </div>
+          )}
+
+          {activeTab === 'revision' && (
+            <RevisionView
+              notes={notes}
+              modules={modules}
+              activeNote={activeNote}
+              syntaxDefinitions={syntaxDefinitions}
+              aiProvider={aiProvider}
+              apiKey={aiProvider === 'openrouter' ? openRouterKey : geminiApiKey}
+              aiModel={aiModel}
+              ollamaUrl={ollamaUrl}
+              onSaveNote={onSaveNote}
+              initialTopic={initialTopic}
+            />
           )}
         </div>
       </div>

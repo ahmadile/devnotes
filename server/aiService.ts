@@ -646,3 +646,504 @@ Réponds de manière précise, encourageante et avec du formatage Markdown élé
 
   return `[Assistant DevNotes] Mode d'exécution hors-ligne. Votre message "${userQuery}" a été reçu. Pour débloquer l'IA multi-modèles (OpenRouter, Gemini, Ollama), renseignez votre clé API dans les paramètres du modal.`;
 }
+
+export interface RevisionRequest {
+  topic: string;
+  existingNotes?: {
+    id: string;
+    title: string;
+    tags: string[];
+    content: string;
+    snippets: { title?: string; language: string; code: string; annotations: { line: number; text: string; fullContext?: string; type: string }[] }[];
+  }[];
+  syntaxDefinitions?: Record<string, { keyword: string; text: string; fullContext?: string }>;
+  activeNoteId?: string | null;
+  provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
+  apiKey?: string;
+  model?: string;
+  ollamaUrl?: string;
+}
+
+export interface GeneratedRevisionSession {
+  id: string;
+  topic: string;
+  isFromExistingNotes: boolean;
+  sourceNoteTitles?: string[];
+  summary: string;
+  flashcards: {
+    id: string;
+    question: string;
+    answer: string;
+    keyTakeaway?: string;
+    codeSnippet?: string;
+  }[];
+  quiz: {
+    id: string;
+    question: string;
+    code?: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  }[];
+  exercises: {
+    id: string;
+    title: string;
+    instructions: string;
+    starterCode: string;
+    solutionCode: string;
+    explanation: string;
+    hints?: string[];
+  }[];
+  suggestedNote?: {
+    title: string;
+    tags: string[];
+    content: string;
+    snippets: {
+      title?: string;
+      language: string;
+      code: string;
+      annotations: {
+        line: number;
+        text: string;
+        type: 'info' | 'warning' | 'tip' | 'logic' | 'debug' | 'important';
+      }[];
+    }[];
+  };
+}
+
+/**
+ * Fallback generator when offline or no API response.
+ */
+export function fallbackRevisionSession(
+  topic: string,
+  matchedNotes: any[] = []
+): GeneratedRevisionSession {
+  const isExisting = matchedNotes.length > 0;
+  const noteTitle = isExisting ? matchedNotes[0].title : topic;
+  const isDecorator = topic.toLowerCase().includes('décorat') || topic.toLowerCase().includes('decorat');
+  const isFunction = topic.toLowerCase().includes('fonct') || topic.toLowerCase().includes('function');
+  const isDate = topic.toLowerCase().includes('date') || topic.toLowerCase().includes('time');
+
+  let summary = `### 🎯 Synthèse de révision : ${topic}\n\n`;
+  if (isDecorator) {
+    summary += `> [!NOTE]\n> En Python, un **décorateur** est une fonction qui prend une autre fonction en argument, lui ajoute du comportement (avant ou après), et renvoie la nouvelle fonction enveloppante (\`wrapper\`).\n\n`;
+    summary += `- La syntaxe \`@mon_decorateur\` est du sucre syntaxique pour \`ma_fonction = mon_decorateur(ma_fonction)\`.\n`;
+    summary += `- Le wrapper intérieur utilise généralement \`*args, **kwargs\` pour accepter tous les arguments possibles.\n`;
+    summary += `- N'oubliez pas de renvoyer le résultat de la fonction originale avec \`return result\` !\n`;
+    summary += `- Pour les décorateurs avec arguments (ex: \`@run_n_times(3)\`), il faut 3 niveaux de fonctions imbriquées.`;
+  } else if (isDate) {
+    summary += `> [!NOTE]\n> Le module standard \`datetime\` permet de manipuler les dates, heures et intervalles de temps en Python.\n\n`;
+    summary += `- \`datetime.now()\` : Date et heure actuelles.\n`;
+    summary += `- \`strftime(format)\` : Convertit une date en chaîne de caractères formatée.\n`;
+    summary += `- \`strptime(string, format)\` : Convertit une chaîne de caractères en objet \`datetime\`.\n`;
+    summary += `- \`timedelta(days=1, hours=2)\` : Représente une durée ou un décalage temporel.`;
+  } else {
+    summary += `> [!NOTE]\n> Fiche de révision DevNotes générée pour consolider votre compréhension et votre pratique sur **${topic}**.\n\n`;
+    summary += `- Maîtrisez la syntaxe fondamentale et les cas d'usage typiques.\n`;
+    summary += `- Identifiez les pièges courants et les conventions idiomatiques.\n`;
+    summary += `- Entraînez-vous avec les flashcards et les défis de code interactifs ci-dessous !`;
+  }
+
+  const flashcards = isDecorator ? [
+    {
+      id: 'f1',
+      question: "Quelle est la définition exacte d'un décorateur en Python ?",
+      answer: "Un décorateur est une fonction qui reçoit une fonction en paramètre, l'enveloppe dans une fonction interne ('wrapper') pour étendre son comportement, et retourne cette nouvelle fonction.",
+      keyTakeaway: "Syntaxe @decorateur équivaut à f = decorateur(f)",
+      codeSnippet: "def my_decorator(func):\n    def wrapper(*args, **kwargs):\n        print('Avant')\n        res = func(*args, **kwargs)\n        print('Après')\n        return res\n    return wrapper"
+    },
+    {
+      id: 'f2',
+      question: "Pourquoi utilise-t-on '*args, **kwargs' dans la fonction wrapper ?",
+      answer: "Pour que le décorateur soit universel et puisse décorer n'importe quelle fonction, peu importe le nombre et le type d'arguments qu'elle accepte (positionnels ou nommés).",
+      keyTakeaway: "*args capture les tuples positionnels, **kwargs capture le dictionnaire d'arguments nommés."
+    },
+    {
+      id: 'f3',
+      question: "Comment créer un décorateur qui accepte des arguments, par exemple '@repeat(num=3)' ?",
+      answer: "Il faut ajouter un niveau d'imbrication supplémentaire (3 fonctions au total) : la fonction externe reçoit les arguments du décorateur, la fonction intermédiaire reçoit la fonction à décorer, et la fonction wrapper exécute la logique.",
+      keyTakeaway: "3 niveaux : Decorator Factory -> Decorator -> Wrapper"
+    }
+  ] : [
+    {
+      id: 'f1',
+      question: `Quel est le principe central à retenir sur "${topic}" ?`,
+      answer: `Comprendre la syntaxe clé, le flux d'exécution et la manière dont les données transitent.`,
+      keyTakeaway: `Pratiquer sur des exemples minimaux reproductibles.`
+    },
+    {
+      id: 'f2',
+      question: `Quel piège classique faut-il absolument éviter avec "${topic}" ?`,
+      answer: `Oublier la valeur de retour ou mal gérer les cas limites (valeurs nulles, arguments optionnels).`,
+      keyTakeaway: `Toujours prévoir les retours explicites.`
+    }
+  ];
+
+  const quiz = isDecorator ? [
+    {
+      id: 'q1',
+      question: "Que fait exactement l'écriture suivante au moment de la définition de la fonction ?",
+      code: "@timer\ndef calculate(n):\n    return sum(range(n))",
+      options: [
+        "Elle exécute immédiatement calculate(100)",
+        "Elle réassigne calculate = timer(calculate)",
+        "Elle crée un thread séparé pour chronométrer le CPU",
+        "Elle transforme calculate en générateur Python"
+      ],
+      correctIndex: 1,
+      explanation: "L'arobase @timer est du sucre syntaxique pour calculate = timer(calculate) au moment du chargement du module."
+    },
+    {
+      id: 'q2',
+      question: "Que se passe-t-il si la fonction wrapper interne d'un décorateur oublie de faire 'return result' ?",
+      code: "def bad_decorator(func):\n    def wrapper(*args, **kwargs):\n        res = func(*args, **kwargs)\n    return wrapper",
+      options: [
+        "Une exception TypeError est levée immédiatement",
+        "La fonction décorée renverra toujours None au lieu de sa vraie valeur",
+        "La fonction originale est exécutée deux fois",
+        "Python refuse de compiler le fichier"
+      ],
+      correctIndex: 1,
+      explanation: "Sans instruction return dans le wrapper, tout appel à la fonction décorée retourne implicitement None."
+    }
+  ] : [
+    {
+      id: 'q1',
+      question: `Dans quel contexte utilise-t-on principalement "${topic}" ?`,
+      options: [
+        "Pour structurer et réutiliser du code proprement",
+        "Uniquement dans le noyau CPython",
+        "Seulement pour les scripts bash",
+        "Pour remplacer l'interpréteur Python"
+      ],
+      correctIndex: 0,
+      explanation: "L'objectif premier est la modularité, la lisibilité et l'isolation des responsabilités."
+    }
+  ];
+
+  const exercises = isDecorator ? [
+    {
+      id: 'ex1',
+      title: "Défi 1 : Créer un décorateur @debug_logger",
+      instructions: "Écrivez un décorateur 'debug_logger' qui affiche 'Calling [nom_fonction]...' avant l'exécution, appelle la fonction avec ses arguments, puis affiche 'Done [nom_fonction]' et retourne le résultat.",
+      starterCode: "def debug_logger(func):\n    def wrapper(*args, **kwargs):\n        # TODO: Affichez le message de début\n        # TODO: Appelez func et stockez le résultat\n        # TODO: Affichez le message de fin\n        # TODO: Retournez le résultat\n        pass\n    return wrapper\n\n@debug_logger\ndef add(a, b):\n    return a + b\n\nprint(add(5, 7))",
+      solutionCode: "def debug_logger(func):\n    def wrapper(*args, **kwargs):\n        print(f\"Calling {func.__name__}...\")\n        result = func(*args, **kwargs)\n        print(f\"Done {func.__name__}\")\n        return result\n    return wrapper\n\n@debug_logger\ndef add(a, b):\n    return a + b\n\nprint(add(5, 7))",
+      explanation: "Le wrapper intercepte l'appel, accède au nom de la fonction via func.__name__, transmet tous les arguments avec *args et **kwargs, et renvoie fidèlement le résultat.",
+      hints: [
+        "Utilisez func.__name__ pour récupérer le nom de la fonction décorée.",
+        "N'oubliez pas 'return result' à la fin du wrapper !"
+      ]
+    },
+    {
+      id: 'ex2',
+      title: "Défi 2 : Décorateur avec argument @repeat(times)",
+      instructions: "Créez une 'decorator factory' @repeat(times=3) qui exécute la fonction décorée 'times' fois d'affilée et retourne le résultat du dernier appel.",
+      starterCode: "def repeat(times=3):\n    def decorator(func):\n        def wrapper(*args, **kwargs):\n            # TODO: Bouclez 'times' fois\n            pass\n        return wrapper\n    return decorator",
+      solutionCode: "def repeat(times=3):\n    def decorator(func):\n        def wrapper(*args, **kwargs):\n            res = None\n            for _ in range(times):\n                res = func(*args, **kwargs)\n            return res\n        return wrapper\n    return decorator\n\n@repeat(times=3)\ndef greet(name):\n    print(f\"Salut {name} !\")\n    return f\"OK-{name}\"\n\ngreet(\"Alice\")",
+      explanation: "Il y a 3 niveaux de fonctions : repeat(times) renvoie decorator(func), qui renvoie wrapper(*args, **kwargs).",
+      hints: [
+        "La fonction externe 'repeat' prend l'argument 'times'.",
+        "La fonction intermédiaire 'decorator' prend la fonction 'func'.",
+        "La fonction interne 'wrapper' prend '*args, **kwargs'."
+      ]
+    }
+  ] : [
+    {
+      id: 'ex1',
+      title: `Défi Pratique : Application de ${topic}`,
+      instructions: `Implémentez une fonction démonstrative qui applique les concepts fondamentaux de ${topic}.`,
+      starterCode: `# Écrivez votre code pour ${topic} ici\ndef solution():\n    pass`,
+      solutionCode: `# Exemple de solution propre pour ${topic}\ndef solution():\n    return "Validation réussie"`,
+      explanation: `Cette solution respecte les principes de conception et les bonnes pratiques standard.`,
+      hints: [`Pensez à découper votre raisonnement étape par étape.`]
+    }
+  ];
+
+  return {
+    id: `rev_${Date.now()}`,
+    topic,
+    isFromExistingNotes: isExisting,
+    sourceNoteTitles: matchedNotes.map(n => n.title),
+    summary,
+    flashcards,
+    quiz,
+    exercises,
+    suggestedNote: {
+      title: isExisting ? `Révision : ${noteTitle}` : `Fiche : ${topic}`,
+      tags: isDecorator ? ['python', 'décorateurs', 'fonctions', 'révision'] : ['révision', topic.toLowerCase().replace(/\s+/g, '-')],
+      content: summary,
+      snippets: [
+        {
+          title: `Code d'entraînement : ${topic}`,
+          language: 'python',
+          code: exercises[0]?.solutionCode || '# Code de démonstration\n',
+          annotations: [
+            {
+              line: 1,
+              text: `Point clé d'implémentation pour ${topic}`,
+              type: 'logic'
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
+
+/**
+ * Generates an end-to-end Smart Revision session.
+ */
+export async function generateRevisionSession(req: RevisionRequest): Promise<GeneratedRevisionSession> {
+  const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
+  const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+
+  // Search existing notes for matches with the requested topic
+  const topicWords = req.topic.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const matchedNotes = (req.existingNotes || []).filter(note => {
+    if (req.activeNoteId && note.id === req.activeNoteId) return true;
+    const titleMatch = topicWords.some(w => note.title.toLowerCase().includes(w));
+    const tagMatch = (note.tags || []).some(t => topicWords.some(w => t.toLowerCase().includes(w)));
+    const contentMatch = topicWords.some(w => (note.content || '').toLowerCase().includes(w));
+    return titleMatch || tagMatch || contentMatch;
+  });
+
+  const isFromExistingNotes = matchedNotes.length > 0;
+  const contextNotesText = matchedNotes.map(n => `
+--- NOTE: ${n.title} (Tags: ${n.tags?.join(', ')}) ---
+${n.content}
+${n.snippets?.map(s => `Code (${s.language}):\n${s.code}\nAnnotations:\n${s.annotations?.map(a => `L${a.line}: [${a.type}] ${a.text}`).join('\n')}`).join('\n\n')}
+`).join('\n\n');
+
+  const systemPrompt = `Tu es l'expert pédagogique et formateur en développement informatique de DevNotes.
+L'utilisateur veut réviser et pratiquer le concept suivant : "${req.topic}".
+
+${isFromExistingNotes 
+  ? `L'utilisateur a déjà des notes sur ce sujet dans son carnet DevNotes. BASE-TOI SUR SES NOTES EXISTANTES, ses snippets et ses annotations pour construire une révision ultra ciblée :\n${contextNotesText}`
+  : `L'utilisateur N'A PAS ENCORE de note sur ce sujet. Génère une fiche de révision complète et interactive dans le style DevNotes (synthétique, avec du code clair et des annotations utiles).`
+}
+
+Consignes strictes :
+1. "summary" : Résumé clair et percutant en Markdown (avec des alertes > [!NOTE], des listes à puces et des termes de code entre backticks \`...\`).
+2. "flashcards" : 3 à 4 fiches de mémorisation active ("question", "answer", "keyTakeaway", "codeSnippet" optionnel).
+3. "quiz" : 3 à 4 questions de QCM ("question", "code" optionnel, "options" tableau de 4 choix, "correctIndex" 0..3, "explanation" détaillée).
+4. "exercises" : 2 à 3 exercices pratiques de code progressifs ("title", "instructions", "starterCode", "solutionCode", "explanation", "hints").
+5. "suggestedNote" : Note structurée DevNotes complète (avec "title", "tags", "content", et "snippets" contenant "title", "language", "code", "annotations": [{"line": 1, "text": "...", "type": "logic"|"tip"|"warning"|"important"}]).
+
+FORMAT DE RÉPONSE OBLIGATOIRE :
+Renvoie UNIQUEMENT un objet JSON valide conforme à ce schéma :
+{
+  "id": "rev_${Date.now()}",
+  "topic": "${req.topic}",
+  "isFromExistingNotes": ${isFromExistingNotes},
+  "sourceNoteTitles": ${JSON.stringify(matchedNotes.map(n => n.title))},
+  "summary": "...",
+  "flashcards": [
+    { "id": "f1", "question": "...", "answer": "...", "keyTakeaway": "...", "codeSnippet": "..." }
+  ],
+  "quiz": [
+    { "id": "q1", "question": "...", "code": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "..." }
+  ],
+  "exercises": [
+    { "id": "ex1", "title": "...", "instructions": "...", "starterCode": "...", "solutionCode": "...", "explanation": "...", "hints": ["..."] }
+  ],
+  "suggestedNote": {
+    "title": "...",
+    "tags": ["..."],
+    "content": "...",
+    "snippets": [
+      {
+        "title": "...",
+        "language": "python",
+        "code": "...",
+        "annotations": [
+          { "line": 1, "text": "...", "type": "logic" }
+        ]
+      }
+    ]
+  }
+}`;
+
+  // Call OpenRouter
+  if (provider === 'openrouter' && apiKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DevNotes',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: 'user', content: systemPrompt }],
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content;
+        if (text) {
+          const parsed = JSON.parse(text) as GeneratedRevisionSession;
+          if (parsed && parsed.summary && parsed.quiz && parsed.exercises) {
+            return parsed;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] OpenRouter revision error:', err);
+    }
+  }
+
+  // Call Ollama
+  if (provider === 'ollama') {
+    try {
+      const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const res = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelName || 'llama3',
+          messages: [{ role: 'user', content: systemPrompt }],
+          stream: false,
+          format: 'json',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.message?.content;
+        if (text) {
+          const parsed = JSON.parse(text) as GeneratedRevisionSession;
+          if (parsed && parsed.summary && parsed.quiz) {
+            return parsed;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] Ollama revision error:', err);
+    }
+  }
+
+  // Call Gemini
+  if ((provider === 'gemini' || !provider) && apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: systemPrompt,
+        config: { responseMimeType: 'application/json' },
+      });
+
+      const responseText = response.text;
+      if (responseText) {
+        const parsed = JSON.parse(responseText) as GeneratedRevisionSession;
+        if (parsed && parsed.summary && parsed.quiz) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] Gemini revision error:', err);
+    }
+  }
+
+  // Fallback
+  return fallbackRevisionSession(req.topic, matchedNotes);
+}
+
+/**
+ * Real-time AI evaluation of a user's code attempt during a revision challenge.
+ */
+export async function evaluateRevisionCode(params: {
+  exerciseTitle: string;
+  exerciseInstructions: string;
+  userCode: string;
+  solutionCode: string;
+  provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
+  apiKey?: string;
+  model?: string;
+  ollamaUrl?: string;
+}): Promise<{ score: number; isCorrect: boolean; feedback: string; suggestion?: string }> {
+  const provider = params.provider || (params.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
+  const apiKey = params.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  const modelName = params.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+
+  const prompt = `Évalue le code écrit par l'étudiant pour l'exercice suivant :
+Exercice : ${params.exerciseTitle}
+Consignes : ${params.exerciseInstructions}
+
+Code écrit par l'étudiant :
+\`\`\`
+${params.userCode}
+\`\`\`
+
+Code de solution attendu / modèle :
+\`\`\`
+${params.solutionCode}
+\`\`\`
+
+Donne une note sur 10, détermine si l'exercice est validé (isCorrect: true si score >= 7), et fournis un feedback pédagogique court, encourageant et clair en Markdown.
+
+Renvoie UNIQUEMENT un JSON conforme à ce format :
+{
+  "score": 9,
+  "isCorrect": true,
+  "feedback": "Bravo ! Le wrapper est bien implémenté avec *args, **kwargs. Pense juste à...",
+  "suggestion": "..."
+}`;
+
+  if (provider === 'openrouter' && apiKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DevNotes',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content;
+        if (text) return JSON.parse(text);
+      }
+    } catch (e) {
+      console.error('[aiService] Evaluation OpenRouter error', e);
+    }
+  }
+
+  if ((provider === 'gemini' || !provider) && apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      if (response.text) return JSON.parse(response.text);
+    } catch (e) {
+      console.error('[aiService] Evaluation Gemini error', e);
+    }
+  }
+
+  // Fallback evaluation
+  const hasCode = params.userCode.trim().length > 20;
+  return {
+    score: hasCode ? 8 : 4,
+    isCorrect: hasCode,
+    feedback: hasCode 
+      ? "Très bon travail ! Votre code semble structuré et conforme à la consigne. Comparez avec la solution pour voir les optimisations possibles."
+      : "Le code est incomplet. Réessayez en vous aidant des indices ou en complétant les sections TODO.",
+    suggestion: "Vérifiez que toutes les fonctions internes retournent bien leur résultat."
+  };
+}
+

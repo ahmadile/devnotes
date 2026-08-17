@@ -51,3 +51,57 @@ export interface Module {
   parentId?: string | null;
   createdAt: number;
 }
+
+export interface RevisionFlashcard {
+  id: string;
+  question: string;
+  answer: string;
+  keyTakeaway?: string;
+  codeSnippet?: string;
+}
+
+export interface RevisionQuizItem {
+  id: string;
+  question: string;
+  code?: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface RevisionCodingExercise {
+  id: string;
+  title: string;
+  instructions: string;
+  starterCode: string;
+  solutionCode: string;
+  explanation: string;
+  hints?: string[];
+}
+
+export interface RevisionSession {
+  id: string;
+  topic: string;
+  isFromExistingNotes: boolean;
+  sourceNoteTitles?: string[];
+  summary: string;
+  flashcards: RevisionFlashcard[];
+  quiz: RevisionQuizItem[];
+  exercises: RevisionCodingExercise[];
+  suggestedNote?: {
+    title: string;
+    tags: string[];
+    content: string;
+    snippets: {
+      title?: string;
+      language: string;
+      code: string;
+      annotations: {
+        line: number;
+        text: string;
+        type: 'info' | 'warning' | 'tip' | 'logic' | 'debug' | 'important';
+      }[];
+    }[];
+  };
+}
+

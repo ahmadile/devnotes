@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -85,6 +85,14 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'revision' | 'settings'>('generator');
+  const [aiModalTopic, setAiModalTopic] = useState<string | undefined>(undefined);
+
+  const openAiAssistant = (tab: 'generator' | 'chat' | 'revision' | 'settings' = 'generator', topic?: string) => {
+    setAiModalTab(tab);
+    setAiModalTopic(topic);
+    setIsAiModalOpen(true);
+  };
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -704,7 +712,15 @@ export default function App() {
 
                 <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
                   <button
-                    onClick={() => setIsAiModalOpen(true)}
+                    onClick={() => openAiAssistant('revision', activeNote?.title)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 transition-all cursor-pointer mr-1 group shadow-sm"
+                    title="Lancer le Mode Révision & Entraînement (Flashcards, Quiz, Défis Code)"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Réviser & Pratiquer</span>
+                  </button>
+                  <button
+                    onClick={() => openAiAssistant('generator')}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground bg-secondary/50 hover:bg-secondary border border-border/80 hover:border-indigo-500/40 dark:hover:border-indigo-400/40 transition-all cursor-pointer mr-1 group"
                     title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
                   >
@@ -1268,6 +1284,8 @@ export default function App() {
             activeNote={activeNote}
             syntaxDefinitions={syntaxDefinitions}
             onSaveNote={handleSaveAiNote}
+            initialTab={aiModalTab}
+            initialTopic={aiModalTopic}
           />
         </div>
       </SignedIn>

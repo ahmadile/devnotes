@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
-import { processNoteWithAI, chatWithAI } from './aiService.js';
+import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode } from './aiService.js';
 import dns from 'dns';
 
 // Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
@@ -144,6 +144,55 @@ const app = express();
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Chat error' });
     }
   });
+
+  app.post('/api/ai/revision', async (req, res) => {
+    try {
+      const { topic, existingNotes, syntaxDefinitions, activeNoteId, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!topic || typeof topic !== 'string') {
+        res.status(400).json({ error: 'Topic is required' });
+        return;
+      }
+
+      const session = await generateRevisionSession({
+        topic,
+        existingNotes: existingNotes || [],
+        syntaxDefinitions,
+        activeNoteId,
+        provider,
+        apiKey,
+        model,
+        ollamaUrl
+      });
+      res.json({ ok: true, session });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'AI Revision error' });
+    }
+  });
+
+  app.post('/api/ai/revision/evaluate', async (req, res) => {
+    try {
+      const { exerciseTitle, exerciseInstructions, userCode, solutionCode, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!userCode || !exerciseTitle) {
+        res.status(400).json({ error: 'userCode and exerciseTitle are required' });
+        return;
+      }
+
+      const evaluation = await evaluateRevisionCode({
+        exerciseTitle,
+        exerciseInstructions: exerciseInstructions || '',
+        userCode,
+        solutionCode: solutionCode || '',
+        provider,
+        apiKey,
+        model,
+        ollamaUrl
+      });
+      res.json({ ok: true, evaluation });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'AI Evaluation error' });
+    }
+  });
+
 
 
   // Serve static files when NOT running as a Vercel Serverless function
