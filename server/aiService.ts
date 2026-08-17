@@ -191,12 +191,6 @@ export function fallbackProcessNote(
       }
     }
 
-    // Clean leading markers from shortTitle
-    shortTitle = shortTitle
-      .replace(/^(?:⚫\s*)?(?:Ligne\s*\d+(?:\s*-\s*\d+)?\s*[-:]?\s*|Line\s*\d+(?:\s*-\s*\d+)?\s*[-:]?\s*)/i, '')
-      .trim();
-    if (!shortTitle) shortTitle = fullText;
-
     let type: GeneratedAnnotation['type'] = 'logic';
     if (fullText.toLowerCase().includes('piège') || fullText.toLowerCase().includes('erreur') || fullText.toLowerCase().includes('attention')) {
       type = 'warning';
@@ -262,20 +256,9 @@ export function alignAnnotationsWithCode(
   if (!codeText || !annotations || annotations.length === 0) return annotations;
   const codeLines = codeText.split('\n');
 
-  const assignedLines: number[] = [];
-
   return annotations.map((ann, idx) => {
     let candidates: string[] = [];
     
-    // 0. Extract any backtick code segments from text or fullContext
-    const backtickMatches = (ann.text + ' ' + (ann.fullContext || '')).match(/`([^`]+)`/g);
-    if (backtickMatches) {
-      backtickMatches.forEach(m => {
-        const clean = m.replace(/`/g, '').trim();
-        if (clean.length >= 2) candidates.push(clean);
-      });
-    }
-
     if (ann.text) {
       if (ann.text.includes(' — ')) {
         candidates.push(ann.text.split(' — ')[0].trim());
@@ -302,7 +285,7 @@ export function alignAnnotationsWithCode(
 
     let matchedLine = -1;
 
-    // 1. Direct substring search in code lines
+    // 1. Direct substring search
     for (const cand of candidates) {
       if (!cand || cand.length < 2) continue;
       const cleanCand = cand.replace(/#.*$/, '').trim();
@@ -350,35 +333,7 @@ export function alignAnnotationsWithCode(
       }
     }
 
-    // 3. Keyword-heuristic mapping (decorators, wrappers, wraps, return)
-    if (matchedLine === -1) {
-      const combinedText = (ann.text + ' ' + (ann.fullContext || '')).toLowerCase();
-      
-      for (let l = 0; l < codeLines.length; l++) {
-        const lineLower = codeLines[l].toLowerCase().trim();
-        if (combinedText.includes('wraps') && (lineLower.includes('@functools.wraps') || lineLower.includes('@wraps'))) {
-          matchedLine = l + 1;
-          break;
-        } else if ((combinedText.includes('wrapper') || combinedText.includes('niveau 3')) && lineLower.includes('def wrapper')) {
-          matchedLine = l + 1;
-          break;
-        } else if ((combinedText.includes('vrai décorateur') || combinedText.includes('niveau 2')) && lineLower.includes('def decorator')) {
-          matchedLine = l + 1;
-          break;
-        } else if ((combinedText.includes('fabrique') || combinedText.includes('niveau 1')) && lineLower.startsWith('def ')) {
-          matchedLine = l + 1;
-          break;
-        } else if (combinedText.includes('renvoie wrapper') && lineLower.includes('return wrapper')) {
-          matchedLine = l + 1;
-          break;
-        } else if (combinedText.includes('renvoie decorator') && lineLower.includes('return decorator')) {
-          matchedLine = l + 1;
-          break;
-        }
-      }
-    }
-
-    // 4. Fallback: check if original ann.line is reasonable
+    // 3. Fallback: check if original ann.line is within bounds and reasonable
     if (matchedLine === -1) {
       if (ann.line >= 1 && ann.line <= codeLines.length) {
         matchedLine = ann.line;
@@ -386,18 +341,6 @@ export function alignAnnotationsWithCode(
         matchedLine = Math.min(Math.max(1, (idx + 1) * Math.floor(codeLines.length / (annotations.length + 1))), codeLines.length);
       }
     }
-
-    // Prevent duplicate clustering if multiple annotations target the same line without explicit match
-    if (assignedLines.includes(matchedLine) && codeLines.length > annotations.length) {
-      // Find the next closest available line
-      for (let offset = 1; offset < codeLines.length; offset++) {
-        if (matchedLine + offset <= codeLines.length && !assignedLines.includes(matchedLine + offset)) {
-          matchedLine = matchedLine + offset;
-          break;
-        }
-      }
-    }
-    assignedLines.push(matchedLine);
 
     const span = (ann.endLine && ann.endLine >= ann.line) ? (ann.endLine - ann.line) : 0;
     const endLine = Math.min(codeLines.length, matchedLine + span);
@@ -438,100 +381,43 @@ export async function processNoteWithAI(req: ProcessNoteRequest): Promise<Genera
     ? `\n\nRéférences de syntaxes déjà enregistrées en base de données : ${Object.keys(req.syntaxDefinitions).join(', ')}.`
     : '';
 
-  const prompt = `Tu es l'assistant IA officiel de DevNotes, un environnement d'apprentissage de code inspiré du design et de la rigueur pédagogique de Claude Code.
-Transforme la note brute fournie en une fiche d'apprentissage haut de gamme, claire, structurée et mémorable.${syntaxContext}
+  const prompt = `Tu es l'assistant IA officiel de DevNotes. Reçois la note brute ci-dessous et transforme-la en une structure d'apprentissage visuelle, claire et mémorable pour un développeur.${syntaxContext}
 
 --- INPUT BRUT ---
 ${req.input}
 --- FIN INPUT BRUT ---
 
-Directives STRICTES de génération :
+Directives de réponse :
+1. Extraction du Titre et Tags : Extraire un titre clair et pertinent. Si un terme correspond à une référence de syntaxe enregistrée, inclus-le dans les tags.
+2. Formattage du Résumé / Content (Markdown Enrichi) :
+   - Rends le texte clair et structuré avec indentation.
+   - Utilise des blocs d'alerte GitHub (ex: > [!NOTE] pour l'idée centrale, > [!TIP] pour les astuces, > [!WARNING] pour les pièges).
+   - Met en gras les concepts clés.
+3. Code Snippet & Annotations de ligne (Sous-notes de code) :
+   - Extraire le code source exact.
+   - Pour CHAQUE explication de ligne (ex: "⚫ Ligne x = my_function ..."), calcule la ligne EXACTE (1-indexed) où ce code apparaît dans le snippet de code.
+   - Le champ 'text' de l'annotation doit mentionner le code exact (ex: "@functools.wraps(func) — préserve les métadonnées").
+   - Crée une annotation avec 'line', 'endLine', 'text' (résumé court), 'fullContext' (explication détaillée), et 'type' ('logic'|'warning'|'tip'|'important'|'debug').
 
-1. Extraction du Titre et Tags :
-   - Titre concis, percutant et professionnel.
-   - Tags pertinents (langage, concept, patterns).
-
-2. Formatage du Résumé / "content" (Style Claude Code & Documentation Premium) :
-   - Structure le contenu avec des sous-titres clairs (ex: "### 🚀 Le problème initial", "### 💡 La solution", "### 📊 Tableau comparatif").
-   - Intègre des blocs d'alerte GitHub :
-     > [!NOTE] pour le concept clé ou l'idée centrale.
-     > [!TIP] pour les bonnes pratiques et optimisations.
-     > [!WARNING] pour les pièges classiques ou erreurs fréquentes.
-   - Insère des EXEMPLES DE CODE ILLUSTRATIFS (mini-snippets markdown comme \`\`\`python ... \`\`\` ou \`\`\`javascript ... \`\`\`) directement dans l'explication pour comparer avant/après ou montrer un cas d'usage.
-   - Pour TOUT schéma, synthèse ou tableau comparatif :
-     - Utilise EXCLUSIVEMENT la syntaxe Markdown GFM standard (tableaux avec \`| Colonne 1 | Colonne 2 | ... |\` et \`| :--- | :--- | ... |\`).
-     - INTERDICTION FORMELLE d'utiliser des caractères de dessin ASCII décalés (\`┌─┬─┐\`, \`│ │\`, \`└───┘\`). Les tableaux Markdown doivent être propres et lisibles.
-     - Tu peux aussi utiliser des blocs Mermaid \`\`\`mermaid pour les diagrammes de flux.
-
-3. Code Snippet Principal & Annotations de ligne (Sous-notes) :
-   - "code" : Le code source propre, complet et indenté.
-   - "annotations" : Liste de sous-notes associées aux lignes exactes du code.
-   - IMPORTANTISSIME : Les numéros de ligne ("line" et "endLine") DOIVENT être 1-indexés et correspondre EXACTEMENT à la ligne dans le bloc "code".
-   - Chaque sous-note DOIT cibler sa ligne spécifique (ex: Ligne 1 pour la fonction externe, Ligne 3 pour le décorateur intermédiaire, Ligne 4 pour @wraps, Ligne 5 pour le wrapper, Ligne 8 pour le return wrapper, etc.).
-   - INTERDICTION de regrouper toutes les sous-notes sur une seule et même ligne.
-   - "text" : Titre court de l'annotation avec le code ou concept ciblé.
-   - "fullContext" : Explication pédagogique détaillée avec mini-exemples si pertinent.
-   - "type" : "logic" | "tip" | "warning" | "important" | "debug".
-
-Format JSON STRICT de réponse (renvoie UNIQUEMENT le JSON valide, sans texte d'introduction ni de conclusion) :
+Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
 {
   "title": "Titre de la note",
-  "tags": ["python", "decorateurs", "closures"],
-  "moduleName": "Python / Fonctions Avancées",
-  "content": "### 🚀 Le concept\\n\\nExplication détaillée style Claude Code avec \`\`\`python\\n# Mini exemple\\n\`\`\`\\n\\n### 📊 Tableau Récapitulatif\\n\\n| Niveau | Fonction | Rôle |\\n| :--- | :--- | :--- |\\n| Niveau 1 | \`run_n_times(n)\` | Capture le paramètre \`n\` |\\n| Niveau 2 | \`decorator(func)\` | Reçoit la fonction cible |\\n| Niveau 3 | \`wrapper(*args, **kwargs)\` | Exécute \`func\` \`n\` fois |\\n\\n> [!TIP]\\n> Toujours utiliser \`@functools.wraps\` pour préserver les métadonnées.",
+  "tags": ["tag1", "tag2"],
+  "moduleName": "Chemin du dossier",
+  "content": "Contenu Markdown structuré...",
   "snippets": [
     {
-      "title": "Décorateur à arguments (3 niveaux d'imbrication)",
+      "title": "Titre du snippet",
       "language": "python",
-      "code": "import functools\\n\\ndef run_n_times(n):\\n    def decorator(func):\\n        @functools.wraps(func)\\n        def wrapper(*args, **kwargs):\\n            for _ in range(n):\\n                func(*args, **kwargs)\\n        return wrapper\\n    return decorator",
+      "code": "code source...",
       "annotations": [
         {
-          "line": 3,
-          "endLine": 3,
-          "text": "run_n_times(n) — Fabrique de décorateurs (NIVEAU 1)",
-          "fullContext": "Prend l'argument de configuration \`n\` et retourne le vrai décorateur.",
-          "type": "logic",
-          "color": "#6366f1"
-        },
-        {
-          "line": 4,
-          "endLine": 4,
-          "text": "decorator(func) — Décorateur classique (NIVEAU 2)",
-          "fullContext": "Reçoit la fonction à décorer \`func\`.",
-          "type": "tip",
-          "color": "#10b981"
-        },
-        {
-          "line": 5,
-          "endLine": 5,
-          "text": "@functools.wraps(func) — Préservation des métadonnées",
-          "fullContext": "Préserve le nom \`__name__\` et la docstring \`__doc__\` de la fonction originale.",
-          "type": "important",
-          "color": "#f43f5e"
-        },
-        {
           "line": 6,
-          "endLine": 8,
-          "text": "wrapper(*args, **kwargs) — Exécution répétée (NIVEAU 3)",
-          "fullContext": "Boucle pour appeler \`func(*args, **kwargs)\` exactement \`n\` fois.",
-          "type": "logic",
-          "color": "#6366f1"
-        },
-        {
-          "line": 9,
-          "endLine": 9,
-          "text": "return wrapper — Retourne la fonction enveloppante",
-          "fullContext": "Le décorateur Niveau 2 renvoie le wrapper.",
-          "type": "logic",
-          "color": "#6366f1"
-        },
-        {
-          "line": 10,
-          "endLine": 10,
-          "text": "return decorator — Retourne le décorateur prêt à l'emploi",
-          "fullContext": "La fabrique Niveau 1 renvoie la fonction décorateur prête à être appliquée.",
-          "type": "tip",
-          "color": "#10b981"
+          "endLine": 6,
+          "text": "Titre court de l'annotation",
+          "fullContext": "Explication détaillée de la sous-note",
+          "type": "warning",
+          "color": "#fbbf24"
         }
       ]
     }
