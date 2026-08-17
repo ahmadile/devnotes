@@ -385,21 +385,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   /** Estimate the rendered height of an annotation card (in px). */
   const estimateCardHeight = (ann: Annotation, isExpanded: boolean): number => {
-    // Base: padding (16+16) + header (~26) + text (~20 per ~36 chars) + button (~26 if fullContext)
-    const textLines = Math.max(1, Math.ceil((ann.text?.length || 20) / 36));
-    let h = 58 + textLines * 20;
-    if (ann.fullContext) h += 28; // "Read Full Context" button
     if (isExpanded && ann.fullContext) {
       const contextLines = Math.max(2, Math.ceil((ann.fullContext.length || 40) / 36));
-      h += 36 + contextLines * 18; // border-t + padding + content
-      h = Math.min(h, 450); // max-h on the card
+      return Math.min(450, 48 + contextLines * 18 + 48);
     }
-    return h;
+    // Compact resting height (padding + header + single-line text)
+    return 42;
   };
 
   /** Compute collision-resolved card positions so cards don't overlap. */
   const cardPositions = useMemo(() => {
-    const GAP = 10; // min vertical gap between cards
+    const GAP = 6; // min vertical gap between cards
     const sorted = [...snippet.annotations].sort((a, b) => a.line - b.line);
     const positions: Record<string, number> = {};
     let prevBottom = 0;
@@ -765,13 +761,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                         onMouseEnter={() => setHoveredLine(ann.line)}
                         onMouseLeave={() => setHoveredLine(null)}
                       >
-                        <div className="flex flex-col max-h-[400px]">
-                          <div className="p-4 overflow-y-auto custom-scrollbar">
-                            <div className="flex items-start gap-3">
+                        <div className="flex flex-col">
+                          <div className="p-2.5 px-3">
+                            <div className="flex items-start gap-2.5">
                               <div className="mt-0.5 shrink-0">{getIcon(ann.type, ann.color)}</div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/60 font-mono">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/70 font-mono">
                                     Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
                                   </span>
                                   <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-all">
@@ -815,12 +811,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                     </button>
                                   </div>
                                 </div>
-                                <p className="text-xs text-foreground leading-relaxed font-semibold mb-2">{ann.text}</p>
+                                <p className={cn(
+                                  "text-xs text-foreground leading-snug font-medium transition-all",
+                                  !isActive && !isExpanded && "line-clamp-1"
+                                )}>
+                                  {ann.text}
+                                </p>
                                 
-                                {ann.fullContext && (
+                                {ann.fullContext && (isActive || isExpanded) && (
                                   <button 
                                     onClick={() => setExpandedId(isExpanded ? null : ann.id)}
-                                    className="text-[10px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+                                    className="mt-1 text-[10px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
                                   >
                                     {isExpanded ? 'Show Less' : 'Read Full Context'}
                                   </button>
@@ -838,7 +839,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="border-t border-border bg-secondary/30 overflow-hidden"
                             >
-                              <div className="p-4 text-xs text-muted-foreground max-h-[300px] overflow-y-auto custom-scrollbar">
+                              <div className="p-3 text-xs text-muted-foreground max-h-[300px] overflow-y-auto custom-scrollbar">
                                 <Markdown content={ann.fullContext || ''} />
                               </div>
                             </motion.div>

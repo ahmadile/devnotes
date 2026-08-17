@@ -11,50 +11,8 @@ interface MarkdownProps {
   className?: string;
 }
 
-// Code terms detection regex for render-time visual highlighting
-const CODE_TERMS_REGEX = /(\bdefaultdict(?:\s*\[[^\]]+\]|\s*\([^)]*\))?|\b[a-zA-Z_][a-zA-Z0-9_]*\([^()]*\)|\.[a-zA-Z_][a-zA-Z0-9_]*(?:\([^()]*\))?|\b(?:list|set|dict|tuple|List|Set|Tuple|Dict|Union|Optional)\s*\[[^\]]+\]|\b(?:dict|tuple|int|float|str|bool|Counter|Pandas|DataFrame|Series)\b)/g;
-
-// Renders text nodes with automatic code term badges without mutating raw note content
+// Identity helper preserved for compatibility
 export const renderTextWithCodeHighlights = (node: React.ReactNode): React.ReactNode => {
-  if (typeof node === 'string') {
-    if (!node.trim()) return node;
-    const parts = node.split(CODE_TERMS_REGEX);
-    if (parts.length <= 1) return node;
-
-    return parts.map((part, index) => {
-      if (!part) return null;
-      if (index % 2 === 1) {
-        const lower = part.toLowerCase();
-        if (lower === 'e.g' || lower === 'i.e') {
-          return part;
-        }
-        return (
-          <code 
-            key={index}
-            className="font-mono text-[11px] bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded-md font-semibold tracking-tight shadow-sm inline-block my-0.5"
-          >
-            {part}
-          </code>
-        );
-      }
-      return part;
-    });
-  }
-
-  if (Array.isArray(node)) {
-    return React.Children.map(node, child => renderTextWithCodeHighlights(child));
-  }
-
-  if (React.isValidElement(node)) {
-    if (node.type === 'code' || node.type === 'a') {
-      return node;
-    }
-    const props = node.props as { children?: React.ReactNode };
-    if (props && props.children) {
-      return React.cloneElement(node, {}, renderTextWithCodeHighlights(props.children));
-    }
-  }
-
   return node;
 };
 
