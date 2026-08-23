@@ -914,24 +914,35 @@ export default function App() {
                         const isPanelOpen = expandedSyntaxKeyword !== null;
 
                         return (
-                          <div className="border border-border rounded-2xl bg-secondary/25 p-5 transition-all duration-300">
+                          <div className="border border-border/80 rounded-2xl bg-secondary/30 hover:bg-secondary/40 p-4 transition-all duration-300 shadow-sm">
                             <div 
-                              className="flex items-center justify-between cursor-pointer select-none" 
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none" 
                               onClick={() => setExpandedSyntaxKeyword(isPanelOpen ? null : matchingSyntaxes[0].keyword.toLowerCase())}
                             >
-                              <div className="flex items-center gap-2.5 text-xs font-bold text-foreground">
-                                <BookOpen className="w-4 h-4 text-emerald-500 animate-pulse" />
-                                <span>{matchingSyntaxes.length} Syntax reference{matchingSyntaxes.length > 1 ? 's' : ''} available for tags:</span>
-                                <div className="flex gap-1.5">
+                              <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <BookOpen className="w-4 h-4 text-emerald-500 shrink-0" />
+                                  <span className="text-xs font-bold text-foreground whitespace-nowrap">
+                                    {matchingSyntaxes.length} Syntax reference{matchingSyntaxes.length > 1 ? 's' : ''} available:
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   {matchingSyntaxes.map(s => (
-                                    <span key={s.keyword} className="px-2 py-0.5 rounded bg-emerald-500/10 text-[10px] text-emerald-500 font-mono font-bold">
+                                    <span 
+                                      key={s.keyword} 
+                                      className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-[10px] text-emerald-500 font-mono font-bold border border-emerald-500/20"
+                                    >
                                       #{s.keyword}
                                     </span>
                                   ))}
                                 </div>
                               </div>
-                              <button className="text-[10px] font-bold text-primary uppercase tracking-widest hover:text-primary/80 transition-colors">
-                                {isPanelOpen ? 'Hide Reference' : 'Show Reference'}
+                              <button 
+                                type="button"
+                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap self-start sm:self-auto"
+                              >
+                                <span>{isPanelOpen ? 'Hide Reference' : 'Show Reference'}</span>
+                                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", isPanelOpen && "rotate-180")} />
                               </button>
                             </div>
 
