@@ -105,3 +105,40 @@ export interface RevisionSession {
   };
 }
 
+export interface ProjectBlueprintComplexPart {
+  title: string;
+  problemDescription: string;
+  solutionStrategy: string;
+  reusableConceptsFromNotes?: string[];
+}
+
+export interface ProjectBlueprint {
+  id: string;
+  projectTitle: string;
+  summary: string;
+  targetStack: string[];
+  reusableNotesSummary?: string[];
+  architectureOverview: string;
+  complexParts: ProjectBlueprintComplexPart[];
+  roadmapSteps: {
+    phase: string;
+    description: string;
+    keyDeliverables: string[];
+  }[];
+  snippets: {
+    title: string;
+    language: string;
+    code: string;
+    annotations: {
+      line: number;
+      endLine?: number;
+      text: string;
+      fullContext?: string;
+      type: 'info' | 'warning' | 'tip' | 'logic' | 'debug' | 'important';
+      color?: string;
+    }[];
+  }[];
+  suggestedTags: string[];
+  suggestedModuleName?: string;
+}
+

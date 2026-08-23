@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -85,10 +85,10 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'revision' | 'settings'>('generator');
+  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>('generator');
   const [aiModalTopic, setAiModalTopic] = useState<string | undefined>(undefined);
 
-  const openAiAssistant = (tab: 'generator' | 'chat' | 'revision' | 'settings' = 'generator', topic?: string) => {
+  const openAiAssistant = (tab: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' = 'generator', topic?: string) => {
     setAiModalTab(tab);
     setAiModalTopic(topic);
     setIsAiModalOpen(true);
@@ -711,6 +711,14 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
+                  <button
+                    onClick={() => openAiAssistant('architect')}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 transition-all cursor-pointer mr-1 group shadow-sm"
+                    title="Concevoir un Projet & Architecture Solution (Tech Lead)"
+                  >
+                    <Briefcase className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Architecte Pro</span>
+                  </button>
                   <button
                     onClick={() => openAiAssistant('revision', activeNote?.title)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 transition-all cursor-pointer mr-1 group shadow-sm"

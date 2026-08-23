@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
-import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode } from './aiService.js';
+import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint } from './aiService.js';
 import dns from 'dns';
 
 // Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
@@ -190,6 +190,30 @@ const app = express();
       res.json({ ok: true, evaluation });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Evaluation error' });
+    }
+  });
+
+  app.post('/api/ai/architect', async (req, res) => {
+    try {
+      const { projectIdea, notesContext, syntaxDefinitions, targetModuleName, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!projectIdea || typeof projectIdea !== 'string') {
+        res.status(400).json({ error: 'Project idea is required' });
+        return;
+      }
+
+      const blueprint = await generateProjectBlueprint({
+        projectIdea,
+        notesContext: notesContext || [],
+        syntaxDefinitions,
+        targetModuleName,
+        provider,
+        apiKey,
+        model,
+        ollamaUrl
+      });
+      res.json({ ok: true, blueprint });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'AI Architect error' });
     }
   });
 

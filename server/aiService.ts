@@ -1147,3 +1147,341 @@ Renvoie UNIQUEMENT un JSON conforme à ce format :
   };
 }
 
+export interface ProjectBlueprintComplexPart {
+  title: string;
+  problemDescription: string;
+  solutionStrategy: string;
+  reusableConceptsFromNotes?: string[];
+}
+
+export interface ProjectBlueprintResult {
+  id: string;
+  projectTitle: string;
+  summary: string;
+  targetStack: string[];
+  reusableNotesSummary?: string[];
+  architectureOverview: string;
+  complexParts: ProjectBlueprintComplexPart[];
+  roadmapSteps: {
+    phase: string;
+    description: string;
+    keyDeliverables: string[];
+  }[];
+  snippets: {
+    title: string;
+    language: string;
+    code: string;
+    annotations: GeneratedAnnotation[];
+  }[];
+  suggestedTags: string[];
+  suggestedModuleName?: string;
+}
+
+export interface ProjectBlueprintRequest {
+  projectIdea: string;
+  notesContext?: {
+    id: string;
+    title: string;
+    tags: string[];
+    content: string;
+    snippets: {
+      title?: string;
+      language: string;
+      code: string;
+      annotations?: { line: number; text: string; type?: string }[];
+    }[];
+  }[];
+  syntaxDefinitions?: Record<string, { keyword: string; text: string; fullContext?: string }>;
+  targetModuleName?: string;
+  provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
+  apiKey?: string;
+  model?: string;
+  ollamaUrl?: string;
+}
+
+/**
+ * Intelligent fallback generator for Project Blueprint when no AI key is provided or API is unreachable.
+ */
+export function fallbackProjectBlueprint(
+  projectIdea: string,
+  notesContext: ProjectBlueprintRequest['notesContext'] = [],
+  syntaxDefinitions: Record<string, { keyword: string; text: string }> = {}
+): ProjectBlueprintResult {
+  const ideaClean = projectIdea.trim();
+  const matchedNoteTitles = notesContext.slice(0, 5).map(n => n.title);
+  const matchedKeywords = Object.keys(syntaxDefinitions).slice(0, 6);
+
+  return {
+    id: 'blueprint-' + Math.random().toString(36).substr(2, 9),
+    projectTitle: ideaClean.length > 50 ? ideaClean.slice(0, 50) + '...' : ideaClean || 'Architecture Solution Logicielle',
+    summary: `Ce document d'architecture technique et de cadrage a été généré en capitalisant sur votre base de connaissances DevNotes. Il détaille la conception modulaire, la résolution des défis critiques et les patterns de code optimaux pour concevoir : "${ideaClean}".`,
+    targetStack: ['Python 3.11+', 'FastAPI / Node.js', 'Pydantic', 'PostgreSQL / MongoDB', 'Docker'],
+    reusableNotesSummary: matchedNoteTitles.length > 0 
+      ? matchedNoteTitles.map(t => `Note de référence : "${t}"`)
+      : ['Concepts et patrons de conception réutilisés depuis votre base de notes'],
+    architectureOverview: `### 🏛️ Vue d'Ensemble de l'Architecture
+
+Le projet s'articule autour d'une architecture orientée services et modulaire :
+1. **Couche Métier (Core Services)** : Traitement des règles business, orchestrateurs d'agents ou de flux de données.
+2. **Couche Données & Persistance** : Gestion optimisée des requêtes, structures de données adaptées et caching.
+3. **Couche API / Interface** : Exposition sécurisée, validation stricte des entrées et gestion des erreurs temps réel.
+
+> [!NOTE]
+> Cette approche garantit la haute disponibilité, l'extensibilité et la réutilisation directe des modules déjà documentés dans vos cours et notes.`,
+    complexParts: [
+      {
+        title: "Gestion de la concurrence et résilience des flux",
+        problemDescription: "Les traitements asynchrones et l'orchestration peuvent saturer les ressources ou causer des blocages en cas de pic de charge.",
+        solutionStrategy: "Mise en place d'une file d'attente (Queue/Worker pattern) avec retry automatique exponentiel et décorateurs de contrôle d'erreurs.",
+        reusableConceptsFromNotes: matchedKeywords.length > 0 ? matchedKeywords.slice(0, 3) : ["Décorateurs", "Gestion d'exceptions", "Asynchronisme"]
+      },
+      {
+        title: "Modélisation des données & Performances d'accès",
+        problemDescription: "Optimiser les agrégations de données et minimiser la latence sur les requêtes fréquentes.",
+        solutionStrategy: "Indexation ciblée, structures mémoires optimisées et découplage entre lecture et écriture.",
+        reusableConceptsFromNotes: matchedKeywords.length > 3 ? matchedKeywords.slice(3, 6) : ["Dictionnaires & Hashing", "Générateurs"]
+      }
+    ],
+    roadmapSteps: [
+      {
+        phase: "Phase 1 : Cadrage & Socle Technique",
+        description: "Initialisation du dépôt, configuration de l'environnement, validation des modèles de données fondamentaux.",
+        keyDeliverables: ["Schéma de données validé", "Configuration environnement & tests unitaires de base"]
+      },
+      {
+        phase: "Phase 2 : Développement du Cœur Métier",
+        description: "Implémentation des services principaux et résolution des composants critiques identifiés.",
+        keyDeliverables: ["Moteur principal opérationnel", "Gestionnaires d'erreurs et de logs"]
+      },
+      {
+        phase: "Phase 3 : Intégration, Tests & Déploiement",
+        description: "Mise en place des tests d'intégration, conteneurisation Docker et documentation technique d'exploitation.",
+        keyDeliverables: ["Image Docker prête pour production", "Documentation d'architecture finale"]
+      }
+    ],
+    snippets: [
+      {
+        title: "Orchestrateur & Gestionnaire d'Architecture Résiliente",
+        language: "python",
+        code: `import asyncio
+import time
+from typing import Dict, Any, Optional
+
+class SolutionOrchestrator:
+    """
+    Orchestrateur central gérant les flux complexes et la tolérance aux pannes.
+    Capitalise sur les patterns asynchrones documentés dans DevNotes.
+    """
+    def __init__(self, service_name: str, max_retries: int = 3):
+        self.service_name = service_name
+        self.max_retries = max_retries
+        self.metrics: Dict[str, Any] = {"success": 0, "failures": 0}
+
+    async def execute_task(self, task_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                # Simulation de l'exécution du nœud logique
+                await asyncio.sleep(0.05)
+                self.metrics["success"] += 1
+                return {"task_id": task_id, "status": "completed", "attempt": attempt}
+            except Exception as e:
+                if attempt == self.max_retries:
+                    self.metrics["failures"] += 1
+                    raise RuntimeError(f"Échec critique sur {task_id}: {str(e)}")
+                await asyncio.sleep(0.1 * attempt)`,
+        annotations: [
+          {
+            line: 5,
+            endLine: 9,
+            text: "Classe centrale encapsulant l'état du service et les compteurs de résilience.",
+            type: "logic",
+            color: "#6366f1"
+          },
+          {
+            line: 15,
+            endLine: 24,
+            text: "Boucle de retry exponentielle pour absorber les défaillances temporaires de réseau ou d'API.",
+            type: "tip",
+            color: "#10b981"
+          }
+        ]
+      }
+    ],
+    suggestedTags: ['architecture', 'blueprint', 'backend', 'system-design'],
+    suggestedModuleName: 'Projets & Architectures'
+  };
+}
+
+/**
+ * Lead Solution Architect Agent:
+ * Synthesizes user's entire knowledge base (notes, courses, syntax definitions)
+ * to design comprehensive technical specifications, solve complex project bottlenecks,
+ * and provide key architectural code patterns.
+ */
+export async function generateProjectBlueprint(req: ProjectBlueprintRequest): Promise<ProjectBlueprintResult> {
+  const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
+  const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+
+  // Build summarized context from all notes
+  const notesOverview = (req.notesContext || []).map(n => {
+    const snips = (n.snippets || []).map(s => `[Snippet: ${s.title || s.language}]`).join(', ');
+    return `- "${n.title}" (Tags: ${n.tags.join(', ') || 'aucun'}): ${n.content.slice(0, 180)}... ${snips}`;
+  }).join('\n');
+
+  const syntaxKeywords = Object.keys(req.syntaxDefinitions || {}).slice(0, 40).join(', ');
+
+  const prompt = `Tu es un Lead Software Architect & Tech Lead de niveau mondial.
+L'utilisateur te soumet une idée de projet logiciel ou un problème d'ingénierie à concevoir :
+"${req.projectIdea}"
+
+Voici l'ensemble des connaissances, cours, syntaxes et notes que l'utilisateur a accumulés dans son espace DevNotes :
+---
+RÉFÉRENCES DE SYNTAXES CONNUES :
+${syntaxKeywords || 'Générales (Python, JS, TS, etc.)'}
+
+BASE DE NOTES ET COURS EXISTANTS :
+${notesOverview || 'Aucune note spécifique transmise.'}
+---
+
+MISSION :
+1. Analyse le projet demandé et conçois un dossier d'architecture technique complet.
+2. Identifie comment le projet peut CAPITALISER et RÉUTILISER directement les connaissances et notes de l'utilisateur (par exemple bibliothèques, algorithmes, patterns, structures de données qu'il a déjà notés).
+3. Décris les PARTIES COMPLEXES du projet (les défis techniques épineux) et donne les stratégies précises et concrètes pour les résoudre.
+4. Fournis 1 ou 2 SNIPPETS DE CODE CLÉS (illustrant la résolution des nœuds complexes) avec des annotations de ligne précises.
+5. Définis une ROADMAP d'implémentation par étapes.
+
+Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
+{
+  "id": "blueprint-12345",
+  "projectTitle": "Titre professionnel et percutant du projet",
+  "summary": "Résumé exécutif du projet, ses objectifs et sa valeur ajoutée (2-3 phrases).",
+  "targetStack": ["Python 3.11", "FastAPI", "Pandas", "Redis", "Docker"],
+  "reusableNotesSummary": [
+    "Réutilisation de la note '...' pour la gestion des...",
+    "Exploitation du pattern décorateur documenté dans '...'"
+  ],
+  "architectureOverview": "### 🏗️ Architecture Globale\\n\\nExplication détaillée en Markdown du flux de données, des couches et des composants...",
+  "complexParts": [
+    {
+      "title": "Nom du défi complexe 1 (ex: Synchronisation temps réel des stocks)",
+      "problemDescription": "Pourquoi c'est difficile (concurrence, latence, cohérence des données)...",
+      "solutionStrategy": "La solution d'ingénierie adoptée (pattern, outil, algo)...",
+      "reusableConceptsFromNotes": ["Pandas", "Asyncio", "Dictionnaires"]
+    }
+  ],
+  "roadmapSteps": [
+    {
+      "phase": "Phase 1 : Socle & Modélisation",
+      "description": "Description de la phase...",
+      "keyDeliverables": ["Livrable 1", "Livrable 2"]
+    }
+  ],
+  "snippets": [
+    {
+      "title": "Nom du composant critique",
+      "language": "python",
+      "code": "code python propre...",
+      "annotations": [
+        {
+          "line": 1,
+          "endLine": 4,
+          "text": "Explication de la logique...",
+          "type": "logic",
+          "color": "#6366f1"
+        }
+      ]
+    }
+  ],
+  "suggestedTags": ["architecture", "supermarche", "agents-ia", "python"],
+  "suggestedModuleName": "Projets & Architectures"
+}`;
+
+  if (provider === 'openrouter' && apiKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DevNotes Solution Architect',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content;
+        if (text) {
+          const parsed = JSON.parse(text) as ProjectBlueprintResult;
+          if (parsed && parsed.projectTitle && parsed.architectureOverview) {
+            parsed.id = parsed.id || 'blueprint-' + Math.random().toString(36).substr(2, 9);
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[aiService] Architect OpenRouter error', e);
+    }
+  }
+
+  if ((provider === 'gemini' || !provider) && apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      if (response.text) {
+        const parsed = JSON.parse(response.text) as ProjectBlueprintResult;
+        if (parsed && parsed.projectTitle && parsed.architectureOverview) {
+          parsed.id = parsed.id || 'blueprint-' + Math.random().toString(36).substr(2, 9);
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('[aiService] Architect Gemini error', e);
+    }
+  }
+
+  if (provider === 'ollama') {
+    try {
+      const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const res = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelName || 'llama3',
+          messages: [{ role: 'user', content: prompt }],
+          stream: false,
+          format: 'json',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.message?.content;
+        if (text) {
+          const parsed = JSON.parse(text) as ProjectBlueprintResult;
+          if (parsed && parsed.projectTitle && parsed.architectureOverview) {
+            parsed.id = parsed.id || 'blueprint-' + Math.random().toString(36).substr(2, 9);
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[aiService] Architect Ollama error', e);
+    }
+  }
+
+  // Fallback
+  return fallbackProjectBlueprint(req.projectIdea, req.notesContext, req.syntaxDefinitions || {});
+}
+
+

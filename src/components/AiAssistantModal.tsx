@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Note, Module, CodeSnippet, Annotation, SyntaxDefinition } from '../types';
+import { Note, Module, CodeSnippet, Annotation, SyntaxDefinition, ProjectBlueprint, ProjectBlueprintComplexPart } from '../types';
 import {
   Sparkles,
   MessageSquare,
@@ -33,7 +33,12 @@ import {
   Trash2,
   Clock,
   ChevronDown,
-  GraduationCap
+  GraduationCap,
+  Briefcase,
+  Copy,
+  ArrowRight,
+  CheckCircle2,
+  Target
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { RevisionView } from './RevisionView';
@@ -61,7 +66,7 @@ interface AiAssistantModalProps {
   activeNote: Note | null;
   syntaxDefinitions?: Record<string, SyntaxDefinition>;
   onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null, updateExistingId?: string | null) => void;
-  initialTab?: 'generator' | 'chat' | 'revision' | 'settings';
+  initialTab?: 'generator' | 'chat' | 'architect' | 'revision' | 'settings';
   initialTopic?: string;
 }
 
@@ -211,7 +216,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   initialTab = 'generator',
   initialTopic,
 }) => {
-  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'revision' | 'settings'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>(initialTab);
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -223,6 +228,14 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // Architect Pro State
+  const [blueprintPrompt, setBlueprintPrompt] = useState('');
+  const [isArchitectProcessing, setIsArchitectProcessing] = useState(false);
+  const [blueprintResult, setBlueprintResult] = useState<ProjectBlueprint | null>(null);
+  const [blueprintScope, setBlueprintScope] = useState<'all' | string>('all');
+  const [blueprintSavedSuccess, setBlueprintSavedSuccess] = useState(false);
+  const [blueprintCopied, setBlueprintCopied] = useState(false);
 
   // AI Provider & Key Settings
   const [aiProvider, setAiProvider] = useState<'openrouter' | 'gemini' | 'ollama' | 'openai'>(
@@ -540,6 +553,198 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     }
   };
 
+  const handleGenerateBlueprint = async (customPrompt?: string) => {
+    const promptToUse = (customPrompt || blueprintPrompt).trim();
+    if (!promptToUse || isArchitectProcessing) return;
+
+    setIsArchitectProcessing(true);
+    setBlueprintResult(null);
+    setBlueprintSavedSuccess(false);
+
+    try {
+      const scopedNotes = blueprintScope === 'all'
+        ? notes
+        : notes.filter(n => n.moduleId === blueprintScope);
+
+      const notesContext = scopedNotes.map(n => ({
+        id: n.id,
+        title: n.title,
+        tags: n.tags,
+        content: n.content,
+        snippets: n.snippets.map(s => ({
+          title: s.title,
+          language: s.language,
+          code: s.code,
+          annotations: s.annotations.map(a => ({ line: a.line, text: a.text, type: a.type }))
+        }))
+      }));
+
+      const targetModule = modules.find(m => m.id === blueprintScope);
+
+      const res = await fetch('/api/ai/architect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectIdea: promptToUse,
+          notesContext,
+          syntaxDefinitions,
+          targetModuleName: targetModule?.name,
+          provider: aiProvider,
+          apiKey: (aiProvider === 'openrouter' ? openRouterKey : geminiApiKey).trim() || undefined,
+          model: aiModel.trim() || undefined,
+          ollamaUrl: ollamaUrl.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.ok && data.blueprint) {
+        setBlueprintResult(data.blueprint);
+      } else {
+        throw new Error(data.error || "Impossible de générer le dossier d'architecture");
+      }
+    } catch (err: any) {
+      console.error('[Architect] Generation error:', err);
+      alert(err.message || 'Une erreur est survenue lors de la conception.');
+    } finally {
+      setIsArchitectProcessing(false);
+    }
+  };
+
+  const handleSaveBlueprintAsNote = () => {
+    if (!blueprintResult) return;
+
+    let fullMarkdown = `# ${blueprintResult.projectTitle}\n\n`;
+    fullMarkdown += `> [!NOTE]\n> **Résumé Exécutif** : ${blueprintResult.summary}\n\n`;
+
+    if (blueprintResult.targetStack && blueprintResult.targetStack.length > 0) {
+      fullMarkdown += `### 🛠️ Stack Technique Ciblée\n`;
+      fullMarkdown += blueprintResult.targetStack.map(s => `- \`${s}\``).join('\n') + '\n\n';
+    }
+
+    if (blueprintResult.reusableNotesSummary && blueprintResult.reusableNotesSummary.length > 0) {
+      fullMarkdown += `### 💡 Connaissances & Notes Réutilisées\n`;
+      fullMarkdown += blueprintResult.reusableNotesSummary.map(s => `- ${s}`).join('\n') + '\n\n';
+    }
+
+    fullMarkdown += `${blueprintResult.architectureOverview}\n\n`;
+
+    if (blueprintResult.complexParts && blueprintResult.complexParts.length > 0) {
+      fullMarkdown += `### 🧩 Résolution des Défis Complexes\n\n`;
+      blueprintResult.complexParts.forEach((cp, idx) => {
+        fullMarkdown += `#### ${idx + 1}. ${cp.title}\n`;
+        fullMarkdown += `- **Problème / Enjeu** : ${cp.problemDescription}\n`;
+        fullMarkdown += `- **Stratégie & Solution** : ${cp.solutionStrategy}\n`;
+        if (cp.reusableConceptsFromNotes && cp.reusableConceptsFromNotes.length > 0) {
+          fullMarkdown += `- **Concepts mobilisés** : ${cp.reusableConceptsFromNotes.map(c => `\`#${c}\``).join(', ')}\n`;
+        }
+        fullMarkdown += '\n';
+      });
+    }
+
+    if (blueprintResult.roadmapSteps && blueprintResult.roadmapSteps.length > 0) {
+      fullMarkdown += `### 🗺️ Roadmap d'Implémentation\n\n`;
+      blueprintResult.roadmapSteps.forEach(st => {
+        fullMarkdown += `#### ${st.phase}\n${st.description}\n`;
+        if (st.keyDeliverables && st.keyDeliverables.length > 0) {
+          fullMarkdown += `*Livrables clés :* ${st.keyDeliverables.join(', ')}\n`;
+        }
+        fullMarkdown += '\n';
+      });
+    }
+
+    const mappedSnippets: CodeSnippet[] = (blueprintResult.snippets || []).map(s => ({
+      id: Math.random().toString(36).substr(2, 9),
+      title: s.title,
+      language: s.language || 'python',
+      code: s.code,
+      annotations: (s.annotations || []).map(a => ({
+        id: Math.random().toString(36).substr(2, 9),
+        line: a.line,
+        endLine: a.endLine,
+        text: a.text,
+        fullContext: a.fullContext,
+        type: a.type || 'logic',
+        color: a.color || '#6366f1'
+      })),
+      highlightedLines: s.annotations ? s.annotations.map(a => a.line) : []
+    }));
+
+    let targetModId = blueprintScope !== 'all' ? blueprintScope : null;
+    if (!targetModId && blueprintResult.suggestedModuleName) {
+      const existingMod = modules.find(m => m.name.toLowerCase() === blueprintResult.suggestedModuleName?.toLowerCase());
+      if (existingMod) targetModId = existingMod.id;
+    }
+
+    onSaveNote({
+      title: blueprintResult.projectTitle,
+      content: fullMarkdown,
+      tags: blueprintResult.suggestedTags || ['architecture', 'project-blueprint'],
+      snippets: mappedSnippets
+    }, targetModId);
+
+    setBlueprintSavedSuccess(true);
+    setTimeout(() => setBlueprintSavedSuccess(false), 4000);
+  };
+
+  const handleCopyBlueprintMarkdown = () => {
+    if (!blueprintResult) return;
+
+    let fullMarkdown = `# ${blueprintResult.projectTitle}\n\n`;
+    fullMarkdown += `> [!NOTE]\n> **Résumé Exécutif** : ${blueprintResult.summary}\n\n`;
+
+    if (blueprintResult.targetStack && blueprintResult.targetStack.length > 0) {
+      fullMarkdown += `### 🛠️ Stack Technique Ciblée\n`;
+      fullMarkdown += blueprintResult.targetStack.map(s => `- \`${s}\``).join('\n') + '\n\n';
+    }
+
+    if (blueprintResult.reusableNotesSummary && blueprintResult.reusableNotesSummary.length > 0) {
+      fullMarkdown += `### 💡 Connaissances & Notes Réutilisées\n`;
+      fullMarkdown += blueprintResult.reusableNotesSummary.map(s => `- ${s}`).join('\n') + '\n\n';
+    }
+
+    fullMarkdown += `${blueprintResult.architectureOverview}\n\n`;
+
+    if (blueprintResult.complexParts && blueprintResult.complexParts.length > 0) {
+      fullMarkdown += `### 🧩 Résolution des Défis Complexes\n\n`;
+      blueprintResult.complexParts.forEach((cp, idx) => {
+        fullMarkdown += `#### ${idx + 1}. ${cp.title}\n`;
+        fullMarkdown += `- **Problème / Enjeu** : ${cp.problemDescription}\n`;
+        fullMarkdown += `- **Stratégie & Solution** : ${cp.solutionStrategy}\n`;
+        if (cp.reusableConceptsFromNotes && cp.reusableConceptsFromNotes.length > 0) {
+          fullMarkdown += `- **Concepts mobilisés** : ${cp.reusableConceptsFromNotes.map(c => `\`#${c}\``).join(', ')}\n`;
+        }
+        fullMarkdown += '\n';
+      });
+    }
+
+    if (blueprintResult.snippets && blueprintResult.snippets.length > 0) {
+      fullMarkdown += `### 💻 Snippets Clés d'Architecture\n\n`;
+      blueprintResult.snippets.forEach(s => {
+        fullMarkdown += `#### ${s.title}\n\`\`\`${s.language}\n${s.code}\n\`\`\`\n\n`;
+      });
+    }
+
+    if (blueprintResult.roadmapSteps && blueprintResult.roadmapSteps.length > 0) {
+      fullMarkdown += `### 🗺️ Roadmap d'Implémentation\n\n`;
+      blueprintResult.roadmapSteps.forEach(st => {
+        fullMarkdown += `#### ${st.phase}\n${st.description}\n`;
+        if (st.keyDeliverables && st.keyDeliverables.length > 0) {
+          fullMarkdown += `*Livrables clés :* ${st.keyDeliverables.join(', ')}\n`;
+        }
+        fullMarkdown += '\n';
+      });
+    }
+
+    navigator.clipboard.writeText(fullMarkdown);
+    setBlueprintCopied(true);
+    setTimeout(() => setBlueprintCopied(false), 2500);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-all duration-300">
       <div
@@ -594,6 +799,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 Assistant Chat
+              </button>
+              <button
+                onClick={() => setActiveTab('architect')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  activeTab === 'architect'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                Architecte Pro
               </button>
               <button
                 onClick={() => setActiveTab('revision')}
@@ -1292,6 +1509,336 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Architect Pro Tab */}
+          {activeTab === 'architect' && (
+            <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto bg-background/50">
+              {!blueprintResult ? (
+                /* Input & Configuration Screen */
+                <div className="max-w-4xl w-full mx-auto space-y-6 my-auto">
+                  {/* Banner */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-background border border-indigo-500/20 shadow-sm space-y-2">
+                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                      <Briefcase className="w-4 h-4" />
+                      <span>Architecte Logiciel & Tech Lead Solution</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Soumettez une idée de projet logiciel ou un défi d'ingénierie. L'agent parcourt l'ensemble de votre base de connaissances (cours, notes, syntaxes, snippets) pour concevoir le dossier d'architecture technique, résoudre les points complexes et générer des modèles de code annotés prêts à l'emploi.
+                    </p>
+                  </div>
+
+                  {/* Scope Selector */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-secondary/40 border border-border">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-xs font-semibold text-foreground">Connaissances ciblées :</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 sm:justify-end">
+                      <select
+                        value={blueprintScope}
+                        onChange={(e) => setBlueprintScope(e.target.value)}
+                        className="bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer min-w-[220px]"
+                      >
+                        <option value="all">🌐 Tout l'espace de travail ({notes.length} notes, {Object.keys(syntaxDefinitions).length} syntaxes)</option>
+                        {modules.map(m => (
+                          <option key={m.id} value={m.id}>📁 Dossier : {m.name} ({notes.filter(n => n.moduleId === m.id).length} notes)</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Quick inspirations */}
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-indigo-400" />
+                      Exemples d'idées de projets :
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        "🤖 Système d'Agents IA pour Supermarché (Stocks, Alertes, Catalogue)",
+                        "⚡ Pipeline ETL & Streaming Temps Réel pour Transactions",
+                        "🔐 Plateforme Microservices avec Auth Sécurisée & Cache Redis",
+                        "📊 Moteur d'Analytics et Détection d'Anomalies avec Pandas"
+                      ].map((idea, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setBlueprintPrompt(idea)}
+                          className="px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary border border-border hover:border-indigo-500/40 text-[11px] text-muted-foreground hover:text-foreground transition-all text-left cursor-pointer"
+                        >
+                          {idea}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Prompt Textarea */}
+                  <div className="space-y-3">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-foreground flex items-center justify-between">
+                      <span>Cahier des charges ou Problème à concevoir</span>
+                      <span className="text-[10px] text-muted-foreground font-normal lowercase">Markdown et détails bienvenus</span>
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={blueprintPrompt}
+                      onChange={(e) => setBlueprintPrompt(e.target.value)}
+                      placeholder="Ex: Je souhaite concevoir un système complet d'agents IA pour un supermarché. Les agents doivent gérer la prédiction des ruptures de stock, surveiller les dates de péremption, et alerter les managers via WebSocket..."
+                      className="w-full bg-background border border-border rounded-xl p-4 text-xs font-sans text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none shadow-inner"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          handleGenerateBlueprint();
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-[11px] text-muted-foreground/70 italic">
+                      Astuce : Appuyez sur Ctrl + Entrée pour lancer la conception.
+                    </span>
+                    <button
+                      onClick={() => handleGenerateBlueprint()}
+                      disabled={isArchitectProcessing || !blueprintPrompt.trim()}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg shadow-indigo-500/20"
+                    >
+                      {isArchitectProcessing ? (
+                        <>
+                          <Brain className="w-4 h-4 animate-spin text-white" />
+                          <span>Conception architecturale en cours...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Briefcase className="w-4 h-4" />
+                          <span>Concevoir l'Architecture du Projet</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Generated Blueprint View */
+                <div className="max-w-5xl w-full mx-auto space-y-6 pb-12">
+                  {/* Top Action Bar */}
+                  <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 p-3.5 bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-lg">
+                    <button
+                      onClick={() => setBlueprintResult(null)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Modifier le prompt</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCopyBlueprintMarkdown}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-semibold transition-colors cursor-pointer"
+                        title="Copier tout le dossier technique en Markdown"
+                      >
+                        {blueprintCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{blueprintCopied ? 'Copié !' : 'Copier Markdown'}</span>
+                      </button>
+
+                      <button
+                        onClick={handleSaveBlueprintAsNote}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        {blueprintSavedSuccess ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Plus className="w-3.5 h-3.5" />}
+                        <span>{blueprintSavedSuccess ? 'Projet Enregistré !' : 'Créer la Note Projet'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Overview Header Card */}
+                  <div className="p-6 rounded-2xl bg-card border border-indigo-500/30 shadow-md space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider text-indigo-500 font-mono">
+                        Dossier d'Architecture
+                      </span>
+                      {(blueprintResult.suggestedTags || []).map(t => (
+                        <span key={t} className="px-2 py-0.5 rounded-md bg-secondary text-[10px] font-mono text-muted-foreground">
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+                      {blueprintResult.projectTitle}
+                    </h2>
+
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed bg-secondary/30 p-4 rounded-xl border border-border/50">
+                      {blueprintResult.summary}
+                    </p>
+
+                    {/* Stack & Capitalized Notes */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      <div className="space-y-2 p-3.5 rounded-xl bg-secondary/20 border border-border/50">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                          Stack Technique Recommandée :
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(blueprintResult.targetStack || []).map((tech, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-semibold">
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                          <Lightbulb className="w-3.5 h-3.5 text-emerald-400" />
+                          Connaissances & Cours Mobilisés :
+                        </span>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {(blueprintResult.reusableNotesSummary || []).map((item, i) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className="text-emerald-500 font-bold">•</span>
+                              <span className="text-[11px]">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Architecture Breakdown */}
+                  <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-4">
+                    <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+                      <Globe className="w-4 h-4 text-indigo-400" />
+                      <span>Spécifications & Architecture Système</span>
+                    </h3>
+                    <div className="prose dark:prose-invert prose-xs max-w-none">
+                      <Markdown content={blueprintResult.architectureOverview} />
+                    </div>
+                  </div>
+
+                  {/* Complex Parts Resolution */}
+                  {blueprintResult.complexParts && blueprintResult.complexParts.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-4">
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+                        <Target className="w-4 h-4 text-rose-400" />
+                        <span>Résolution des Défis Techniques Complexes</span>
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {blueprintResult.complexParts.map((cp, idx) => (
+                          <div key={idx} className="p-4 rounded-xl bg-secondary/30 border border-border/80 space-y-3 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <h4 className="text-xs font-bold text-foreground">{cp.title}</h4>
+                              </div>
+
+                              <div className="space-y-1 text-xs">
+                                <p className="text-rose-400/90 text-[11px] font-semibold">⚠️ Le Défi :</p>
+                                <p className="text-muted-foreground text-[11px] leading-relaxed">{cp.problemDescription}</p>
+                              </div>
+
+                              <div className="space-y-1 text-xs pt-1">
+                                <p className="text-emerald-400 font-semibold text-[11px]">💡 Stratégie & Solution :</p>
+                                <p className="text-foreground/90 text-[11px] leading-relaxed">{cp.solutionStrategy}</p>
+                              </div>
+                            </div>
+
+                            {cp.reusableConceptsFromNotes && cp.reusableConceptsFromNotes.length > 0 && (
+                              <div className="pt-2 border-t border-border/40 flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] uppercase font-bold text-muted-foreground/60">Concepts réutilisés :</span>
+                                {cp.reusableConceptsFromNotes.map((c, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[9px] text-emerald-500 font-mono">
+                                    #{c}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Key Code Snippets */}
+                  {blueprintResult.snippets && blueprintResult.snippets.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-4">
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+                        <Code className="w-4 h-4 text-indigo-400" />
+                        <span>Modèles de Code Clés & Annotations</span>
+                      </h3>
+
+                      <div className="space-y-4">
+                        {blueprintResult.snippets.map((snip, idx) => (
+                          <div key={idx} className="rounded-xl border border-border overflow-hidden bg-secondary/20 space-y-2">
+                            <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 border-b border-border">
+                              <span className="text-xs font-bold text-foreground">{snip.title}</span>
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                {snip.language}
+                              </span>
+                            </div>
+                            <pre className="p-4 text-xs font-mono text-foreground overflow-x-auto bg-black/30 rounded-b-xl leading-relaxed">
+                              <code>{snip.code}</code>
+                            </pre>
+                            {snip.annotations && snip.annotations.length > 0 && (
+                              <div className="p-3 bg-secondary/30 border-t border-border space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                  Annotations d'Architecture :
+                                </span>
+                                <div className="space-y-1.5">
+                                  {snip.annotations.map((ann, aIdx) => (
+                                    <div key={aIdx} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-background/60 border border-border/40">
+                                      <span className="text-[10px] font-mono font-bold text-indigo-400 shrink-0">
+                                        Ligne {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
+                                      </span>
+                                      <span className="text-[11px] text-muted-foreground">{ann.text}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Implementation Roadmap */}
+                  {blueprintResult.roadmapSteps && blueprintResult.roadmapSteps.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-4">
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
+                        <ArrowRight className="w-4 h-4 text-emerald-400" />
+                        <span>Roadmap d'Implémentation par Étapes</span>
+                      </h3>
+
+                      <div className="space-y-3">
+                        {blueprintResult.roadmapSteps.map((step, idx) => (
+                          <div key={idx} className="p-3.5 rounded-xl bg-secondary/25 border border-border/60 flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                              {idx + 1}
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <h4 className="text-xs font-bold text-foreground">{step.phase}</h4>
+                              <p className="text-xs text-muted-foreground">{step.description}</p>
+                              {step.keyDeliverables && step.keyDeliverables.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {step.keyDeliverables.map((del, dIdx) => (
+                                    <span key={dIdx} className="px-2 py-0.5 rounded-md bg-secondary text-[10px] text-foreground/80 border border-border/50">
+                                      ✓ {del}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
