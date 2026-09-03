@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, atomDark, prism, tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal, Upload } from 'lucide-react';
@@ -272,6 +272,45 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const prevCodeRef = React.useRef(snippet.code);
 
+  const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Dynamically measure real DOM heights of all rendered annotation cards
+  useEffect(() => {
+    const updateHeights = () => {
+      let changed = false;
+      const newHeights: Record<string, number> = {};
+
+      cardRefs.current.forEach((el, id) => {
+        if (el) {
+          const height = Math.ceil(el.getBoundingClientRect().height);
+          if (height > 0 && cardHeights[id] !== height) {
+            newHeights[id] = height;
+            changed = true;
+          }
+        }
+      });
+
+      if (changed) {
+        setCardHeights(prev => ({ ...prev, ...newHeights }));
+      }
+    };
+
+    updateHeights();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        updateHeights();
+      });
+
+      cardRefs.current.forEach((el) => {
+        if (el) observer.observe(el);
+      });
+
+      return () => observer.disconnect();
+    }
+  }, [snippet.annotations, expandedId]);
+
   useEffect(() => {
     prevCodeRef.current = snippet.code;
   }, [snippet.code]);
@@ -383,15 +422,21 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
-  /** Estimate the rendered resting height of an annotation card (in px). */
-  const estimateCardHeight = (_ann: Annotation): number => {
-    // Ultra compact resting height: py-2 + header + 1-line text
-    return 46;
+  /** Estimate the rendered height of an annotation card (in px) as a safe baseline before/during measurement. */
+  const estimateCardHeight = (ann: Annotation, isExpanded: boolean): number => {
+    const measured = cardHeights[ann.id];
+    if (measured && measured > 30) return measured;
+
+    // Baseline calculation based on content
+    const textLength = (ann.text || '').length;
+    const textLines = Math.max(1, Math.ceil(textLength / 32));
+    const baseHeight = 54 + (textLines * 18);
+    return isExpanded ? baseHeight + 220 : baseHeight;
   };
 
-  /** Compute collision-resolved card positions so cards stay neatly anchored to their code lines. */
+  /** Compute collision-resolved card positions so cards stay neatly anchored to their code lines without ANY overlap. */
   const cardPositions = useMemo(() => {
-    const GAP = 4; // Tight vertical gap between consecutive cards
+    const GAP = 10; // Clean 10px vertical gap between consecutive cards
     const sorted = [...snippet.annotations].sort((a, b) => a.line - b.line);
     const positions: Record<string, number> = {};
     let prevBottom = 0;
@@ -399,16 +444,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
     for (const ann of sorted) {
       const idealTop = 24 + (ann.line - 1) * 24;
-      const resolvedTop = Math.max(idealTop, prevBottom + GAP);
+      const resolvedTop = Math.max(idealTop, prevBottom > 0 ? prevBottom + GAP : idealTop);
       positions[ann.id] = resolvedTop;
 
-      const height = estimateCardHeight(ann);
+      const isExpanded = expandedId === ann.id;
+      const height = estimateCardHeight(ann, isExpanded);
       prevBottom = resolvedTop + height;
       maxBottom = Math.max(maxBottom, prevBottom);
     }
 
     return { positions, maxBottom };
-  }, [snippet.annotations]);
+  }, [snippet.annotations, cardHeights, expandedId]);
 
   const handlePaste = async () => {
     if (snippet.code && snippet.code.trim().length > 0) {
@@ -730,13 +776,25 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
                     const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
-                    // Use collision-resolved position instead of raw line offset
-                    const topOffset = cardPositions.positions[ann.id] ?? (24 + (ann.line - 1) * 24);
+                    const idealTop = 24 + (ann.line - 1) * 24;
+                    const topOffset = cardPositions.positions[ann.id] ?? idealTop;
+                    const isPushedDown = topOffset > idealTop;
                     const isVisible = !isMinimizedMode || isActive;
+
+                    const sameLineAnnotations = snippet.annotations.filter(a => a.line === ann.line);
+                    const sameLineIndex = sameLineAnnotations.findIndex(a => a.id === ann.id);
+                    const hasMultipleOnSameLine = sameLineAnnotations.length > 1;
 
                     return (
                       <motion.div
                         key={ann.id}
+                        ref={(el) => {
+                          if (el) {
+                            cardRefs.current.set(ann.id, el);
+                          } else {
+                            cardRefs.current.delete(ann.id);
+                          }
+                        }}
                         initial={{ opacity: 0, x: 20, scale: 0.95 }}
                         animate={{ 
                           opacity: isVisible ? (hoveredLine === null || isActive ? 1 : 0.35) : 0, 
@@ -746,7 +804,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                         }}
                         exit={{ opacity: 0, x: 20, scale: 0.95 }}
                         className={cn(
-                          "absolute right-0 w-full floating-card rounded-xl border-l-[3px] shadow-xl group/card overflow-hidden transition-all duration-200",
+                          "absolute right-0 w-full floating-card rounded-xl border-l-[3px] shadow-xl group/card overflow-hidden transition-all duration-300",
                           isActive ? "ring-2 ring-primary/40 shadow-primary/20 z-50 opacity-100 grayscale-0" : "grayscale-[0.2] opacity-95"
                         )}
                         style={{ 
@@ -767,6 +825,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/70 font-mono shrink-0">
                                       Lines {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
                                     </span>
+                                    {hasMultipleOnSameLine && (
+                                      <span className="px-1.5 py-0.2 rounded bg-secondary/80 border border-border/60 text-[9px] font-mono font-bold text-muted-foreground shrink-0" title={`Note ${sameLineIndex + 1} sur ${sameLineAnnotations.length} sur cette ligne`}>
+                                        #{sameLineIndex + 1}
+                                      </span>
+                                    )}
                                     {ann.fullContext && (
                                       <button 
                                         onClick={(e) => {
@@ -822,8 +885,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                   </div>
                                 </div>
                                 <p className={cn(
-                                  "text-xs text-foreground leading-snug font-medium transition-all",
-                                  !isExpanded && "line-clamp-1"
+                                  "text-xs text-foreground leading-snug font-medium transition-all break-words whitespace-pre-line",
+                                  !isExpanded && "line-clamp-2"
                                 )}>
                                   {ann.text}
                                 </p>
@@ -847,10 +910,23 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                           )}
                         </AnimatePresence>
                         
+                        {/* Vertical dashed guide line connecting displaced card back to its original code line */}
+                        {isPushedDown && (
+                          <div 
+                            className="absolute -left-[1.05rem] w-px border-l border-dashed pointer-events-none transition-all duration-300"
+                            style={{
+                              borderColor: ann.color || 'var(--primary)',
+                              opacity: isActive ? 0.9 : 0.35,
+                              top: `${idealTop - topOffset + 12}px`,
+                              height: `${topOffset - idealTop}px`
+                            }}
+                          />
+                        )}
+
                         {/* Connection Dot Trigger */}
                         <div 
                           className={cn(
-                            "absolute -left-[1.3rem] top-3 w-2.5 h-2.5 rounded-full cursor-pointer transition-all duration-300",
+                            "absolute -left-[1.3rem] top-3 w-2.5 h-2.5 rounded-full cursor-pointer transition-all duration-300 z-10",
                             isActive ? "scale-125 shadow-lg" : "opacity-60 hover:opacity-100"
                           )}
                           style={{ 
@@ -858,6 +934,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                             boxShadow: `0 0 10px ${ann.color || 'var(--primary)'}` 
                           }}
                           onMouseEnter={() => setHoveredLine(ann.line)}
+                          title={`Lié à la ligne ${ann.line}${hasMultipleOnSameLine ? ` (Note ${sameLineIndex + 1}/${sameLineAnnotations.length})` : ''}`}
                         />
                       </motion.div>
                     );
