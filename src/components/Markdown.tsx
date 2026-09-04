@@ -26,7 +26,7 @@ export const renderTextWithCodeHighlights = (node: React.ReactNode): React.React
         return (
           <code 
             key={index}
-            className="font-mono text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 px-1.5 py-0.5 rounded font-semibold inline-block mx-0.5 my-0.5"
+            className="font-mono text-xs bg-[#141417] text-zinc-200 border border-white/[0.08] px-1.5 py-0.5 rounded-md font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] inline-block mx-0.5 my-0.5"
           >
             {part}
           </code>
@@ -74,7 +74,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             if (isInline) {
               return (
                 <code 
-                  className="font-mono text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 px-1.5 py-0.5 rounded font-semibold"
+                  className="font-mono text-xs bg-[#141417] text-zinc-200 border border-white/[0.08] px-1.5 py-0.5 rounded-md font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                   {...props}
                 >
                   {children}
@@ -88,37 +88,37 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             return <Callout>{renderTextWithCodeHighlights(children)}</Callout>;
           },
           h1: ({ children }) => (
-            <h1 className="text-xl font-extrabold text-indigo-400 border-b border-indigo-500/20 pb-1.5 mt-6 mb-4 font-sans tracking-wide">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight border-b border-white/[0.08] pb-2 mt-6 mb-4 font-sans">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-bold text-sky-400 mt-5 mb-3 font-sans">
+            <h2 className="text-lg font-semibold text-zinc-100 tracking-tight mt-6 mb-3 font-sans">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-semibold text-emerald-400 mt-4 mb-2 font-sans">
+            <h3 className="text-base font-semibold text-zinc-200 tracking-tight mt-5 mb-2 font-sans">
               {children}
             </h3>
           ),
           p: ({ children }) => (
-            <p className="leading-relaxed text-foreground/90 my-3 text-sm font-sans whitespace-pre-line">
+            <p className="leading-relaxed text-zinc-300 my-3 text-sm font-sans whitespace-pre-line">
               {renderTextWithCodeHighlights(children)}
             </p>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-foreground/85 text-sm font-sans">
+            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-zinc-300 text-sm font-sans">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-foreground/85 text-sm font-sans">
+            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-zinc-300 text-sm font-sans">
               {children}
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed text-foreground/90 font-sans marker:text-indigo-400">
+            <li className="leading-relaxed text-zinc-300 font-sans marker:text-zinc-500">
               {renderTextWithCodeHighlights(children)}
             </li>
           ),
@@ -127,13 +127,13 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
               href={href} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-indigo-400 hover:text-indigo-300 underline underline-offset-4 decoration-indigo-500/30 transition-all font-semibold"
+              className="text-zinc-200 hover:text-white underline underline-offset-4 decoration-zinc-500/40 transition-colors font-medium"
             >
               {children}
             </a>
           ),
           strong: ({ children }) => (
-            <strong className="font-bold text-indigo-200">
+            <strong className="font-semibold text-white">
               {renderTextWithCodeHighlights(children)}
             </strong>
           ),
@@ -150,12 +150,12 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-secondary/80 border-b border-indigo-500/30 text-foreground font-semibold">
+            <thead className="bg-secondary/60 border-b border-white/[0.08] text-zinc-200 font-semibold">
               {children}
             </thead>
           ),
           th: ({ children }) => (
-            <th className="px-4 py-3 text-left font-bold text-indigo-300 uppercase tracking-wider text-[11px]">
+            <th className="px-4 py-3 text-left font-semibold text-zinc-300 uppercase tracking-wider text-[11px]">
               {children}
             </th>
           ),
@@ -165,7 +165,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </td>
           ),
           tr: ({ children }) => (
-            <tr className="even:bg-secondary/15 hover:bg-indigo-500/10 transition-colors">
+            <tr className="even:bg-secondary/15 hover:bg-white/[0.03] transition-colors">
               {children}
             </tr>
           ),
@@ -270,34 +270,34 @@ const Callout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const styleMap = {
     note: {
-      border: 'border-l-4 border-indigo-500/60 bg-indigo-500/5',
-      icon: <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />,
+      border: 'border-l-[3px] border-l-sky-500/80 bg-[#121215] border border-white/[0.07]',
+      icon: <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />,
       title: 'Note',
-      titleColor: 'text-indigo-400'
+      titleColor: 'text-sky-400'
     },
     tip: {
-      border: 'border-l-4 border-emerald-500/60 bg-emerald-500/5',
+      border: 'border-l-[3px] border-l-emerald-500/80 bg-[#121215] border border-white/[0.07]',
       icon: <Lightbulb className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />,
       title: 'Tip',
       titleColor: 'text-emerald-400'
     },
     warning: {
-      border: 'border-l-4 border-amber-500/60 bg-amber-500/5',
+      border: 'border-l-[3px] border-l-amber-500/80 bg-[#121215] border border-white/[0.07]',
       icon: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />,
       title: 'Warning',
       titleColor: 'text-amber-400'
     },
     important: {
-      border: 'border-l-4 border-rose-500/60 bg-rose-500/5',
+      border: 'border-l-[3px] border-l-rose-500/80 bg-[#121215] border border-white/[0.07]',
       icon: <Star className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />,
       title: 'Important',
       titleColor: 'text-rose-400'
     },
     info: {
-      border: 'border-l-4 border-primary/50 bg-secondary/35',
-      icon: <HelpCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />,
+      border: 'border-l-[3px] border-l-zinc-500 bg-[#121215] border border-white/[0.07]',
+      icon: <HelpCircle className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />,
       title: '',
-      titleColor: 'text-primary'
+      titleColor: 'text-zinc-400'
     }
   };
 

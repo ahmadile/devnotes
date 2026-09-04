@@ -710,30 +710,30 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-3 text-muted-foreground border-l border-border pl-6">
+                <div className="flex items-center gap-2 text-muted-foreground border-l border-white/[0.06] pl-4">
                   <button
                     onClick={() => openAiAssistant('architect')}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 transition-all cursor-pointer mr-1 group shadow-sm"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#141416] hover:bg-[#1c1c20] border border-white/[0.08] hover:border-white/[0.18] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
                     title="Concevoir un Projet & Architecture Solution (Tech Lead)"
                   >
-                    <Briefcase className="w-3.5 h-3.5 text-purple-500" />
+                    <Briefcase className="w-3.5 h-3.5 text-purple-400 shrink-0" strokeWidth={1.5} />
                     <span>Architecte Pro</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('revision', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 transition-all cursor-pointer mr-1 group shadow-sm"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#141416] hover:bg-[#1c1c20] border border-white/[0.08] hover:border-white/[0.18] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
                     title="Lancer le Mode Révision & Entraînement (Flashcards, Quiz, Défis Code)"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+                    <GraduationCap className="w-3.5 h-3.5 text-sky-400 shrink-0" strokeWidth={1.5} />
                     <span>Réviser & Pratiquer</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('generator')}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground bg-secondary/50 hover:bg-secondary border border-border/80 hover:border-indigo-500/40 dark:hover:border-indigo-400/40 transition-all cursor-pointer mr-1 group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#17171c] hover:bg-[#202026] border border-white/[0.1] hover:border-white/[0.2] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
                     title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
                   >
-                    <DevNotesAiEmblem size="sm" />
-                    <span className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Assistant IA</span>
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" strokeWidth={1.5} />
+                    <span>Assistant IA</span>
                   </button>
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -859,18 +859,18 @@ export default function App() {
                                 }
                               }}
                               className={cn(
-                                "group flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shadow-sm select-none transition-all relative",
+                                "group flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono border select-none transition-all relative",
                                 hasSyntax 
-                                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 cursor-pointer"
-                                  : "bg-primary/10 text-primary border-primary/20"
+                                  ? "bg-[#122218] text-[#86efac] border-[#1e462c] hover:border-[#2e6b43] shadow-sm cursor-pointer"
+                                  : "bg-[#141416] hover:bg-[#1b1b1e] text-zinc-300 hover:text-white border-white/[0.08] hover:border-white/[0.15]"
                               )}
                             >
                               #{tag}
                               {hasSyntax && (
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 bg-popover text-foreground text-[10px] rounded-lg border border-border opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-30 font-sans">
-                                  <div className="font-bold border-b border-border pb-1 mb-1 font-mono text-emerald-500">#{tag} Reference</div>
-                                  <div className="line-clamp-2 text-muted-foreground">{syntaxDefinitions[tag.toLowerCase().trim()].text}</div>
-                                  <div className="text-[9px] text-primary mt-1 font-bold">Click to expand details</div>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 bg-[#141417] text-zinc-200 text-[10px] rounded-lg border border-white/[0.1] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-30 font-sans backdrop-blur-md">
+                                  <div className="font-bold border-b border-white/[0.08] pb-1 mb-1 font-mono text-[#86efac]">#{tag} Reference</div>
+                                  <div className="line-clamp-2 text-zinc-400">{syntaxDefinitions[tag.toLowerCase().trim()].text}</div>
+                                  <div className="text-[9px] text-zinc-400 mt-1 font-medium">Click to expand details</div>
                                 </div>
                               )}
                               <button 
@@ -922,15 +922,15 @@ export default function App() {
                         const isPanelOpen = expandedSyntaxKeyword !== null;
 
                         return (
-                          <div className="border border-border/80 rounded-2xl bg-secondary/30 hover:bg-secondary/40 p-4 transition-all duration-300 shadow-sm">
+                          <div className="border border-white/[0.08] rounded-xl bg-[#121215]/80 hover:bg-[#151519] p-3.5 transition-all duration-300 shadow-sm backdrop-blur-sm">
                             <div 
                               className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none" 
                               onClick={() => setExpandedSyntaxKeyword(isPanelOpen ? null : matchingSyntaxes[0].keyword.toLowerCase())}
                             >
                               <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1">
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <BookOpen className="w-4 h-4 text-emerald-500 shrink-0" />
-                                  <span className="text-xs font-bold text-foreground whitespace-nowrap">
+                                  <BookOpen className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={1.5} />
+                                  <span className="text-xs font-medium text-zinc-200 whitespace-nowrap">
                                     {matchingSyntaxes.length} Syntax reference{matchingSyntaxes.length > 1 ? 's' : ''} available:
                                   </span>
                                 </div>
@@ -938,7 +938,7 @@ export default function App() {
                                   {matchingSyntaxes.map(s => (
                                     <span 
                                       key={s.keyword} 
-                                      className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-[10px] text-emerald-500 font-mono font-bold border border-emerald-500/20"
+                                      className="px-2 py-0.5 rounded text-[10px] text-[#86efac] font-mono font-medium bg-[#14261b] border border-[#1e462c]"
                                     >
                                       #{s.keyword}
                                     </span>
@@ -947,10 +947,10 @@ export default function App() {
                               </div>
                               <button 
                                 type="button"
-                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap self-start sm:self-auto"
+                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#18181c] hover:bg-[#202026] text-zinc-200 border border-white/[0.08] text-[10px] font-medium tracking-wider uppercase transition-all whitespace-nowrap self-start sm:self-auto shadow-sm"
                               >
                                 <span>{isPanelOpen ? 'Hide Reference' : 'Show Reference'}</span>
-                                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", isPanelOpen && "rotate-180")} />
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-zinc-400 transition-transform duration-200", isPanelOpen && "rotate-180")} strokeWidth={1.5} />
                               </button>
                             </div>
 

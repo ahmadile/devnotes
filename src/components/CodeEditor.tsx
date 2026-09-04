@@ -836,7 +836,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                           e.stopPropagation();
                                           setExpandedId(isExpanded ? null : ann.id);
                                         }}
-                                        className="text-[10px] font-bold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 shrink-0"
+                                        className="text-[10px] font-mono font-medium text-zinc-300 hover:text-white bg-[#1a1a1e] hover:bg-[#242429] border border-white/[0.08] px-2 py-0.5 rounded transition-all flex items-center gap-1 shrink-0 shadow-sm cursor-pointer"
                                         title={isExpanded ? 'Réduire les détails' : 'Voir les détails complets'}
                                       >
                                         {isExpanded ? 'Réduire' : 'Voir plus'}
@@ -885,7 +885,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                                   </div>
                                 </div>
                                 <p className={cn(
-                                  "text-xs text-foreground leading-snug font-medium transition-all break-words whitespace-pre-line",
+                                  "text-xs text-zinc-200 leading-snug font-medium transition-all break-words whitespace-pre-line",
                                   !isExpanded && "line-clamp-2"
                                 )}>
                                   {ann.text}
