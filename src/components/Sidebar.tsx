@@ -74,20 +74,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         key={note.id}
         onClick={() => onSelectNote(note.id)}
         className={cn(
-          "w-full text-left py-1.5 pl-6 pr-3 rounded-lg border transition-all group relative flex items-center justify-between",
+          "w-full text-left py-1.5 pl-6 pr-3 rounded-lg border transition-all group relative flex items-center justify-between cursor-pointer",
           activeNoteId === note.id 
-            ? "bg-secondary border-primary/10 shadow-sm" 
-            : "hover:bg-secondary/40 border-transparent"
+            ? "bg-[#18181c] border-white/[0.08] text-white shadow-sm" 
+            : "hover:bg-white/[0.03] border-transparent text-zinc-400 hover:text-zinc-200"
         )}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <FileText className={cn(
             "w-3.5 h-3.5 shrink-0",
-            activeNoteId === note.id ? "text-primary" : "text-muted-foreground/60"
-          )} strokeWidth="1.5" />
+            activeNoteId === note.id ? "text-zinc-200" : "text-zinc-500"
+          )} strokeWidth={1.5} />
           <span className={cn(
             "text-xs truncate transition-colors",
-            activeNoteId === note.id ? "font-semibold text-foreground" : "font-medium text-foreground/70 group-hover:text-foreground"
+            activeNoteId === note.id ? "font-semibold text-white" : "font-medium text-zinc-400 group-hover:text-zinc-200"
           )}>
             {note.title || 'Untitled Note'}
           </span>
@@ -178,12 +178,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 toggleExpand(module.id);
               }}
             >
-              {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />}
             </button>
             {isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-primary shrink-0" />
+              <FolderOpen className="w-4 h-4 text-amber-400/80 shrink-0" strokeWidth={1.5} />
             ) : (
-              <Folder className="w-4 h-4 text-primary shrink-0" />
+              <Folder className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={1.5} />
             )}
             
             {isRenaming ? (
@@ -344,30 +344,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
           <button 
             onClick={onOpenSettings}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-zinc-400 hover:text-white p-1.5 hover:bg-white/[0.06] rounded-md transition-colors cursor-pointer"
+            title="Paramètres Développeur"
           >
-            <SettingsIcon className="w-4 h-4" strokeWidth="1.5" />
+            <SettingsIcon className="w-4 h-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>
 
       {/* Action & Search */}
-      <div className="p-4 flex flex-col gap-4">
+      <div className="p-4 flex flex-col gap-3">
         <button 
           onClick={() => onNewNote(null)}
-          className="w-full flex items-center justify-center gap-2 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary py-2 rounded-md text-sm font-medium transition-colors group"
+          className="w-full flex items-center justify-center gap-2 shiny-btn py-2 rounded-lg text-xs font-medium text-zinc-200 hover:text-white transition-all cursor-pointer group"
         >
-          <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" strokeWidth="2" />
-          New Note
+          <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform text-zinc-400 group-hover:text-white" strokeWidth={1.5} />
+          <span>New Note</span>
         </button>
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" strokeWidth="2" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" strokeWidth={1.5} />
           <input 
             type="text" 
             placeholder="Search notes (use # for tags)..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-secondary/50 border border-border rounded-md pl-9 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
+            className="w-full bg-[#121215] border border-white/[0.06] hover:border-white/[0.12] focus:border-zinc-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none transition-all font-sans"
           />
         </div>
       </div>

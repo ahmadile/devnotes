@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -737,56 +737,56 @@ export default function App() {
                   </button>
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="hover:text-primary transition-colors p-1.5 hover:bg-secondary rounded-md"
+                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
                     title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                   >
-                    {theme === 'dark' ? <Sun className="w-4 h-4" strokeWidth="1.5" /> : <Moon className="w-4 h-4" strokeWidth="1.5" />}
+                    {theme === 'dark' ? <Sun className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />}
                   </button>
-                  <div className="w-px h-4 bg-border mx-1" />
+                  <div className="w-px h-3.5 bg-white/[0.08] mx-0.5" />
                   <button 
                     onClick={manualSave}
-                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md"
+                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
                     title="Save locally"
                   >
-                    <Save className="w-4 h-4" strokeWidth="1.5" />
+                    <Save className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={syncToCloud}
                     disabled={isSyncing}
-                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md disabled:opacity-30"
+                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md disabled:opacity-30 cursor-pointer"
                     title="Sync to cloud"
                   >
-                    <CloudUpload className="w-4 h-4" strokeWidth="1.5" />
+                    <CloudUpload className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={loadFromCloud}
                     disabled={isSyncing}
-                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md disabled:opacity-30"
+                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md disabled:opacity-30 cursor-pointer"
                     title="Pull from cloud"
                   >
-                    <CloudDownload className="w-4 h-4" strokeWidth="1.5" />
+                    <CloudDownload className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
-                  <div className="w-px h-4 bg-border mx-1" />
-                  <button
+                  <div className="w-px h-3.5 bg-white/[0.08] mx-0.5" />
+                  <button 
                     onClick={exportAsJson}
-                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md"
+                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
                     title="Export backup"
                   >
-                    <Download className="w-4 h-4" strokeWidth="1.5" />
+                    <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
-                  <button
+                  <button 
                     onClick={() => importInputRef.current?.click()}
-                    className="hover:text-foreground transition-colors p-1.5 hover:bg-secondary rounded-md"
+                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
                     title="Import backup"
                   >
-                    <Upload className="w-4 h-4" strokeWidth="1.5" />
+                    <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
                   <button 
                     onClick={() => activeNote && deleteNote(activeNote.id)}
-                    className="hover:text-destructive transition-colors p-1.5 hover:bg-destructive/10 rounded-md ml-2"
+                    className="text-zinc-400 hover:text-rose-400 transition-colors p-1.5 hover:bg-rose-500/10 rounded-md ml-1 cursor-pointer"
                     title="Delete Note"
                   >
-                    <Trash2 className="w-4 h-4" strokeWidth="1.5" />
+                    <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
                 </div>
 
@@ -1206,36 +1206,48 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md"
+                onClick={() => setIsSettingsOpen(false)}
               >
                 <motion.div 
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.95, opacity: 0 }}
-                  className="w-full max-w-md bg-popover border border-border rounded-3xl p-8 space-y-8 shadow-2xl relative overflow-hidden"
+                  initial={{ scale: 0.96, opacity: 0, y: 8 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.96, opacity: 0, y: 8 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-md bg-[#0d0d10] border border-white/[0.08] rounded-2xl p-6 space-y-6 shadow-2xl relative overflow-hidden"
                 >
-                  <div className="absolute top-0 inset-x-0 h-1.5 bg-primary" />
+                  {/* Subtle top edge glow reflection */}
+                  <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.18] to-transparent" />
                   
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <SettingsIcon className="w-5 h-5 text-primary" />
-                      <h3 className="text-xl font-bold text-foreground">Developer Settings</h3>
+                  <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-300">
+                        <SettingsIcon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-white tracking-tight">Paramètres Développeur</h3>
+                        <p className="text-[11px] text-zinc-500 font-normal">Préférences d'affichage et de syntaxe</p>
+                      </div>
                     </div>
                     <button 
                       onClick={() => setIsSettingsOpen(false)} 
-                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                      className="text-zinc-500 hover:text-white hover:bg-white/[0.06] rounded-md p-1.5 transition-colors cursor-pointer"
+                      title="Fermer"
                     >
-                      &times;
+                      <X className="w-4 h-4" strokeWidth={1.5} />
                     </button>
                   </div>
                   
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Syntax Theme</label>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-400">
+                        Thème de Syntaxe Code
+                      </label>
                       <select 
                         value={settings.syntaxTheme}
                         onChange={(e) => updateSettings({ syntaxTheme: e.target.value as any })}
-                        className="w-full bg-secondary border border-border rounded-xl p-3 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                        className="w-full bg-[#141416] border border-white/[0.08] hover:border-white/[0.15] focus:border-zinc-500 rounded-xl p-2.5 text-xs text-zinc-200 focus:outline-none transition-colors cursor-pointer shadow-sm"
                       >
                         <option value="vscDarkPlus">VS Code Dark Plus</option>
                         <option value="atomDark">Atom Dark</option>
@@ -1243,12 +1255,15 @@ export default function App() {
                         <option value="tomorrow">Tomorrow Night</option>
                       </select>
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Font Family</label>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-400">
+                        Police Monospace
+                      </label>
                       <select 
                         value={settings.fontFamily}
                         onChange={(e) => updateSettings({ fontFamily: e.target.value as any })}
-                        className="w-full bg-secondary border border-border rounded-xl p-3 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-mono cursor-pointer"
+                        className="w-full bg-[#141416] border border-white/[0.08] hover:border-white/[0.15] focus:border-zinc-500 rounded-xl p-2.5 text-xs text-zinc-200 focus:outline-none transition-colors font-mono cursor-pointer shadow-sm"
                       >
                         <option value="JetBrains Mono">JetBrains Mono</option>
                         <option value="Fira Code">Fira Code</option>
@@ -1256,38 +1271,45 @@ export default function App() {
                         <option value="System">System Mono</option>
                       </select>
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">App Appearance</label>
-                      <div className="grid grid-cols-2 gap-3">
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-400">
+                        Mode d'Affichage
+                      </label>
+                      <div className="grid grid-cols-2 gap-2.5">
                         <button 
                           onClick={() => updateSettings({ theme: 'dark' })}
                           className={cn(
-                            "flex items-center justify-center gap-2 py-3 rounded-xl border transition-all",
-                            theme === 'dark' ? "bg-primary/10 border-primary text-primary" : "bg-secondary/50 border-border text-muted-foreground hover:border-border/80"
+                            "flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer",
+                            theme === 'dark' 
+                              ? "bg-[#18181c] border-white/[0.22] text-white shadow-sm" 
+                              : "bg-[#121215] border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.12]"
                           )}
                         >
-                          <Moon className="w-4 h-4" />
-                          <span className="text-xs font-semibold">Dark</span>
+                          <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          <span>Sombre (Carbone)</span>
                         </button>
                         <button 
                           onClick={() => updateSettings({ theme: 'light' })}
                           className={cn(
-                            "flex items-center justify-center gap-2 py-3 rounded-xl border transition-all",
-                            theme === 'light' ? "bg-primary/10 border-primary text-primary" : "bg-secondary/50 border-border text-muted-foreground hover:border-border/80"
+                            "flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer",
+                            theme === 'light' 
+                              ? "bg-white text-zinc-900 border-zinc-300 shadow-sm font-semibold" 
+                              : "bg-[#121215] border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.12]"
                           )}
                         >
-                          <Sun className="w-4 h-4" />
-                          <span className="text-xs font-semibold">Light</span>
+                          <Sun className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          <span>Clair</span>
                         </button>
                       </div>
                     </div>
                   </div>
 
                   <button 
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-4 rounded-xl font-bold transition-all shadow-lg shadow-primary/20"
+                    onClick={() => setIsSettingsOpen(false)} 
+                    className="w-full shiny-btn py-2.5 rounded-xl font-medium text-xs text-white transition-all shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.08)] cursor-pointer"
                   >
-                    Close Settings
+                    Fermer les paramètres
                   </button>
                 </motion.div>
               </motion.div>
