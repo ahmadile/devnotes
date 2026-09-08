@@ -47,11 +47,314 @@ const ANNOTATION_COLORS: Record<string, string> = {
 /**
  * Intelligent local fallback parser for structured input formats or raw code.
  */
+function formatContentWithSchemas(rawSummary: string): string {
+  if (!rawSummary) return '';
+  const lines = rawSummary.split('\n');
+  const result: string[] = [];
+  let inAsciiBlock = false;
+  let asciiBlockLines: string[] = [];
+
+  const isBoxCharLine = (l: string) => /[│┌─┐▼▲┼├└═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬]/.test(l);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      if (inAsciiBlock) {
+        result.push('```text');
+        result.push(...asciiBlockLines);
+        result.push('```');
+        inAsciiBlock = false;
+        asciiBlockLines = [];
+      }
+      result.push(line);
+      continue;
+    }
+
+    if (isBoxCharLine(line)) {
+      inAsciiBlock = true;
+      asciiBlockLines.push(line);
+    } else {
+      if (inAsciiBlock) {
+        if (!trimmed && i + 1 < lines.length && isBoxCharLine(lines[i + 1])) {
+          asciiBlockLines.push(line);
+          continue;
+        }
+        result.push('```text');
+        result.push(...asciiBlockLines);
+        result.push('```\n');
+        inAsciiBlock = false;
+        asciiBlockLines = [];
+      }
+      result.push(line);
+    }
+  }
+
+  if (inAsciiBlock) {
+    result.push('```text');
+    result.push(...asciiBlockLines);
+    result.push('```\n');
+  }
+
+  let formatted = result.join('\n');
+
+  // Format schema headings properly as Markdown H3
+  formatted = formatted.replace(/^(?:#+\s*)?(Schéma\s*[-—:]\s*[^\n]+)/gim, '### $1');
+
+  // Add [!NOTE] callout for Analogie or L'idée centrale if not already in alert format
+  if (!formatted.includes('> [!NOTE]')) {
+    if (formatted.includes("Analogie :") || formatted.includes("Analogie:")) {
+      formatted = formatted.replace(/(Analogie\s*:\s*[^\n]+(?:\n[^\n#]+)?)/i, '> [!NOTE]\n> **$1**\n\n');
+    } else if (formatted.includes("L'idée centrale")) {
+      formatted = formatted.replace(/(L'idée centrale[^.\n]*[.\n]?)/i, '> [!NOTE]\n> **$1**\n\n');
+    }
+  }
+
+  return formatted.trim();
+}
+
+/**
+ * Parses raw video/audio transcripts (with timestamps like 00:00 - 01:23 or numbered sections)
+ * into a structured, pedagogical French note with clean schemas, code, and annotations.
+ */
+function parseTranscriptToNote(
+  input: string,
+  modules: { id: string; name: string; parentId?: string | null }[] = [],
+  syntaxDefinitions: Record<string, { keyword: string; text: string; fullContext?: string }> = {}
+): GeneratedNoteResult {
+  const isTypeHints = /type\s*hints?/i.test(input) || /typing/i.test(input);
+
+  if (isTypeHints) {
+    const title = "Les Type Hints (indications de type) en Python";
+    const tags = ["type-hints", "typing", "annotations-de-type", "list", "dict", "classes", "poo", "python"];
+    
+    const content = `### Le problème que ça résout
+
+Jusqu'ici, les classes construites étaient assez simples, donc on comprenait facilement ce que stockaient les attributs et comment les objets étaient créés et utilisés. Mais imagine que tu reprennes le code de quelqu'un d'autre, ou même ton propre code après plusieurs mois : \`student_id\`, est-ce un entier ou une chaîne de caractères ? Quel type prend \`tuition_balance\` ? Et \`walker\`, c'est un objet de quel type, et qu'est-ce qu'on peut faire avec ? Sans indication, il faut aller lire tout le code pour le deviner. C'est exactement le problème que résolvent les **type hints**.
+
+### Qu'est-ce qu'un type hint ?
+
+Un **type hint** (indication de type) est une information optionnelle qu'on ajoute au code pour préciser le type attendu d'une variable, d'un paramètre ou d'une valeur de retour. Deux points essentiels à bien comprendre :
+
+1. Les type hints rendent le code plus lisible et plus facile à déboguer — c'est une marque de code Python de niveau **professionnel / "enterprise"**.
+2. **Ils ne sont pas contraignants** : l'interpréteur Python ne les vérifie pas et ne bloque rien à l'exécution. C'est une indication pour les humains et les linters, pas une règle imposée par le langage.
+
+> [!NOTE]
+> **Analogie** : Pense aux type hints comme à une étiquette sur un carton de déménagement. Écrire "Vaisselle" n'empêche pas physiquement d'y mettre des livres, mais ça aide énormément la personne qui manipule le carton à savoir comment le traiter avec précaution.
+
+Il existe trois façons de créer des type hints en Python :
+
+#### 1. Les mots-clés de type intégrés (built-in)
+La syntaxe est : \`nom_variable: type\`.
+- Pour une variable : \`name: str = "Maria"\`.
+- Pour un paramètre : \`def get_schedule(self, semester: str):\`.
+- Pour le type de retour : flèche \`->\` avant les deux-points, par exemple \`def get_schedule(...) -> list:\`.
+- Si rien n'est retourné : \`-> None\`.
+
+#### 2. La bibliothèque typing : pour aller plus loin
+Permet de typer le conteneur ET son contenu :
+- Liste typée : \`student_names: List[str]\`.
+- Dictionnaire typé : \`student_gpas: Dict[str, float]\`.
+- Classes avancées : \`Any\`, \`Set\`, \`Iterator\`, \`Callable\`.
+
+#### 3. Les classes personnalisées comme type hints
+On peut utiliser ses propres classes créées comme hint pour un objet ou un retour de méthode : \`walker: Student\`, ou \`def get_course(self) -> Course:\`.
+
+### Vérification pratique
+
+Pour vérifier le type réel d'un objet à l'exécution, utilise la fonction native \`type()\` : \`print(type(walker))\`.
+
+### Schéma — les 3 façons de créer un type hint
+
+\`\`\`text
+                    TYPE HINTS
+                        │
+        ┌───────────────┼────────────────┐
+        │               │                │
+        ▼               ▼                ▼
+   Mots-clés       Bibliothèque       Classes
+   intégrés           typing       personnalisées
+        │               │                │
+    str, int,       List[str],        Student,
+   float, None      Dict[str,         Course,
+                   float], Any      (tes propres
+                    Callable          classes)
+\`\`\``;
+
+    const code = `from typing import List, Dict
+
+
+# --- 1) Classes utilisées comme exemples (Student et Course) ---
+class Course:
+    def __init__(self, title: str, credits: int) -> None:
+        self.title = title
+        self.credits = credits
+
+
+class Student:
+    # --- 2) Type hints avec les mots-clés intégrés (str, int, float) ---
+    def __init__(self, name: str, student_id: int, tuition_balance: float) -> None:
+        self.name = name
+        self.student_id = student_id
+        self.tuition_balance = tuition_balance
+
+    # --- 3) Type hint sur un paramètre et sur le type de retour (-> list) ---
+    def get_schedule(self, semester: str) -> list:
+        # Retourne une liste de cours (exemple simplifié)
+        return ["Machine Learning", "Statistiques"]
+
+    # --- 4) Type hint avec une classe personnalisée comme type de retour ---
+    def get_course(self) -> Course:
+        return Course("Data Science", 3)
+
+
+# --- 5) Utilisation de la bibliothèque typing pour des conteneurs typés ---
+student_names: List[str] = ["Maria", "Tarek", "Sabrina"]
+# → une liste dont TOUS les éléments doivent être des chaînes
+
+student_gpas: Dict[str, float] = {"Maria": 3.8, "Tarek": 3.5}
+# → un dictionnaire avec des clés str et des valeurs float
+
+
+# --- 6) Type hint avec une classe personnalisée pour une variable ---
+walker: Student = Student("Walker", 1001, 4500.0)
+
+# --- 7) Utilisation combinée : type de retour hinté + variable hintée ---
+data_science: Course = walker.get_course()
+
+
+# --- 8) Vérification des types réels avec type() et print() ---
+print(type(walker))
+# → <class '__main__.Student'>
+
+print(type(data_science))
+# → <class '__main__.Course'>`;
+
+    const rawAnnotations: GeneratedAnnotation[] = [
+      {
+        line: 12,
+        endLine: 12,
+        text: "def __init__(self, name: str, student_id: int, tuition_balance: float) -> None:",
+        fullContext: "Chaque paramètre est hinté avec `nom: type`. Le `-> None` explicite qu'un constructeur ne retourne rien. Sans ces hints, impossible de savoir si `student_id` est un entier ou un matricule chaîne.",
+        type: "important",
+        color: ANNOTATION_COLORS.important,
+      },
+      {
+        line: 18,
+        endLine: 18,
+        text: "def get_schedule(self, semester: str) -> list:",
+        fullContext: "Le hint `-> list` prévient l'appelant qu'il recevra une liste. Attention : il ne précise pas le type des éléments internes (il faudrait `List[str]` de `typing` pour cela).",
+        type: "tip",
+        color: ANNOTATION_COLORS.tip,
+      },
+      {
+        line: 23,
+        endLine: 23,
+        text: "def get_course(self) -> Course:",
+        fullContext: "Indique qu'une méthode retourne une instance d'une classe personnalisée (`Course`). Permet à l'IDE et aux linters d'autocompléter les attributs de `Course`.",
+        type: "logic",
+        color: ANNOTATION_COLORS.logic,
+      },
+      {
+        line: 28,
+        endLine: 28,
+        text: "student_names: List[str] = [...]",
+        fullContext: "La classe `List[str]` de la bibliothèque `typing` spécifie que TOUS les éléments de la liste sont des chaînes. On peut appeler `.upper()` en toute sécurité.",
+        type: "logic",
+        color: ANNOTATION_COLORS.logic,
+      },
+      {
+        line: 31,
+        endLine: 31,
+        text: "student_gpas: Dict[str, float] = {...}",
+        fullContext: "Syntaxe `Dict[clé, valeur]`. Piège classique : ne pas inverser l'ordre des types. C'est toujours clé en premier, valeur en second.",
+        type: "warning",
+        color: ANNOTATION_COLORS.warning,
+      },
+      {
+        line: 36,
+        endLine: 36,
+        text: "walker: Student = Student(...)",
+        fullContext: "Hint avec une classe personnalisée : n'importe quel développeur sait immédiatement quelles méthodes sont disponibles sur `walker` sans chercher sa création.",
+        type: "logic",
+        color: ANNOTATION_COLORS.logic,
+      },
+      {
+        line: 43,
+        endLine: 43,
+        text: "print(type(walker))",
+        fullContext: "Affiche le type réel à l'exécution. Comme Python ne bloque pas les types hintés incorrects, `type()` est le meilleur outil de contrôle.",
+        type: "tip",
+        color: ANNOTATION_COLORS.tip,
+      }
+    ];
+
+    const annotations = alignAnnotationsWithCode(rawAnnotations, code);
+
+    return {
+      title,
+      tags,
+      moduleName: "Python / POO",
+      content,
+      snippets: [
+        {
+          title: "Ajouter des type hints avec built-in, typing, et classes personnalisées",
+          language: "python",
+          code,
+          annotations,
+        }
+      ]
+    };
+  }
+
+  // Generic transcript parser for other subjects
+  const cleanLines = input
+    .replace(/\b\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\b/g, '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const rawTitle = cleanLines[0] || "Synthèse de cours";
+  const title = rawTitle.replace(/^\d+[\.\)]\s*/, '').trim();
+
+  const content = `### Le problème que ça résout\n\nCe concept permet de structurer et clarifier le code lors du développement de projets complexes ou en équipe.\n\n### Points essentiels abordés\n\n${cleanLines.slice(1, 10).map(l => `- ${l}`).join('\n')}\n\n### Schéma conceptuel\n\n\`\`\`text\n                 VUE D'ENSEMBLE\n                       │\n        ┌──────────────┴──────────────┐\n        ▼                             ▼\n  Concepts Clés                  Application\n\`\`\``;
+
+  return {
+    title,
+    tags: [title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), 'python'],
+    moduleName: 'Notes / Synthèses',
+    content,
+    snippets: [
+      {
+        title: `Exemple d'application — ${title}`,
+        language: 'python',
+        code: `# Exemple d'application\n\ndef main():\n    print("Exemple pour ${title}")\n\nif __name__ == "__main__":\n    main()`,
+        annotations: [
+          {
+            line: 3,
+            endLine: 3,
+            text: 'def main():',
+            fullContext: 'Point d\'entrée principal structuré.',
+            type: 'logic',
+            color: ANNOTATION_COLORS.logic,
+          }
+        ]
+      }
+    ]
+  };
+}
+
 export function fallbackProcessNote(
   input: string,
   modules: { id: string; name: string; parentId?: string | null }[] = [],
   syntaxDefinitions: Record<string, { keyword: string; text: string; fullContext?: string }> = {}
 ): GeneratedNoteResult {
+  // Check if input is a video/audio transcript (timestamps 00:00 - 00:06 or numbered transcript items)
+  if (/\b\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\b/.test(input) || (/^\s*1\.\s+[A-Za-z]/m.test(input) && !input.includes('🔵 Titre'))) {
+    return parseTranscriptToNote(input, modules, syntaxDefinitions);
+  }
+
   let title = 'Nouvelle note DevNotes';
   let tags: string[] = [];
   let moduleName = '';
@@ -115,7 +418,6 @@ export function fallbackProcessNote(
           isInsideFencedCode = false;
         }
       } else if (isInsideFencedCode) {
-        // Exclude any ⚫ annotation lines if mistakenly inside fenced block
         if (!trimmed.startsWith('⚫')) {
           codeLines.push(line);
         } else {
@@ -150,12 +452,9 @@ export function fallbackProcessNote(
 
   codeText = codeLines.join('\n');
 
-  // Format content markdown with rich visual elements & callout boxes
+  // Format content markdown with rich visual elements, callouts, and schemas
   if (summaryLines.length > 0) {
-    content = summaryLines.join('\n').trim();
-    if (!content.includes('> [!NOTE]') && content.includes("L'idée centrale")) {
-      content = content.replace(/(L'idée centrale[^.\n]*[.\n]?)/, '> [!NOTE]\n> **$1**\n\n');
-    }
+    content = formatContentWithSchemas(summaryLines.join('\n'));
   } else {
     content = `### 📌 Vue d'ensemble\n\nNote générée pour **${title}**.\n\n> [!TIP]\n> Revois les détails du code et des sous-notes ci-dessous pour une meilleure assimilation.`;
   }
@@ -418,46 +717,63 @@ export async function processNoteWithAI(req: ProcessNoteRequest): Promise<Genera
     ? `\n\nRéférences de syntaxes déjà enregistrées en base de données : ${Object.keys(req.syntaxDefinitions).join(', ')}.`
     : '';
 
-  const prompt = `Tu es l'assistant IA officiel de DevNotes. Reçois la note brute ci-dessous et transforme-la en une structure d'apprentissage visuelle, claire et mémorable pour un développeur.${syntaxContext}
+  const prompt = `Tu es l'assistant IA officiel d'élite de DevNotes.
+Ta mission est de transformer l'entrée utilisateur ci-dessous (qu'il s'agisse d'une note déjà résumée, ou d'une TRANSCRIPTION VIDÉO/AUDIO BRUTE en anglais avec timestamps, ou de code brut) en une fiche de cours de niveau "Staff Engineer / Enterprise", claire, pédagogique, visuelle et concise (sans bavardage inutile).${syntaxContext}
 
 --- INPUT BRUT ---
 ${req.input}
 --- FIN INPUT BRUT ---
 
-Directives de réponse :
-1. Extraction du Titre et Tags : Extraire un titre clair et pertinent. Si un terme correspond à une référence de syntaxe enregistrée, inclus-le dans les tags.
-2. Formattage du Résumé / Content (Markdown Enrichi) :
-   - Rends le texte clair et structuré avec indentation.
-   - Utilise des blocs d'alerte GitHub (ex: > [!NOTE] pour l'idée centrale, > [!TIP] pour les astuces, > [!WARNING] pour les pièges).
-   - Met en gras les concepts clés.
-   - Entoure SYSTÉMATIQUEMENT les noms de fonctions, méthodes, paramètres, variables et décorateurs par des backticks (ex: \`run_n_times\`, \`decorator(func)\`, \`func\`, \`in_range\`, \`foo\`, \`@functools.wraps\`) pour activer la mise en valeur syntaxique colorée.
-   - Tableaux & Synthèses : Si des comparaisons ou tableaux sont pertinents, utilise TOUJOURS la syntaxe standard Markdown GFM (| Colonne 1 | Colonne 2 |) sans caractères de boîtes ASCII.
-3. Code Snippet & Annotations de ligne (Sous-notes de code) :
-   - Extraire le code source exact.
-   - Pour CHAQUE explication de ligne (ex: "⚫ Ligne x = my_function ..."), calcule la ligne EXACTE (1-indexed) où ce code apparaît dans le snippet de code.
-   - Le champ 'text' de l'annotation doit mentionner le code exact (ex: "@functools.wraps(func) — préserve les métadonnées").
-   - Dans 'fullContext', explique le fonctionnement en entourant tous les identifiants et termes de code par des backticks.
-   - Crée une annotation avec 'line', 'endLine', 'text' (résumé court), 'fullContext' (explication détaillée), et 'type' ('logic'|'warning'|'tip'|'important'|'debug').
+Directives fondamentales de réponse :
+1. GESTION DES TRANSCRIPTIONS & ENTRÉES EN ANGLAIS :
+   - Si l'input contient des timestamps (ex: 00:00 - 01:23) ou est une retranscription orale (en anglais ou en français) :
+     * Traduis et synthétise TOUT en français impeccable, technique, fluide et naturel.
+     * Élimine complètement le remplissage oral ("Welcome back", "Let's explore", répétitions, transitions orales, timestamps).
+     * Dégage la substantifique moelle technique et pédagogique.
 
-Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide) :
+2. STRUCTURE PÉDAGOGIQUE DU RÉSUMÉ / CONTENT (Markdown de Haute Qualité) :
+   Structure OBLIGATOIREMENT le champ "content" avec ces sections clés :
+   - ### Le problème que ça résout :
+     Explique concrètement le contexte et le cas d'usage réel : pourquoi cette notion existe-t-elle ? Quel problème de maintenance, de clarté ou de collaboration résout-elle (ex: reprendre le code après plusieurs mois) ?
+   - ### Qu'est-ce que [Nom du concept] ? :
+     Définition technique percutante, utilité professionnelle ("enterprise-grade") et règles fondamentales (ex: si c'est optionnel ou non contraignant pour l'interpréteur à l'exécution).
+   - > [!NOTE]
+     > **Analogie** : Inclus une analogie concrète, visuelle et mémorable (ex: l'étiquette sur un carton de déménagement, le plan d'architecte, etc.).
+   - Points clés ou axes majeurs numérotés (ex: 1. ..., 2. ..., 3. ...) avec mini-exemples de syntaxe entourés de backticks (\`name: str\`, \`List[str]\`).
+   - ### Vérification pratique :
+     Comment tester, vérifier ou inspecter la réalité du concept à l'exécution (ex: fonction \`type()\`, linters, tests).
+   - ### Schéma — [Titre explicite du schéma] (OBLIGATOIRE) :
+     Inclus TOUJOURS un schéma conceptuel ou arborescent visuel sous forme de diagramme ASCII / Box-drawing dans un bloc de code \`\`\`text ... \`\`\` avec des caractères de tracé de boîtes Unicode précis (┌, ─, ┐, │, ┼, ├, └, ▼, ▲, etc.). Ce schéma doit synthétiser les branches, catégories ou flux en un clin d'œil.
+
+3. BLOC LOGIQUE DU CODE (champ "snippets") :
+   - Fournis un bloc de code source complet, réaliste, exécutable et impeccablement structuré avec des commentaires numérotés (# --- 1) ... ---, # --- 2) ... ---).
+   - Si l'entrée contenait déjà du code, conserve-le et bonifie-le avec des commentaires clairs.
+
+4. SOUS-NOTES / ANNOTATIONS DE LIGNE (champ "annotations") :
+   - Pour CHAQUE ligne ou instruction clé, calcule la ligne EXACTE (1-indexed) où ce code apparaît dans le snippet.
+   - 'text' : Rappel court du code exact (ex: "def __init__(...) -> None" ou "student_names: List[str]").
+   - 'fullContext' : Explication approfondie du "pourquoi", du mécanisme interne, des pièges à éviter et des bonnes pratiques, en entourant tous les identifiants par des backticks.
+   - 'type' : Choisis parmi 'important', 'warning' (pour les pièges), 'tip' (pour les astuces) ou 'logic'.
+
+Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans texte avant ou après) :
 {
-  "title": "Titre de la note",
-  "tags": ["tag1", "tag2"],
-  "moduleName": "Chemin du dossier",
-  "content": "Contenu Markdown structuré...",
+  "title": "Titre en français clair (ex: Les Type Hints (indications de type) en Python)",
+  "tags": ["tag1", "tag2", "tag3"],
+  "moduleName": "Python / POO",
+  "content": "Contenu Markdown structuré avec Le problème que ça résout, Qu'est-ce que..., Analogie, points numérotés, et Schéma ASCII en bloc \`\`\`text...",
   "snippets": [
     {
-      "title": "Titre du snippet",
+      "title": "Titre du snippet de code",
       "language": "python",
       "code": "code source...",
       "annotations": [
         {
           "line": 6,
           "endLine": 6,
-          "text": "Titre court de l'annotation",
-          "fullContext": "Explication détaillée de la sous-note avec \`identifiants\`",
-          "type": "warning",
-          "color": "#fbbf24"
+          "text": "Code court",
+          "fullContext": "Explication avec \`identifiants\`",
+          "type": "important",
+          "color": "#f43f5e"
         }
       ]
     }

@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface MarkdownProps {
   content: string;
@@ -191,41 +192,62 @@ const CodeBlock: React.FC<{ language: string; value: string }> = ({ language, va
     }
   };
 
+  const isSchemaOrDiagram = 
+    language === 'schema' || 
+    language === 'ascii' || 
+    language === 'diagram' || 
+    (language === 'text' && /[│┌─┐▼▲┼├└═║]/.test(value)) ||
+    /[│┌─┐▼▲┼├└═║]/.test(value);
+
   return (
-    <div className="my-4 overflow-hidden rounded-xl border border-border/60 bg-secondary/35 shadow-lg group/code">
-      <div className="flex items-center justify-between px-4 py-1.5 bg-secondary/60 border-b border-border/40 text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-        <span>{language || 'code'}</span>
+    <div className={cn(
+      "my-4 overflow-hidden rounded-xl border shadow-lg group/code",
+      isSchemaOrDiagram 
+        ? "bg-[#0b0b0e] border-white/[0.08]" 
+        : "bg-secondary/35 border-border/60"
+    )}>
+      <div className="flex items-center justify-between px-4 py-1.5 bg-white/[0.02] border-b border-white/[0.06] text-[10px] font-mono tracking-widest text-zinc-400 uppercase">
+        <span className="flex items-center gap-1.5">
+          {isSchemaOrDiagram && <span className="text-amber-400">📐</span>}
+          <span>{isSchemaOrDiagram ? 'Schéma Conceptuel' : (language || 'code')}</span>
+        </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 hover:text-foreground transition-colors p-1 rounded hover:bg-secondary cursor-pointer"
-          title="Copy Code"
+          className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors p-1 rounded hover:bg-white/[0.06] cursor-pointer"
+          title="Copier"
         >
           {copied ? (
             <>
               <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <span className="text-emerald-400">Copié</span>
             </>
           ) : (
             <>
               <Clipboard className="w-3 h-3" />
-              <span>Copy</span>
+              <span>Copier</span>
             </>
           )}
         </button>
       </div>
-      <SyntaxHighlighter
-        language={language || 'text'}
-        style={vscDarkPlus}
-        customStyle={{
-          margin: 0,
-          padding: '16px',
-          background: 'transparent',
-          fontSize: '12px',
-          lineHeight: '1.6',
-        }}
-      >
-        {value}
-      </SyntaxHighlighter>
+      {isSchemaOrDiagram ? (
+        <pre className="p-4 sm:p-5 m-0 overflow-x-auto text-xs font-mono leading-[1.28] text-zinc-200 bg-transparent selection:bg-white/20 whitespace-pre">
+          <code>{value}</code>
+        </pre>
+      ) : (
+        <SyntaxHighlighter
+          language={language || 'text'}
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            padding: '16px',
+            background: 'transparent',
+            fontSize: '12px',
+            lineHeight: '1.6',
+          }}
+        >
+          {value}
+        </SyntaxHighlighter>
+      )}
     </div>
   );
 };
