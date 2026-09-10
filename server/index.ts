@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
-import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint } from './aiService.js';
+import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept } from './aiService.js';
 import dns from 'dns';
 
 // Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
@@ -214,6 +214,32 @@ const app = express();
       res.json({ ok: true, blueprint });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Architect error' });
+    }
+  });
+
+  app.post('/api/ai/explain', async (req, res) => {
+    try {
+      const { noteTitle, noteContent, selectedText, userQuestion, analogyMode, allNotes, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!noteTitle && !noteContent && !selectedText) {
+        res.status(400).json({ error: 'Note title, content or selected text is required' });
+        return;
+      }
+
+      const result = await explainNoteConcept({
+        noteTitle: noteTitle || 'Note sans titre',
+        noteContent: noteContent || '',
+        selectedText,
+        userQuestion,
+        analogyMode,
+        allNotes: allNotes || [],
+        provider,
+        apiKey,
+        model,
+        ollamaUrl
+      });
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'AI Explain error' });
     }
   });
 

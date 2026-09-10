@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bold, Italic, Heading3, Paintbrush, Highlighter, X } from 'lucide-react';
+import { Bold, Italic, Heading3, Paintbrush, Highlighter, X, Sparkles } from 'lucide-react';
 
 interface FloatingToolbarProps {
   x: number;
   y: number;
   onFormat: (type: string, param?: string) => void;
   onClose: () => void;
+  onExplain?: () => void;
 }
 
 const colors = [
@@ -25,7 +26,7 @@ const highlightColors = [
   { name: 'Rose', value: 'rgba(244, 63, 94, 0.2)' },
 ];
 
-export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ x, y, onFormat, onClose }) => {
+export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ x, y, onFormat, onClose, onExplain }) => {
   const [activeSubmenu, setActiveSubmenu] = useState<'color' | 'highlight' | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +117,23 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ x, y, onFormat
         >
           <Highlighter className="w-3.5 h-3.5" />
         </button>
+
+        {onExplain && (
+          <>
+            <div className="w-px h-4 bg-border/60 mx-1" />
+            <button
+              onClick={() => {
+                onExplain();
+                onClose();
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              title="Expliquer ce passage avec l'IA (Pédagogie & Analogies)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Expliquer</span>
+            </button>
+          </>
+        )}
 
         <div className="w-px h-4 bg-border/60 mx-1 flex-1" />
 

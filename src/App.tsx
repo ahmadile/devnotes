@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -85,12 +85,18 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>('generator');
+  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer'>('generator');
   const [aiModalTopic, setAiModalTopic] = useState<string | undefined>(undefined);
+  const [aiModalSelectedText, setAiModalSelectedText] = useState<string | undefined>(undefined);
 
-  const openAiAssistant = (tab: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' = 'generator', topic?: string) => {
+  const openAiAssistant = (
+    tab: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer' = 'generator',
+    topic?: string,
+    selectedText?: string
+  ) => {
     setAiModalTab(tab);
     setAiModalTopic(topic);
+    setAiModalSelectedText(selectedText);
     setIsAiModalOpen(true);
   };
   const [lastSaved, setLastSaved] = useState<number | null>(null);
@@ -728,6 +734,14 @@ export default function App() {
                     <span>Réviser & Pratiquer</span>
                   </button>
                   <button
+                    onClick={() => openAiAssistant('explainer', activeNote?.title)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-200 bg-[#171410] hover:bg-[#221c14] border border-amber-500/25 hover:border-amber-500/40 shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
+                    title="Expliquer & Vulgariser cette note (Analogies universelles & liens avec vos autres notes)"
+                  >
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0" strokeWidth={1.5} />
+                    <span>Expliquer & Approfondir</span>
+                  </button>
+                  <button
                     onClick={() => openAiAssistant('generator')}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#17171c] hover:bg-[#202026] border border-white/[0.1] hover:border-white/[0.2] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
                     title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
@@ -1028,33 +1042,45 @@ export default function App() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Note Content</span>
-                        <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setEditorTab('write')}
-                            className={cn(
-                              "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
-                              editorTab === 'write' 
-                                ? "bg-background text-foreground shadow-sm border border-border/10" 
-                                : "text-muted-foreground hover:text-foreground"
-                            )}
+                            onClick={() => openAiAssistant('explainer', activeNote.title)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 rounded-lg transition-all cursor-pointer shadow-xs"
+                            title="Demander à l'IA d'approfondir et d'expliquer cette note avec des analogies concrètes"
                           >
-                            <Edit3 className="w-3 h-3" />
-                            Write
+                            <Lightbulb className="w-3 h-3 text-amber-400" />
+                            <span>💡 Expliquer cette note</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditorTab('preview')}
-                            className={cn(
-                              "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
-                              editorTab === 'preview' 
-                                ? "bg-background text-foreground shadow-sm border border-border/10" 
-                                : "text-muted-foreground hover:text-foreground"
-                            )}
-                          >
-                            <Eye className="w-3 h-3" />
-                            Preview
-                          </button>
+
+                          <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
+                            <button
+                              type="button"
+                              onClick={() => setEditorTab('write')}
+                              className={cn(
+                                "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                                editorTab === 'write' 
+                                  ? "bg-background text-foreground shadow-sm border border-border/10" 
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              Write
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditorTab('preview')}
+                              className={cn(
+                                "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                                editorTab === 'preview' 
+                                  ? "bg-background text-foreground shadow-sm border border-border/10" 
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Eye className="w-3 h-3" />
+                              Preview
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -1079,6 +1105,10 @@ export default function App() {
                                 y={selection.y}
                                 onFormat={handleFormat}
                                 onClose={() => setSelection(null)}
+                                onExplain={() => {
+                                  const selectedSnippet = activeNote.content.slice(selection.start, selection.end);
+                                  openAiAssistant('explainer', activeNote.title, selectedSnippet);
+                                }}
                               />
                             )}
                           </>
@@ -1327,6 +1357,7 @@ export default function App() {
             onSaveNote={handleSaveAiNote}
             initialTab={aiModalTab}
             initialTopic={aiModalTopic}
+            initialSelectedText={aiModalSelectedText}
           />
         </div>
       </SignedIn>

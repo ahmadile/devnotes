@@ -38,7 +38,8 @@ import {
   Copy,
   ArrowRight,
   CheckCircle2,
-  Target
+  Target,
+  BookOpen
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { RevisionView } from './RevisionView';
@@ -66,8 +67,9 @@ interface AiAssistantModalProps {
   activeNote: Note | null;
   syntaxDefinitions?: Record<string, SyntaxDefinition>;
   onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null, updateExistingId?: string | null) => void;
-  initialTab?: 'generator' | 'chat' | 'architect' | 'revision' | 'settings';
+  initialTab?: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer';
   initialTopic?: string;
+  initialSelectedText?: string;
 }
 
 interface ProcessedAiResult {
@@ -215,14 +217,33 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   onSaveNote,
   initialTab = 'generator',
   initialTopic,
+  initialSelectedText,
 }) => {
-  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer'>(initialTab);
+
+  // Explainer & Pédagogie State
+  const [explainTopic, setExplainTopic] = useState(initialTopic || '');
+  const [explainSelectedText, setExplainSelectedText] = useState(initialSelectedText || '');
+  const [explainAnalogy, setExplainAnalogy] = useState<'universal' | 'football' | 'cards' | 'daily' | 'eli10' | 'deep_code'>('universal');
+  const [explainQuestion, setExplainQuestion] = useState('');
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explainResult, setExplainResult] = useState<{
+    explanation: string;
+    relatedNotes: { id?: string; title: string; reason: string }[];
+    analogyUsed: string;
+  } | null>(null);
+  const [explainCopied, setExplainCopied] = useState(false);
+  const [explainInserted, setExplainInserted] = useState(false);
+  const [explainFollowup, setExplainFollowup] = useState('');
+  const [isFollowupLoading, setIsFollowupLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && initialTab) {
-      setActiveTab(initialTab);
+    if (isOpen) {
+      if (initialTab) setActiveTab(initialTab);
+      if (initialTopic) setExplainTopic(initialTopic);
+      if (initialSelectedText) setExplainSelectedText(initialSelectedText);
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, initialTopic, initialSelectedText]);
   const [inputContent, setInputContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
@@ -745,6 +766,124 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setTimeout(() => setBlueprintCopied(false), 2500);
   };
 
+  const handleExplain = async (
+    overrideAnalogy?: 'universal' | 'football' | 'cards' | 'daily' | 'eli10' | 'deep_code',
+    overrideQuestion?: string
+  ) => {
+    const analogyToUse = overrideAnalogy || explainAnalogy;
+    const questionToUse = overrideQuestion !== undefined ? overrideQuestion : explainQuestion;
+    setIsExplaining(true);
+    setExplainInserted(false);
+
+    try {
+      const allNotesSummary = notes.map(n => {
+        const moduleName = modules.find(m => m.id === n.moduleId)?.name || 'Général';
+        return {
+          id: n.id,
+          title: n.title,
+          moduleName,
+          tags: n.tags || [],
+          contentSnippet: n.content.slice(0, 300)
+        };
+      });
+
+      const activeApiKey = aiProvider === 'openrouter' ? openRouterKey : (aiProvider === 'gemini' ? geminiApiKey : '');
+
+      const res = await fetch('/api/ai/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          noteTitle: activeNote?.title || explainTopic || 'Note sans titre',
+          noteContent: activeNote?.content || '',
+          selectedText: explainSelectedText || undefined,
+          userQuestion: questionToUse || undefined,
+          analogyMode: analogyToUse,
+          allNotes: allNotesSummary,
+          provider: aiProvider,
+          apiKey: activeApiKey.trim() || undefined,
+          model: aiModel.trim() || undefined,
+          ollamaUrl: ollamaUrl.trim() || undefined,
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.ok && data.explanation) {
+        setExplainResult({
+          explanation: data.explanation,
+          relatedNotes: data.relatedNotes || [],
+          analogyUsed: data.analogyUsed || analogyToUse
+        });
+      } else {
+        throw new Error(data.error || "Impossible d'obtenir une explication");
+      }
+    } catch (err: any) {
+      console.error('Explain error:', err);
+      alert(err.message || 'Une erreur est survenue lors de l\'explication.');
+    } finally {
+      setIsExplaining(false);
+    }
+  };
+
+  const handleInsertExplanationIntoNote = () => {
+    if (!activeNote || !explainResult?.explanation) return;
+    const appendix = `\n\n---\n\n### 💡 Explication Approfondie & Analogie Pédagogique\n\n${explainResult.explanation}\n`;
+    const updatedContent = (activeNote.content || '') + appendix;
+    onSaveNote({ ...activeNote, content: updatedContent }, activeNote.moduleId, activeNote.id);
+    setExplainInserted(true);
+    setTimeout(() => setExplainInserted(false), 3000);
+  };
+
+  const handleCopyExplanation = () => {
+    if (!explainResult?.explanation) return;
+    navigator.clipboard.writeText(explainResult.explanation);
+    setExplainCopied(true);
+    setTimeout(() => setExplainCopied(false), 2000);
+  };
+
+  const handleExplainFollowup = async () => {
+    if (!explainFollowup.trim() || isFollowupLoading || !explainResult) return;
+    const userQ = explainFollowup.trim();
+    setExplainFollowup('');
+    setIsFollowupLoading(true);
+
+    try {
+      const activeApiKey = aiProvider === 'openrouter' ? openRouterKey : (aiProvider === 'gemini' ? geminiApiKey : '');
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'user', content: `Voici l'explication que tu as fournie :\n${explainResult.explanation}\n\nL'utilisateur a cette question d'approfondissement :\n${userQ}` }
+          ],
+          notesContext: `Note active: "${activeNote?.title}"\n${activeNote?.content || ''}`,
+          provider: aiProvider,
+          apiKey: activeApiKey.trim() || undefined,
+          model: aiModel.trim() || undefined,
+          ollamaUrl: ollamaUrl.trim() || undefined,
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && data.reply) {
+          setExplainResult({
+            ...explainResult,
+            explanation: explainResult.explanation + `\n\n---\n\n**❓ Question d'approfondissement :** ${userQ}\n\n${data.reply}`
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Followup error', err);
+    } finally {
+      setIsFollowupLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-all duration-300">
       <div
@@ -787,6 +926,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               >
                 <Zap className="w-3.5 h-3.5" />
                 Générateur de Note
+              </button>
+              <button
+                onClick={() => setActiveTab('explainer')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  activeTab === 'explainer'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                Expliquer & Approfondir
               </button>
               <button
                 onClick={() => setActiveTab('chat')}
@@ -1150,6 +1301,296 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Explainer / Pédagogie Tab */}
+          {activeTab === 'explainer' && (
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-border/60 overflow-hidden">
+              
+              {/* Left Column (5 cols): Controls, Note context, Analogy selector, Question */}
+              <div className="lg:col-span-5 p-6 flex flex-col h-full bg-secondary/10 space-y-4 overflow-y-auto">
+                
+                {/* Active Note & Knowledge Base Header */}
+                <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-4 space-y-2.5 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Lightbulb className="w-3 h-3" />
+                      Note Ciblée
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
+                      <Folder className="w-3 h-3 text-sky-400" />
+                      {notes.length} notes interconnectées
+                    </span>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-zinc-100 truncate">
+                    {activeNote?.title || explainTopic || "Aucune note sélectionnée"}
+                  </h3>
+
+                  {activeNote && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {activeNote.tags?.map((t, idx) => (
+                        <span key={idx} className="text-[10px] bg-white/[0.05] border border-white/[0.08] text-zinc-300 px-2 py-0.5 rounded-md">
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Selected passage indicator if any */}
+                  {explainSelectedText && (
+                    <div className="mt-2 bg-indigo-950/30 border border-indigo-500/30 rounded-lg p-2.5 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-indigo-300 uppercase tracking-wider">
+                        <span>Passage ciblé :</span>
+                        <button
+                          onClick={() => setExplainSelectedText('')}
+                          className="text-zinc-400 hover:text-white"
+                          title="Effacer l'extrait ciblé"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-zinc-300 font-mono line-clamp-3 italic">
+                        "{explainSelectedText}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 1-Click Analogy Selector */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    Angle d'Explication & Analogie
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'universal', label: '🌍 Universelle', desc: 'Accessible à tous, vie courante' },
+                      { id: 'deep_code', label: '🔬 Mécanique interne', desc: 'Sous le capot & pièges' },
+                      { id: 'football', label: '⚽ Football & Sport', desc: 'VAR, Ballon d\'Or, règles' },
+                      { id: 'cards', label: '🃏 Poker & Croupier', desc: 'Distribution, pioche, cartes' },
+                      { id: 'daily', label: '🚗 Cuisine & Quotidien', desc: 'Recette, restaurant, trafic' },
+                      { id: 'eli10', label: '👶 Enfant de 10 ans', desc: 'Vulgarisation ultra-simple' },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setExplainAnalogy(item.id as any)}
+                        className={cn(
+                          "p-2.5 rounded-xl border text-left transition-all cursor-pointer",
+                          explainAnalogy === item.id
+                            ? "bg-indigo-600/15 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/40"
+                            : "bg-secondary/20 border-white/[0.06] text-zinc-300 hover:bg-secondary/40 hover:border-white/[0.12]"
+                        )}
+                      >
+                        <div className="text-xs font-bold">{item.label}</div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Specific Question / Prompt */}
+                <div className="space-y-1.5 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <HelpCircle className="w-3.5 h-3.5 text-sky-400" />
+                      Question ou point bloquant (Optionnel)
+                    </label>
+                    {explainQuestion && (
+                      <button
+                        onClick={() => setExplainQuestion('')}
+                        className="text-[10px] text-zinc-400 hover:text-white"
+                      >
+                        Effacer
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    value={explainQuestion}
+                    onChange={(e) => setExplainQuestion(e.target.value)}
+                    placeholder="Ex: Pourquoi StopIteration est obligatoire ? Pourquoi utilise-t-on __dict__ ? Fais le lien avec ma note sur les dictionnaires..."
+                    className="w-full h-24 bg-secondary/35 border border-border/80 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-indigo-500 resize-none font-sans leading-relaxed"
+                  />
+                  
+                  {/* Quick question suggestions */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[
+                      "Explique-moi les détails essentiels",
+                      "Quels sont les pièges à éviter ?",
+                      "Fais le lien avec mes autres notes"
+                    ].map((sugg, sIdx) => (
+                      <button
+                        key={sIdx}
+                        type="button"
+                        onClick={() => setExplainQuestion(sugg)}
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.06] transition-colors cursor-pointer"
+                      >
+                        + {sugg}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  onClick={() => handleExplain()}
+                  disabled={isExplaining || (!activeNote && !explainTopic && !explainSelectedText)}
+                  className="w-full py-3 bg-gradient-to-r from-amber-600 via-indigo-600 to-sky-600 hover:from-amber-500 hover:to-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isExplaining ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Analyse pédagogique en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Lightbulb className="w-4 h-4 text-amber-300" />
+                      🚀 Expliquer & Approfondir cette note
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Right Column (7 cols): Result, DataCamp Cross-References, Markdown Viewer, Followup */}
+              <div className="lg:col-span-7 flex flex-col h-full overflow-hidden bg-background">
+                {isExplaining ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                    <DevNotesAiEmblem isThinking={true} size="lg" />
+                    <div className="space-y-1 max-w-sm">
+                      <h4 className="text-sm font-bold text-foreground">Élaboration de l'explication en cours</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Recherche d'une analogie accessible, analyse des détails sous le capot et exploration des ponts avec vos {notes.length} notes...
+                      </p>
+                    </div>
+                  </div>
+                ) : explainResult ? (
+                  <div className="flex-1 flex flex-col h-full overflow-hidden">
+                    {/* Top Action Bar */}
+                    <div className="px-6 py-3 border-b border-border/80 bg-secondary/20 flex items-center justify-between gap-3 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Lightbulb className="w-4 h-4 text-amber-400" />
+                          Explication Pédagogique
+                        </span>
+                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+                          {explainResult.analogyUsed}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleCopyExplanation}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border bg-secondary/50 hover:bg-secondary text-zinc-300 hover:text-white transition-all cursor-pointer"
+                          title="Copier l'explication"
+                        >
+                          {explainCopied ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400">Copié</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copier</span>
+                            </>
+                          )}
+                        </button>
+
+                        {activeNote && (
+                          <button
+                            onClick={handleInsertExplanationIntoNote}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-sm cursor-pointer"
+                            title="Ajouter cette explication à la fin de votre note active"
+                          >
+                            {explainInserted ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Ajouté à la note !</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>📥 Insérer dans ma note</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Related Notes Banner (DataCamp style progression) */}
+                    {explainResult.relatedNotes && explainResult.relatedNotes.length > 0 && (
+                      <div className="px-6 py-2 bg-indigo-950/25 border-b border-indigo-500/20 flex items-center gap-2 text-xs overflow-x-auto">
+                        <span className="font-bold text-indigo-300 shrink-0 flex items-center gap-1">
+                          🔗 Notes connexes dans votre base :
+                        </span>
+                        {explainResult.relatedNotes.map((rn, rnIdx) => (
+                          <span
+                            key={rnIdx}
+                            className="text-[11px] bg-white/[0.06] border border-white/[0.1] text-zinc-200 px-2 py-0.5 rounded-md shrink-0 font-mono"
+                          >
+                            {rn.title}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Explanation Content Body */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                      <div className="max-w-none text-xs leading-relaxed">
+                        <Markdown content={explainResult.explanation} />
+                      </div>
+                    </div>
+
+                    {/* Followup Chat Footer */}
+                    <div className="p-4 border-t border-border/80 bg-secondary/20 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={explainFollowup}
+                          onChange={(e) => setExplainFollowup(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleExplainFollowup()}
+                          placeholder="Une question sur cette explication ? Tapez ici..."
+                          className="flex-1 bg-secondary/50 border border-border/80 rounded-xl px-4 py-2 text-xs text-foreground focus:outline-none focus:border-indigo-500"
+                        />
+                        <button
+                          onClick={handleExplainFollowup}
+                          disabled={!explainFollowup.trim() || isFollowupLoading}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          {isFollowupLoading ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-lg">
+                      <Lightbulb className="w-8 h-8" strokeWidth={1.5} />
+                    </div>
+                    <div className="space-y-1.5 max-w-md">
+                      <h4 className="text-base font-bold text-foreground">Besoin d'éclaircir cette note ?</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        L'IA analyse votre note brute et son contexte pour déployer une explication détaillée pas à pas, avec une analogie universelle et des ponts vers vos {notes.length} notes de cours (façon DataCamp).
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleExplain('universal')}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      Lancer l'explication universelle
+                    </button>
                   </div>
                 )}
               </div>

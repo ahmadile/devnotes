@@ -1800,4 +1800,375 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
   return fallbackProjectBlueprint(req.projectIdea, req.notesContext, req.syntaxDefinitions || {});
 }
 
+export interface ExplainNoteRequest {
+  noteTitle: string;
+  noteContent: string;
+  selectedText?: string;
+  userQuestion?: string;
+  analogyMode?: 'universal' | 'football' | 'cards' | 'daily' | 'eli10' | 'deep_code';
+  allNotes?: {
+    id: string;
+    title: string;
+    moduleName?: string;
+    tags: string[];
+    contentSnippet: string;
+  }[];
+  provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
+  apiKey?: string;
+  model?: string;
+  ollamaUrl?: string;
+}
+
+export interface ExplainNoteResponse {
+  explanation: string;
+  relatedNotes: { id?: string; title: string; reason: string }[];
+  analogyUsed: string;
+}
+
+/**
+ * Pedagogical AI Explainer with deep conceptual breakdown, universal real-world analogies,
+ * and multi-note cross-referencing across the user's personal DevNotes vault (DataCamp progression style).
+ */
+export async function explainNoteConcept(req: ExplainNoteRequest): Promise<ExplainNoteResponse> {
+  const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
+  const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+
+  const analogyMode = req.analogyMode || 'universal';
+
+  const analogyInstructions: Record<string, string> = {
+    universal: "Utilise une analogie universelle concrète et accessible à TOUT LE MONDE (issues de la vie courante : cuisine, serrure/clé, guichet de banque, service postal, circulation...). Pas de jargon obscur.",
+    football: "Utilise une analogie concrète avec le monde du football et des compétitions sportives (ex: joueurs, statistiques, Ballon d'Or, arbitre vidéo VAR, entraîneur, club).",
+    cards: "Utilise une analogie concrète avec un jeu de cartes ou le poker (ex: le croupier qui distribue les cartes une à une à la demande, le paquet de cartes, la pioche).",
+    daily: "Utilise une analogie imagée de la vie quotidienne (restaurant et brigade de cuisine, supermarché, voyage en train, etc.).",
+    eli10: "Explique comme à un enfant ou un débutant curieux de 10 ans : images simples, mots vivants, zéro acronyme technique sans vulgarisation immédiate.",
+    deep_code: "Explique en détail la mécanique interne du moteur d'exécution (pile d'appels, table de hachage interne, flux mémoire, bytecode) avec rigueur chirurgicale."
+  };
+
+  // Compile other notes context for DataCamp-style prerequisite and connection mapping
+  const otherNotesContext = (req.allNotes || [])
+    .filter(n => n.title.toLowerCase() !== req.noteTitle.toLowerCase())
+    .slice(0, 15)
+    .map(n => `- Note "${n.title}" [Module: ${n.moduleName || 'Racine'}, Tags: ${n.tags.join(', ')}]\n  Extrait: ${n.contentSnippet.slice(0, 120)}...`)
+    .join('\n');
+
+  const systemPrompt = `Tu es le Mentor et Pédagogue d'Élite de DevNotes, spécialisé dans l'apprentissage progressif (façon parcours DataCamp).
+L'utilisateur a du mal à comprendre une note ou a besoin d'approfondir les détails essentiels qui ont été résumés.
+
+NOTE ACTUELLE À EXPLIQUER :
+Titre : ${req.noteTitle}
+${req.selectedText ? `Passage / extrait ciblé par l'utilisateur :\n"""${req.selectedText}"""\n` : ''}
+Contenu complet de la note :
+"""
+${req.noteContent}
+"""
+
+QUESTION OU BESOIN DE L'UTILISATEUR :
+${req.userQuestion || "Explique-moi cette note en profondeur avec des analogies claires et universelles."}
+
+MODE D'ANALOGIE SOUHAITÉ :
+${analogyInstructions[analogyMode] || analogyInstructions.universal}
+
+BASE DE CONNAISSANCES DE L'UTILISATEUR (AUTRES NOTES DISPONIBLES DANS DEVNOTES) :
+${otherNotesContext || 'Aucune autre note disponible.'}
+
+DIRECTIVES PÉDAGOGIQUES MAJEURES :
+1. NE RÉSUME PAS BRUTALEMENT : Les résumés éliminent souvent les détails cruciaux. Entre dans les détails de la mécanique interne, explique le "pourquoi", comment ça fonctionne pas à pas.
+2. CONNEXIONS MULTI-NOTES (DataCamp style) : Fais explicitement le lien avec les autres notes de l'utilisateur quand c'est pertinent (ex: si la note est sur les Itérateurs, relie-la aux Listes ou Dictionnaires déjà étudiés).
+3. ANALOGIE CONCRÈTE : Donne une analogie vivante, facile à visualiser pour n'importe qui.
+4. CE QUI SE PASSE DANS LA VRAIE VIE : Montre des cas concrets avec du code commenté et ce qui se passe quand le code s'exécute.
+5. FORMAT DE RÉPONSE OBLIGATOIRE (en Markdown GFM) :
+   - Commence par une alerte > [!NOTE] avec l'analogie phare.
+   - ### 1. Le problème concret que ça résout
+   - ### 2. L'analogie expliquée pas à pas
+   - ### 3. Ce qui se passe sous le capot (La mécanique interne)
+   - ### 4. Le code en pratique (avec l'univers de l'analogie)
+   - ### 5. Ce qui se passe dans la vraie vie & Pièges à éviter
+   - ### 6. Connexion avec vos autres notes (si applicable)
+   - ### 💡 Résumé ultra-rapide (La règle d'or)
+6. Mets les mots-clés et titres importants bien en valeur.`;
+
+  // OpenRouter call
+  if (provider === 'openrouter' && apiKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DevNotes Pédagogie',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: 'user', content: systemPrompt }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const reply = data.choices?.[0]?.message?.content;
+        if (reply && reply.trim()) {
+          return {
+            explanation: reply.trim(),
+            relatedNotes: extractRelatedNotes(reply, req.allNotes || []),
+            analogyUsed: analogyMode
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] Explain OpenRouter error, using fallback:', err);
+    }
+  }
+
+  // Gemini call
+  if ((provider === 'gemini' || !provider) && apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: systemPrompt,
+      });
+
+      if (response.text && response.text.trim()) {
+        return {
+          explanation: response.text.trim(),
+          relatedNotes: extractRelatedNotes(response.text, req.allNotes || []),
+          analogyUsed: analogyMode
+        };
+      }
+    } catch (err) {
+      console.error('[aiService] Explain Gemini error, using fallback:', err);
+    }
+  }
+
+  // Ollama call
+  if (provider === 'ollama') {
+    try {
+      const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const res = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelName || 'llama3',
+          messages: [{ role: 'user', content: systemPrompt }],
+          stream: false,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const reply = data.message?.content;
+        if (reply && reply.trim()) {
+          return {
+            explanation: reply.trim(),
+            relatedNotes: extractRelatedNotes(reply, req.allNotes || []),
+            analogyUsed: analogyMode
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] Explain Ollama error, using fallback:', err);
+    }
+  }
+
+  // Intelligent local fallback
+  return fallbackExplainNote(req);
+}
+
+function extractRelatedNotes(text: string, allNotes: { id: string; title: string }[]): { id?: string; title: string; reason: string }[] {
+  const result: { id?: string; title: string; reason: string }[] = [];
+  for (const n of allNotes) {
+    if (text.toLowerCase().includes(n.title.toLowerCase())) {
+      result.push({
+        id: n.id,
+        title: n.title,
+        reason: 'Mentionnée comme concept connexe dans l\'explication'
+      });
+    }
+  }
+  return result.slice(0, 4);
+}
+
+/**
+ * Smart pedagogical offline fallback for key programming concepts with multiple analogies.
+ */
+function fallbackExplainNote(req: ExplainNoteRequest): ExplainNoteResponse {
+  const title = (req.noteTitle || '').toLowerCase();
+  const content = (req.noteContent || '').toLowerCase();
+  const query = (req.userQuestion || '').toLowerCase();
+  const selected = (req.selectedText || '').toLowerCase();
+
+  const isFootball = req.analogyMode === 'football' || query.includes('foot');
+  const isPoker = req.analogyMode === 'cards' || query.includes('carte') || query.includes('poker');
+
+  // Check for __getattr__ or __setattr__
+  if (title.includes('getattr') || title.includes('setattr') || content.includes('__getattr__') || selected.includes('getattr')) {
+    if (isFootball) {
+      return {
+        analogyUsed: 'football',
+        relatedNotes: [],
+        explanation: `> [!NOTE]
+> **L'Analogie du Football : Le Classement du Ballon d'Or et l'Arbitre VAR**
+> Imaginez que vous développiez le programme officiel pour gérer les statistiques des joueurs et calculer le classement au Ballon d'Or. \`__setattr__\` est l'arbitre vidéo (VAR) à l'entrée de chaque statistique, tandis que \`__getattr__\` est le statisticien de secours qui intervient quand une donnée manque.
+
+### 1. Le problème concret que ça résout
+Sans ces méthodes magiques, si un utilisateur saisit un nombre de buts négatif (\`joueur.buts = -5\`) ou du texte (\`joueur.buts = "beaucoup"\`), votre classement est faussé. De même, si le programme demande \`joueur.notes_defensives\` pour un attaquant qui n'en a pas, l'application crashe immédiatement avec une \`AttributeError\`.
+
+### 2. \`__setattr__\` : Le contrôleur à l'entrée (écriture)
+Cette méthode est appelée **automatiquement à chaque fois** qu'on assigne une valeur à un attribut.
+\`\`\`python
+class JoueurFoot:
+    def __init__(self, nom, buts, passes):
+        self.nom = nom
+        self.buts = buts
+        self.passes = passes
+
+    def __setattr__(self, nom_attr, valeur):
+        if nom_attr in ("buts", "passes"):
+            if not isinstance(valeur, (int, float)):
+                raise TypeError(f"{nom_attr} doit être un nombre !")
+            if valeur < 0:
+                raise ValueError(f"{nom_attr} ne peut pas être négatif !")
+        # Stockage sécurisé dans le dictionnaire interne
+        self.__dict__[nom_attr] = valeur
+\`\`\`
+
+### 3. \`__getattr__\` : Le filet de secours (lecture inexistante)
+Cette méthode n'est appelée **que si l'attribut n'existe pas** dans le dictionnaire interne \`__dict__\`.
+\`\`\`python
+    def __getattr__(self, nom_attr):
+        if nom_attr == "notes_defensives":
+            print(f"Info : {self.nom} n'a pas de note défensive. Valeur par défaut : 0.")
+            return 0
+        return None
+\`\`\`
+
+### 4. Ce qui se passe dans la vraie vie
+- \`mbappe = JoueurFoot("Kylian", 50, 20)\` → Tout va bien.
+- \`mbappe.buts = -5\` → Exception levée, classement sauvé !
+- \`print(mbappe.notes_defensives)\` → Renvoie 0 sans jamais faire planter l'application.
+
+### 💡 Résumé ultra-rapide (La règle d'or)
+- **\`__setattr__\`** : S'exécute à chaque écriture pour valider, filtrer ou transformer la donnée.
+- **\`__getattr__\`** : Filet de sécurité qui ne s'éveille que si la donnée demandée est introuvable.`
+      };
+    }
+
+    return {
+      analogyUsed: 'universal',
+      relatedNotes: [],
+      explanation: `> [!NOTE]
+> **L'Analogie Universelle : Le Guichetier Contrôleur et le Service d'Objets Trouvés**
+> Pensez à un objet comme à un dossier administratif. \`__setattr__\` est le guichetier qui vérifie chaque document avant de le glisser dans le classeur. \`__getattr__\` est le service d'assistance qui propose une solution de remplacement lorsqu'un document demandé n'a jamais été archivé.
+
+### 1. Le problème concret que ça résout
+Dans une application d'entreprise, laisser n'importe qui modifier les attributs d'un objet sans contrôle peut corrompre l'état de la mémoire. À l'inverse, lever une erreur fatale à chaque fois qu'un champ optionnel manque rend le système très fragile.
+
+### 2. Mécanique interne sous le capot
+- Tout objet Python stocke ses attributs dans un dictionnaire sous-jacent : \`self.__dict__\`.
+- Quand vous écrivez \`obj.x = 10\`, Python exécute en réalité \`obj.__setattr__("x", 10)\`.
+- Quand vous lisez \`obj.y\`, Python regarde d'abord dans \`self.__dict__\`. S'il ne trouve rien, il appelle \`obj.__getattr__("y")\`.
+
+### 3. Le code en pratique
+\`\`\`python
+class DocumentSecurise:
+    def __init__(self, titre):
+        self.titre = titre
+
+    def __setattr__(self, cle, valeur):
+        if cle == "titre" and not isinstance(valeur, str):
+            raise TypeError("Le titre doit obligatoirement être du texte !")
+        self.__dict__[cle] = valeur
+
+    def __getattr__(self, cle):
+        # Filet de sauvetage pour attribut inconnu
+        return f"[Information non renseignée pour '{cle}']"
+
+doc = DocumentSecurise("Contrat 2026")
+print(doc.date_signature) # Affiche la mention de secours au lieu de planter
+\`\`\`
+
+### 💡 Résumé ultra-rapide (La règle d'or)
+- Utilisez \`__setattr__\` pour garantir la validité absolue de ce qui entre dans votre objet.
+- Utilisez \`__getattr__\` pour fournir des valeurs par défaut élégantes sans faire planter votre système.`
+    };
+  }
+
+  // Iterators / Generators fallback
+  if (title.includes('itérateur') || title.includes('iterator') || content.includes('__iter__') || content.includes('__next__') || isPoker) {
+    return {
+      analogyUsed: isPoker ? 'cards' : 'universal',
+      relatedNotes: [],
+      explanation: `> [!NOTE]
+> **L'Analogie Universelle : Le Croupier de Cartes (ou le Distributeur de tickets)**
+> Contrairement à une liste qui garde un million d'éléments entassés sur la table (consommant toute votre mémoire RAM), un itérateur est comme un croupier : il ne garde en main qu'une seule carte et ne vous la tend que lorsque vous lui demandez expressément "Suivante !".
+
+### 1. Le problème concret que ça résout
+Si vous devez traiter 10 millions de lignes d'un fichier de données (DataCamp style), créer une liste \`[...]\` fera exploser la mémoire de votre serveur. Un itérateur génère ou lit les éléments un par un au fur et à mesure du besoin (*lazy evaluation*).
+
+### 2. Le protocole officiel en 2 méthodes
+1. **\`__iter__()\`** : Dit au mot-clé \`for\` : *"Je suis l'itérateur, utilisez-moi !"* (renvoie généralement \`self\`).
+2. **\`__next__()\`** : Calcule et retourne la valeur suivante. Quand il n'y a plus rien, lève impérativement \`raise StopIteration\`.
+
+### 3. Code concret et ce qui se passe
+\`\`\`python
+class DistributeurTickets:
+    def __init__(self, total):
+        self.total = total
+        self.actuel = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.actuel < self.total:
+            self.actuel += 1
+            return f"Ticket N°{self.actuel}"
+        # Signal d'arrêt officiel pour la boucle for
+        raise StopIteration
+
+distrib = DistributeurTickets(3)
+for ticket in distrib:
+    print(ticket)
+\`\`\`
+
+### 4. Pourquoi \`StopIteration\` est obligatoire
+Sans cette exception, la boucle \`for\` continuerait à interroger \`__next__()\` à l'infini, causant une boucle sans fin dans votre programme.
+
+### 💡 Résumé ultra-rapide (La règle d'or)
+- Liste = Stockage complet et immédiat en mémoire vive.
+- Itérateur = Génération d'une valeur à la fois, à la demande, arrêtée proprement par \`StopIteration\`.`
+    };
+  }
+
+  // Default pedagogical explanation
+  return {
+    analogyUsed: 'universal',
+    relatedNotes: [],
+    explanation: `> [!NOTE]
+> **Explication Pédagogique & Approfondissement de "${req.noteTitle}"**
+> Voici une décomposition pas à pas pour éclairer les concepts clés de cette note et comprendre exactement comment les appliquer sereinement.
+
+### 1. Le problème concret que ça résout
+Cette technique permet de séparer proprement les responsabilités dans votre code, d'éviter les bugs difficiles à diagnostiquer et de rendre vos composants réutilisables à grande échelle.
+
+### 2. L'analogie du monde réel
+Imaginez une recette de cuisine standardisée : vous avez les ingrédients de base (les données), les ustensiles obligatoires (les fonctions clés), et les règles d'hygiène (les validations et types). Chaque élément a un rôle précis pour garantir un résultat infaillible.
+
+### 3. Les détails techniques sous le capot
+- Le système vérifie en amont la conformité des entrées.
+- Les données transitent de façon prévisible sans effets de bord inattendus.
+- En cas d'erreur, des messages explicites permettent d'identifier la cause sans faire crasher le reste de l'application.
+
+### 4. Ce qui se passe dans la vraie vie & Pièges
+- Ne supposez jamais que les variables ont toujours la valeur attendue : prévoyez les cas limites (valeurs nulles, listes vides).
+- Privilégiez la lisibilité plutôt que la concision extrême : le code s'écrit une fois mais se relit cent fois.
+
+### 💡 Résumé ultra-rapide (La règle d'or)
+Maîtrisez d'abord la règle générale avant d'explorer les cas particuliers. Si un concept vous semble abstrait, testez-le immédiatement dans un petit script de 5 lignes pour observer son comportement direct !`
+  };
+}
+
+
 

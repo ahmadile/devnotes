@@ -75,7 +75,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             if (isInline) {
               return (
                 <code 
-                  className="font-mono text-xs bg-[#141417] text-zinc-200 border border-white/[0.08] px-1.5 py-0.5 rounded-md font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                  className="font-mono text-xs bg-sky-950/30 text-sky-200 border border-sky-500/25 px-1.5 py-0.5 rounded-md font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] mx-0.5"
                   {...props}
                 >
                   {children}
@@ -89,17 +89,17 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             return <Callout>{renderTextWithCodeHighlights(children)}</Callout>;
           },
           h1: ({ children }) => (
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight border-b border-white/[0.08] pb-2 mt-6 mb-4 font-sans">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-zinc-200 to-indigo-200 tracking-tight border-b border-white/[0.1] pb-2.5 mt-7 mb-4 font-sans">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-semibold text-zinc-100 tracking-tight mt-6 mb-3 font-sans">
+            <h2 className="text-lg font-bold text-zinc-100 tracking-tight mt-7 mb-3 font-sans border-l-2 border-indigo-500/80 pl-3 flex items-center gap-2">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-semibold text-zinc-200 tracking-tight mt-5 mb-2 font-sans">
+            <h3 className="text-base font-bold text-sky-200/90 tracking-tight mt-6 mb-2 font-sans border-l-2 border-sky-500/60 pl-2.5">
               {children}
             </h3>
           ),
@@ -119,7 +119,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed text-zinc-300 font-sans marker:text-zinc-500">
+            <li className="leading-relaxed text-zinc-300 font-sans marker:text-indigo-400 marker:font-bold">
               {renderTextWithCodeHighlights(children)}
             </li>
           ),
@@ -128,13 +128,13 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
               href={href} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-zinc-200 hover:text-white underline underline-offset-4 decoration-zinc-500/40 transition-colors font-medium"
+              className="text-sky-300 hover:text-sky-200 underline underline-offset-4 decoration-sky-500/40 transition-colors font-medium"
             >
               {children}
             </a>
           ),
           strong: ({ children }) => (
-            <strong className="font-semibold text-white">
+            <strong className="font-bold text-amber-200/95 bg-amber-400/[0.08] px-1.5 py-0.5 rounded border border-amber-400/25 shadow-xs mx-0.5 inline-block">
               {renderTextWithCodeHighlights(children)}
             </strong>
           ),
@@ -292,49 +292,54 @@ const Callout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const styleMap = {
     note: {
-      border: 'border-l-[3px] border-l-sky-500/80 bg-[#121215] border border-white/[0.07]',
+      border: 'border-l-[4px] border-l-sky-500 bg-sky-950/20 border border-sky-500/25 shadow-[0_2px_12px_rgba(14,165,233,0.06)]',
       icon: <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />,
       title: 'Note',
-      titleColor: 'text-sky-400'
+      badgeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
     },
     tip: {
-      border: 'border-l-[3px] border-l-emerald-500/80 bg-[#121215] border border-white/[0.07]',
+      border: 'border-l-[4px] border-l-emerald-500 bg-emerald-950/20 border border-emerald-500/25 shadow-[0_2px_12px_rgba(16,185,129,0.06)]',
       icon: <Lightbulb className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />,
-      title: 'Tip',
-      titleColor: 'text-emerald-400'
+      title: 'Astuce / Tip',
+      badgeClass: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
     },
     warning: {
-      border: 'border-l-[3px] border-l-amber-500/80 bg-[#121215] border border-white/[0.07]',
+      border: 'border-l-[4px] border-l-amber-500 bg-amber-950/20 border border-amber-500/25 shadow-[0_2px_12px_rgba(245,158,11,0.06)]',
       icon: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />,
-      title: 'Warning',
-      titleColor: 'text-amber-400'
+      title: 'Attention / Warning',
+      badgeClass: 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
     },
     important: {
-      border: 'border-l-[3px] border-l-rose-500/80 bg-[#121215] border border-white/[0.07]',
-      icon: <Star className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />,
+      border: 'border-l-[4px] border-l-rose-500 bg-rose-950/25 border border-rose-500/30 shadow-[0_2px_14px_rgba(244,63,94,0.09)]',
+      icon: <Star className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 fill-rose-500/20" />,
       title: 'Important',
-      titleColor: 'text-rose-400'
+      badgeClass: 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
     },
     info: {
-      border: 'border-l-[3px] border-l-zinc-500 bg-[#121215] border border-white/[0.07]',
-      icon: <HelpCircle className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />,
-      title: '',
-      titleColor: 'text-zinc-400'
+      border: 'border-l-[4px] border-l-indigo-500/70 bg-indigo-950/15 border border-indigo-500/20',
+      icon: <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />,
+      title: 'Information',
+      badgeClass: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25'
     }
   };
 
   const styles = styleMap[type];
 
   return (
-    <div className={`p-4 rounded-r-xl my-4 text-sm font-sans flex gap-3 ${styles.border}`}>
+    <div className={`p-4 rounded-xl my-4 text-sm font-sans flex gap-3 ${styles.border}`}>
       {styles.icon}
-      <div className="flex-1 min-w-0 space-y-1">
+      <div className="flex-1 min-w-0 space-y-1.5">
         {styles.title && (
-          <span className={`text-xs font-bold uppercase tracking-wider ${styles.titleColor}`}>
-            {styles.title}
-          </span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className={cn(
+              "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs inline-flex items-center gap-1",
+              styles.badgeClass
+            )}>
+              {styles.title}
+            </span>
+          </div>
         )}
-        <div className="text-foreground/90">{cleanChildren}</div>
+        <div className="text-foreground/90 leading-relaxed">{cleanChildren}</div>
       </div>
     </div>
   );
