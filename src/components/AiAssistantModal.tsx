@@ -93,16 +93,16 @@ interface ProcessedAiResult {
   }[];
 }
 
-// Custom DevNotes AI Emblem
+// Custom DevNotes AI Emblem (Carbon Sleek)
 export const DevNotesAiEmblem = ({ isThinking = false, size = "md" }: { isThinking?: boolean; size?: "sm" | "md" | "lg" }) => {
   const containerSize = {
-    sm: "w-5 h-5 rounded-md",
+    sm: "w-6 h-6 rounded-md",
     md: "w-8 h-8 rounded-lg",
     lg: "w-10 h-10 rounded-xl",
   }[size];
 
   const iconSize = {
-    sm: "w-3 h-3",
+    sm: "w-3.5 h-3.5",
     md: "w-4 h-4",
     lg: "w-5 h-5",
   }[size];
@@ -111,15 +111,12 @@ export const DevNotesAiEmblem = ({ isThinking = false, size = "md" }: { isThinki
     <div className="relative inline-flex items-center justify-center shrink-0">
       <div className={cn(
         "flex items-center justify-center transition-all duration-300",
-        "bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 group-hover:border-indigo-500/40",
+        "bg-[#18181c] border border-white/[0.08] text-zinc-300",
         containerSize,
-        isThinking && "animate-pulse shadow-sm shadow-indigo-500/30 border-indigo-500/50"
+        isThinking && "border-zinc-500 text-white shadow-sm shadow-zinc-800"
       )}>
-        <Brain className={cn(iconSize, "transition-transform", isThinking && "animate-spin text-indigo-500")} />
+        <Sparkles className={cn(iconSize, "transition-transform", isThinking && "animate-spin text-zinc-200")} strokeWidth={1.5} />
       </div>
-      {isThinking && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background animate-ping" />
-      )}
     </div>
   );
 };
@@ -219,31 +216,26 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   initialTopic,
   initialSelectedText,
 }) => {
-  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>(
+    initialTab === 'explainer' ? 'chat' : initialTab
+  );
 
-  // Explainer & Pédagogie State
-  const [explainTopic, setExplainTopic] = useState(initialTopic || '');
-  const [explainSelectedText, setExplainSelectedText] = useState(initialSelectedText || '');
-  const [explainAnalogy, setExplainAnalogy] = useState<'universal' | 'football' | 'cards' | 'daily' | 'eli10' | 'deep_code'>('universal');
-  const [explainQuestion, setExplainQuestion] = useState('');
-  const [isExplaining, setIsExplaining] = useState(false);
-  const [explainResult, setExplainResult] = useState<{
-    explanation: string;
-    relatedNotes: { id?: string; title: string; reason: string }[];
-    analogyUsed: string;
-  } | null>(null);
-  const [explainCopied, setExplainCopied] = useState(false);
-  const [explainInserted, setExplainInserted] = useState(false);
-  const [explainFollowup, setExplainFollowup] = useState('');
-  const [isFollowupLoading, setIsFollowupLoading] = useState(false);
+  // Snippet context & Message Actions State for Chat
+  const [selectedSnippetContext, setSelectedSnippetContext] = useState(initialSelectedText || '');
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
+  const [insertedMessageIndex, setInsertedMessageIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      if (initialTab) setActiveTab(initialTab);
-      if (initialTopic) setExplainTopic(initialTopic);
-      if (initialSelectedText) setExplainSelectedText(initialSelectedText);
+      if (initialTab) {
+        setActiveTab(initialTab === 'explainer' ? 'chat' : initialTab);
+      }
+      if (initialSelectedText) {
+        setSelectedSnippetContext(initialSelectedText);
+        setChatInput(`Peux-tu m'expliquer en détail ce passage : "${initialSelectedText.slice(0, 120)}${initialSelectedText.length > 120 ? '...' : ''}" ?`);
+      }
     }
-  }, [isOpen, initialTab, initialTopic, initialSelectedText]);
+  }, [isOpen, initialTab, initialSelectedText]);
   const [inputContent, setInputContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
@@ -493,11 +485,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     onClose();
   };
 
-  const handleSendChat = async () => {
-    if (!chatInput.trim() || isChatSending) return;
+  const handleSendChat = async (customPrompt?: string) => {
+    const userMessageText = (customPrompt || chatInput).trim();
+    if (!userMessageText || isChatSending) return;
 
-    const userMessageText = chatInput.trim();
-    setChatInput('');
+    if (!customPrompt) {
+      setChatInput('');
+    }
     const userMsg: AiConversationMessage = {
       role: 'user',
       content: userMessageText,
@@ -523,16 +517,28 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setIsChatSending(true);
 
     try {
-      const notesSummary = notes
-        .map(n => `- Note: "${n.title}" [Tags: ${n.tags.join(', ')}]\n  Extrait: ${n.content.slice(0, 150)}...`)
+      const activeNoteSummary = activeNote
+        ? `=== NOTE ACTIVE ACTUELLE ===\nTitre: "${activeNote.title}"\nTags: ${(activeNote.tags || []).join(', ')}\nContenu:\n${activeNote.content}\n${activeNote.snippets?.length ? '\nSnippets de code associés:\n' + activeNote.snippets.map((s, i) => `--- Snippet ${i+1}: ${s.title || s.language} ---\n${s.code}`).join('\n') : ''}\n=== FIN NOTE ACTIVE ===\n`
+        : 'Aucune note active actuellement.';
+
+      const otherNotesSummary = notes
+        .filter(n => !activeNote || n.id !== activeNote.id)
+        .slice(0, 30)
+        .map(n => `- Note: "${n.title}" [Tags: ${(n.tags || []).join(', ')}]\n  Extrait: ${n.content.slice(0, 150)}...`)
         .join('\n');
+
+      const snippetContextStr = selectedSnippetContext
+        ? `\n=== EXTRAIT PRÉCIS SÉLECTIONNÉ PAR L'UTILISATEUR ===\n"${selectedSnippetContext}"\n`
+        : '';
+
+      const notesContext = `${activeNoteSummary}${snippetContextStr}\n=== AUTRES NOTES DE LA BASE DE CONNAISSANCES ===\n${otherNotesSummary}`;
 
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
-          notesContext: notesSummary,
+          notesContext,
           provider: aiProvider,
           apiKey: activeApiKey.trim() || undefined,
           model: aiModel.trim() || undefined,
@@ -751,7 +757,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     }
 
     if (blueprintResult.roadmapSteps && blueprintResult.roadmapSteps.length > 0) {
-      fullMarkdown += `### 🗺️ Roadmap d'Implémentation\n\n`;
+      fullMarkdown += `### Roadmap d'Implémentation\n\n`;
       blueprintResult.roadmapSteps.forEach(st => {
         fullMarkdown += `#### ${st.phase}\n${st.description}\n`;
         if (st.keyDeliverables && st.keyDeliverables.length > 0) {
@@ -766,129 +772,26 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setTimeout(() => setBlueprintCopied(false), 2500);
   };
 
-  const handleExplain = async (
-    overrideAnalogy?: 'universal' | 'football' | 'cards' | 'daily' | 'eli10' | 'deep_code',
-    overrideQuestion?: string
-  ) => {
-    const analogyToUse = overrideAnalogy || explainAnalogy;
-    const questionToUse = overrideQuestion !== undefined ? overrideQuestion : explainQuestion;
-    setIsExplaining(true);
-    setExplainInserted(false);
-
-    try {
-      const allNotesSummary = notes.map(n => {
-        const moduleName = modules.find(m => m.id === n.moduleId)?.name || 'Général';
-        return {
-          id: n.id,
-          title: n.title,
-          moduleName,
-          tags: n.tags || [],
-          contentSnippet: n.content.slice(0, 300)
-        };
-      });
-
-      const activeApiKey = aiProvider === 'openrouter' ? openRouterKey : (aiProvider === 'gemini' ? geminiApiKey : '');
-
-      const res = await fetch('/api/ai/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          noteTitle: activeNote?.title || explainTopic || 'Note sans titre',
-          noteContent: activeNote?.content || '',
-          selectedText: explainSelectedText || undefined,
-          userQuestion: questionToUse || undefined,
-          analogyMode: analogyToUse,
-          allNotes: allNotesSummary,
-          provider: aiProvider,
-          apiKey: activeApiKey.trim() || undefined,
-          model: aiModel.trim() || undefined,
-          ollamaUrl: ollamaUrl.trim() || undefined,
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.ok && data.explanation) {
-        setExplainResult({
-          explanation: data.explanation,
-          relatedNotes: data.relatedNotes || [],
-          analogyUsed: data.analogyUsed || analogyToUse
-        });
-      } else {
-        throw new Error(data.error || "Impossible d'obtenir une explication");
-      }
-    } catch (err: any) {
-      console.error('Explain error:', err);
-      alert(err.message || 'Une erreur est survenue lors de l\'explication.');
-    } finally {
-      setIsExplaining(false);
-    }
-  };
-
-  const handleInsertExplanationIntoNote = () => {
-    if (!activeNote || !explainResult?.explanation) return;
-    const appendix = `\n\n---\n\n### 💡 Explication Approfondie & Analogie Pédagogique\n\n${explainResult.explanation}\n`;
+  const handleInsertMessageIntoNote = (content: string, msgIndex: number) => {
+    if (!activeNote) return;
+    const appendix = `\n\n---\n\n### Explication Approfondie & Analyse Pédagogique\n\n${content}\n`;
     const updatedContent = (activeNote.content || '') + appendix;
     onSaveNote({ ...activeNote, content: updatedContent }, activeNote.moduleId, activeNote.id);
-    setExplainInserted(true);
-    setTimeout(() => setExplainInserted(false), 3000);
+    setInsertedMessageIndex(msgIndex);
+    setTimeout(() => setInsertedMessageIndex(null), 3000);
   };
 
-  const handleCopyExplanation = () => {
-    if (!explainResult?.explanation) return;
-    navigator.clipboard.writeText(explainResult.explanation);
-    setExplainCopied(true);
-    setTimeout(() => setExplainCopied(false), 2000);
-  };
-
-  const handleExplainFollowup = async () => {
-    if (!explainFollowup.trim() || isFollowupLoading || !explainResult) return;
-    const userQ = explainFollowup.trim();
-    setExplainFollowup('');
-    setIsFollowupLoading(true);
-
-    try {
-      const activeApiKey = aiProvider === 'openrouter' ? openRouterKey : (aiProvider === 'gemini' ? geminiApiKey : '');
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'user', content: `Voici l'explication que tu as fournie :\n${explainResult.explanation}\n\nL'utilisateur a cette question d'approfondissement :\n${userQ}` }
-          ],
-          notesContext: `Note active: "${activeNote?.title}"\n${activeNote?.content || ''}`,
-          provider: aiProvider,
-          apiKey: activeApiKey.trim() || undefined,
-          model: aiModel.trim() || undefined,
-          ollamaUrl: ollamaUrl.trim() || undefined,
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && data.reply) {
-          setExplainResult({
-            ...explainResult,
-            explanation: explainResult.explanation + `\n\n---\n\n**❓ Question d'approfondissement :** ${userQ}\n\n${data.reply}`
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Followup error', err);
-    } finally {
-      setIsFollowupLoading(false);
-    }
+  const handleCopyMessage = (content: string, msgIndex: number) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageIndex(msgIndex);
+    setTimeout(() => setCopiedMessageIndex(null), 2000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-all duration-300">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-all duration-300">
       <div
         className={cn(
-          "bg-card border border-indigo-500/30 shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-300",
+          "bg-[#0f0f12] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-300",
           isMaximized
             ? "w-full h-full rounded-none max-w-none"
             : "w-full max-w-6xl h-[90vh] rounded-2xl"
@@ -896,113 +799,101 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       >
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-muted/30">
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/[0.06] bg-[#141417]">
           <div className="flex items-center gap-3">
             <DevNotesAiEmblem isThinking={isProcessing || isChatSending} />
             <div>
-              <h2 className="text-base font-extrabold text-foreground flex items-center gap-2">
+              <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
                 DevNotes AI Engine
-                <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-semibold">
+                <span className="text-[10px] bg-white/[0.05] text-zinc-300 border border-white/[0.08] px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-semibold">
                   {aiProvider === 'openrouter' ? 'OpenRouter' : aiProvider === 'ollama' ? 'Ollama Local' : 'Gemini 2.5'}
                 </span>
               </h2>
-              <p className="text-xs text-muted-foreground">
-                Génération automatique de notes, sous-notes de code et réutilisation de syntaxes
+              <p className="text-xs text-zinc-400">
+                Génération de notes, explications pédagogiques approfondies et architecture
               </p>
             </div>
           </div>
 
           {/* Navigation Tabs & Window Controls */}
           <div className="flex items-center gap-3">
-            <div className="flex bg-secondary/80 p-1 rounded-xl border border-border/60">
+            <div className="flex bg-[#18181c] p-1 rounded-xl border border-white/[0.06]">
               <button
                 onClick={() => setActiveTab('generator')}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
                   activeTab === 'generator'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-white/[0.08]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
                 )}
               >
-                <Zap className="w-3.5 h-3.5" />
+                <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
                 Générateur de Note
-              </button>
-              <button
-                onClick={() => setActiveTab('explainer')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
-                  activeTab === 'explainer'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
-                Expliquer & Approfondir
               </button>
               <button
                 onClick={() => setActiveTab('chat')}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
                   activeTab === 'chat'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-white/[0.08]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
                 )}
               >
-                <MessageSquare className="w-3.5 h-3.5" />
-                Assistant Chat
+                <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Assistant & Pédagogie
               </button>
               <button
                 onClick={() => setActiveTab('architect')}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
                   activeTab === 'architect'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-white/[0.08]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
                 )}
               >
-                <Briefcase className="w-3.5 h-3.5" />
+                <Briefcase className="w-3.5 h-3.5" strokeWidth={1.5} />
                 Architecte Pro
               </button>
               <button
                 onClick={() => setActiveTab('revision')}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
                   activeTab === 'revision'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-white/[0.08]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
                 )}
               >
-                <GraduationCap className="w-3.5 h-3.5" />
-                Révision & Pratique
+                <GraduationCap className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Révision
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
                   activeTab === 'settings'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-white/[0.08]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
                 )}
               >
-                <Settings className="w-3.5 h-3.5" />
-                Clé API / Modèle
+                <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Configuration IA
               </button>
             </div>
 
             {/* Window Resizing & Close controls */}
-            <div className="flex items-center gap-1 pl-2 border-l border-border/60">
+            <div className="flex items-center gap-1 pl-2 border-l border-white/[0.06]">
               <button
                 onClick={() => setIsMaximized(!isMaximized)}
                 title={isMaximized ? "Réduire la fenêtre" : "Agrandir en plein écran"}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+                className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded-lg transition-colors cursor-pointer"
               >
-                {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isMaximized ? <Minimize2 className="w-4 h-4" strokeWidth={1.5} /> : <Maximize2 className="w-4 h-4" strokeWidth={1.5} />}
               </button>
               <button
                 onClick={onClose}
-                className="p-2 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                className="p-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" strokeWidth={1.5} />
               </button>
             </div>
           </div>
@@ -1017,30 +908,30 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               <div className="p-6 flex flex-col h-full bg-secondary/10 space-y-4 overflow-y-auto">
                 {/* Active Note Banner if available */}
                 {activeNote && (
-                  <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 flex items-center justify-between gap-3">
+                  <div className="bg-[#151518] border border-white/[0.08] rounded-xl p-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold text-indigo-400 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                      <div className="text-[11px] font-semibold text-zinc-300 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
                         <span className="truncate">Note active : {activeNote.title}</span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground truncate">
+                      <p className="text-[10px] text-zinc-500 truncate">
                         {activeNote.snippets?.length ? `${activeNote.snippets[0].annotations?.length || 0} sous-notes de code` : 'Aucun code'}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={handleLoadActiveNote}
-                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 transition-colors shadow-sm cursor-pointer"
+                      className="px-2.5 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 hover:text-white border border-white/[0.08] rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 transition-colors shadow-xs cursor-pointer"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      📥 Charger la note active
+                      <RotateCcw className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.5} />
+                      Charger la note active
                     </button>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-indigo-400" />
+                    <FileText className="w-4 h-4 text-zinc-400" strokeWidth={1.5} />
                     Texte Brut / Format de la Note
                   </label>
 
@@ -1048,7 +939,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setInputContent(DEFAULT_EXAMPLE_INPUT)}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-xs text-zinc-400 hover:text-zinc-200 font-medium hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Sparkles className="w-3 h-3" />
                       Exemple
@@ -1067,27 +958,27 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 </div>
 
                 <textarea
-                  placeholder="Collez votre contenu de note, le format 🔵 Titre 🟡 Tags 🟢 Résumé 🔴 Code ⚫ Ligne ..., ou chargez la note active pour la restructurer..."
+                  placeholder="Collez votre contenu de note, le format Titre, Tags, Résumé, Code ou chargez la note active pour la restructurer..."
                   value={inputContent}
                   onChange={(e) => setInputContent(e.target.value)}
-                  className="flex-1 w-full min-h-[240px] bg-secondary/35 border border-border/80 rounded-xl p-4 text-xs font-mono text-foreground focus:outline-none focus:border-indigo-500 transition-colors resize-none leading-relaxed"
+                  className="flex-1 w-full min-h-[240px] bg-secondary/35 border border-border/80 rounded-xl p-4 text-xs font-mono text-foreground focus:outline-none focus:border-zinc-500 transition-colors resize-none leading-relaxed"
                 />
 
                 {/* Destination Folder Selector */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                    <Folder className="w-3.5 h-3.5 text-sky-400" />
+                    <Folder className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.5} />
                     Dossier de destination (Module)
                   </label>
                   <select
                     value={selectedModuleId || ''}
                     onChange={(e) => setSelectedModuleId(e.target.value || null)}
-                    className="w-full bg-secondary/40 border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    className="w-full bg-secondary/40 border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-zinc-500 cursor-pointer"
                   >
                     <option value="">-- Racine (Aucun dossier spécifique) --</option>
                     {modules.map((m) => (
                       <option key={m.id} value={m.id}>
-                        📂 {m.name}
+                        {m.name}
                       </option>
                     ))}
                   </select>
@@ -1097,7 +988,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <button
                   onClick={handleProcessNote}
                   disabled={!inputContent.trim() || isProcessing}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                  className="w-full py-3 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
                 >
                   {isProcessing ? (
                     <>
@@ -1106,7 +997,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     </>
                   ) : (
                     <>
-                      <Zap className="w-4 h-4" />
+                      <Zap className="w-4 h-4" strokeWidth={1.5} />
                       Générer et Structurer la Note avec l'IA
                     </>
                   )}
@@ -1307,318 +1198,28 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             </div>
           )}
 
-          {/* Explainer / Pédagogie Tab */}
-          {activeTab === 'explainer' && (
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-border/60 overflow-hidden">
-              
-              {/* Left Column (5 cols): Controls, Note context, Analogy selector, Question */}
-              <div className="lg:col-span-5 p-6 flex flex-col h-full bg-secondary/10 space-y-4 overflow-y-auto">
-                
-                {/* Active Note & Knowledge Base Header */}
-                <div className="bg-[#121215] border border-white/[0.08] rounded-xl p-4 space-y-2.5 shadow-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <Lightbulb className="w-3 h-3" />
-                      Note Ciblée
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
-                      <Folder className="w-3 h-3 text-sky-400" />
-                      {notes.length} notes interconnectées
-                    </span>
-                  </div>
-
-                  <h3 className="text-sm font-bold text-zinc-100 truncate">
-                    {activeNote?.title || explainTopic || "Aucune note sélectionnée"}
-                  </h3>
-
-                  {activeNote && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {activeNote.tags?.map((t, idx) => (
-                        <span key={idx} className="text-[10px] bg-white/[0.05] border border-white/[0.08] text-zinc-300 px-2 py-0.5 rounded-md">
-                          #{t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Selected passage indicator if any */}
-                  {explainSelectedText && (
-                    <div className="mt-2 bg-indigo-950/30 border border-indigo-500/30 rounded-lg p-2.5 space-y-1">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-indigo-300 uppercase tracking-wider">
-                        <span>Passage ciblé :</span>
-                        <button
-                          onClick={() => setExplainSelectedText('')}
-                          className="text-zinc-400 hover:text-white"
-                          title="Effacer l'extrait ciblé"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <p className="text-xs text-zinc-300 font-mono line-clamp-3 italic">
-                        "{explainSelectedText}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 1-Click Analogy Selector */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    Angle d'Explication & Analogie
-                  </label>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'universal', label: '🌍 Universelle', desc: 'Accessible à tous, vie courante' },
-                      { id: 'deep_code', label: '🔬 Mécanique interne', desc: 'Sous le capot & pièges' },
-                      { id: 'football', label: '⚽ Football & Sport', desc: 'VAR, Ballon d\'Or, règles' },
-                      { id: 'cards', label: '🃏 Poker & Croupier', desc: 'Distribution, pioche, cartes' },
-                      { id: 'daily', label: '🚗 Cuisine & Quotidien', desc: 'Recette, restaurant, trafic' },
-                      { id: 'eli10', label: '👶 Enfant de 10 ans', desc: 'Vulgarisation ultra-simple' },
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setExplainAnalogy(item.id as any)}
-                        className={cn(
-                          "p-2.5 rounded-xl border text-left transition-all cursor-pointer",
-                          explainAnalogy === item.id
-                            ? "bg-indigo-600/15 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/40"
-                            : "bg-secondary/20 border-white/[0.06] text-zinc-300 hover:bg-secondary/40 hover:border-white/[0.12]"
-                        )}
-                      >
-                        <div className="text-xs font-bold">{item.label}</div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">{item.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Specific Question / Prompt */}
-                <div className="space-y-1.5 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <HelpCircle className="w-3.5 h-3.5 text-sky-400" />
-                      Question ou point bloquant (Optionnel)
-                    </label>
-                    {explainQuestion && (
-                      <button
-                        onClick={() => setExplainQuestion('')}
-                        className="text-[10px] text-zinc-400 hover:text-white"
-                      >
-                        Effacer
-                      </button>
-                    )}
-                  </div>
-                  <textarea
-                    value={explainQuestion}
-                    onChange={(e) => setExplainQuestion(e.target.value)}
-                    placeholder="Ex: Pourquoi StopIteration est obligatoire ? Pourquoi utilise-t-on __dict__ ? Fais le lien avec ma note sur les dictionnaires..."
-                    className="w-full h-24 bg-secondary/35 border border-border/80 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-indigo-500 resize-none font-sans leading-relaxed"
-                  />
-                  
-                  {/* Quick question suggestions */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {[
-                      "Explique-moi les détails essentiels",
-                      "Quels sont les pièges à éviter ?",
-                      "Fais le lien avec mes autres notes"
-                    ].map((sugg, sIdx) => (
-                      <button
-                        key={sIdx}
-                        type="button"
-                        onClick={() => setExplainQuestion(sugg)}
-                        className="text-[10px] px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.06] transition-colors cursor-pointer"
-                      >
-                        + {sugg}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Action Button */}
-                <button
-                  onClick={() => handleExplain()}
-                  disabled={isExplaining || (!activeNote && !explainTopic && !explainSelectedText)}
-                  className="w-full py-3 bg-gradient-to-r from-amber-600 via-indigo-600 to-sky-600 hover:from-amber-500 hover:to-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  {isExplaining ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Analyse pédagogique en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Lightbulb className="w-4 h-4 text-amber-300" />
-                      🚀 Expliquer & Approfondir cette note
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Right Column (7 cols): Result, DataCamp Cross-References, Markdown Viewer, Followup */}
-              <div className="lg:col-span-7 flex flex-col h-full overflow-hidden bg-background">
-                {isExplaining ? (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                    <DevNotesAiEmblem isThinking={true} size="lg" />
-                    <div className="space-y-1 max-w-sm">
-                      <h4 className="text-sm font-bold text-foreground">Élaboration de l'explication en cours</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Recherche d'une analogie accessible, analyse des détails sous le capot et exploration des ponts avec vos {notes.length} notes...
-                      </p>
-                    </div>
-                  </div>
-                ) : explainResult ? (
-                  <div className="flex-1 flex flex-col h-full overflow-hidden">
-                    {/* Top Action Bar */}
-                    <div className="px-6 py-3 border-b border-border/80 bg-secondary/20 flex items-center justify-between gap-3 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <Lightbulb className="w-4 h-4 text-amber-400" />
-                          Explication Pédagogique
-                        </span>
-                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
-                          {explainResult.analogyUsed}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleCopyExplanation}
-                          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border bg-secondary/50 hover:bg-secondary text-zinc-300 hover:text-white transition-all cursor-pointer"
-                          title="Copier l'explication"
-                        >
-                          {explainCopied ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="text-emerald-400">Copié</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>Copier</span>
-                            </>
-                          )}
-                        </button>
-
-                        {activeNote && (
-                          <button
-                            onClick={handleInsertExplanationIntoNote}
-                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-sm cursor-pointer"
-                            title="Ajouter cette explication à la fin de votre note active"
-                          >
-                            {explainInserted ? (
-                              <>
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Ajouté à la note !</span>
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>📥 Insérer dans ma note</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Related Notes Banner (DataCamp style progression) */}
-                    {explainResult.relatedNotes && explainResult.relatedNotes.length > 0 && (
-                      <div className="px-6 py-2 bg-indigo-950/25 border-b border-indigo-500/20 flex items-center gap-2 text-xs overflow-x-auto">
-                        <span className="font-bold text-indigo-300 shrink-0 flex items-center gap-1">
-                          🔗 Notes connexes dans votre base :
-                        </span>
-                        {explainResult.relatedNotes.map((rn, rnIdx) => (
-                          <span
-                            key={rnIdx}
-                            className="text-[11px] bg-white/[0.06] border border-white/[0.1] text-zinc-200 px-2 py-0.5 rounded-md shrink-0 font-mono"
-                          >
-                            {rn.title}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Explanation Content Body */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                      <div className="max-w-none text-xs leading-relaxed">
-                        <Markdown content={explainResult.explanation} />
-                      </div>
-                    </div>
-
-                    {/* Followup Chat Footer */}
-                    <div className="p-4 border-t border-border/80 bg-secondary/20 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={explainFollowup}
-                          onChange={(e) => setExplainFollowup(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleExplainFollowup()}
-                          placeholder="Une question sur cette explication ? Tapez ici..."
-                          className="flex-1 bg-secondary/50 border border-border/80 rounded-xl px-4 py-2 text-xs text-foreground focus:outline-none focus:border-indigo-500"
-                        />
-                        <button
-                          onClick={handleExplainFollowup}
-                          disabled={!explainFollowup.trim() || isFollowupLoading}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                        >
-                          {isFollowupLoading ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Send className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-lg">
-                      <Lightbulb className="w-8 h-8" strokeWidth={1.5} />
-                    </div>
-                    <div className="space-y-1.5 max-w-md">
-                      <h4 className="text-base font-bold text-foreground">Besoin d'éclaircir cette note ?</h4>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        L'IA analyse votre note brute et son contexte pour déployer une explication détaillée pas à pas, avec une analogie universelle et des ponts vers vos {notes.length} notes de cours (façon DataCamp).
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleExplain('universal')}
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-amber-300" />
-                      Lancer l'explication universelle
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Chat Tab */}
+          {/* Chat Tab: Assistant & Pédagogie Unifié */}
           {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-card relative">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0f0f12] relative">
               {/* Chat Sub-Header / History Bar */}
-              <div className="px-5 py-3 border-b border-border/80 bg-secondary/30 flex items-center justify-between gap-3 shrink-0">
+              <div className="px-5 py-3 border-b border-white/[0.06] bg-[#141417] flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <button
                     onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-                    className="flex items-center gap-2 text-xs font-bold text-indigo-300 hover:text-indigo-200 bg-indigo-500/15 border border-indigo-500/30 px-3 py-1.5 rounded-xl transition-all cursor-pointer hover:bg-indigo-500/25"
+                    className="flex items-center gap-2 text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 rounded-xl transition-all cursor-pointer hover:bg-white/[0.08]"
                     title="Afficher vos conversations précédentes"
                   >
-                    <History className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Dernières conversations</span>
-                    <span className="bg-indigo-500/40 text-indigo-200 text-[10px] font-mono px-1.5 py-0.5 rounded-full">
+                    <History className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.5} />
+                    <span>Historique</span>
+                    <span className="bg-white/[0.08] text-zinc-300 text-[10px] font-mono px-1.5 py-0.5 rounded-full">
                       {conversations.length}
                     </span>
-                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", isHistoryOpen && "rotate-180")} />
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200 text-zinc-400", isHistoryOpen && "rotate-180")} />
                   </button>
 
-                  <div className="h-4 w-px bg-border hidden sm:block" />
+                  <div className="h-4 w-px bg-white/[0.08] hidden sm:block" />
 
-                  <span className="text-xs font-semibold text-foreground truncate max-w-[200px] sm:max-w-[300px] hidden sm:inline-block">
+                  <span className="text-xs font-medium text-zinc-300 truncate max-w-[200px] sm:max-w-[320px] hidden sm:inline-block">
                     {activeConv.title}
                   </span>
                 </div>
@@ -1626,20 +1227,20 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleNewConversation}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 hover:text-white border border-white/[0.08] rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-xs"
                     title="Démarrer une nouvelle discussion"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Nouvelle conversation</span>
                   </button>
 
                   {conversations.length > 1 && (
                     <button
                       onClick={(e) => handleDeleteConversation(activeConv.id, e)}
-                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
+                      className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
                       title="Supprimer la conversation actuelle"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
                     </button>
                   )}
                 </div>
@@ -1647,12 +1248,12 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
               {/* History Drawer Dropdown */}
               {isHistoryOpen && (
-                <div className="absolute top-12 left-4 z-30 w-80 max-h-96 bg-card border border-border shadow-2xl rounded-2xl overflow-y-auto p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between border-b border-border">
-                    <span>Dernières conversations ({conversations.length})</span>
+                <div className="absolute top-12 left-4 z-30 w-80 max-h-96 bg-[#141417] border border-white/[0.1] shadow-2xl rounded-2xl overflow-y-auto p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center justify-between border-b border-white/[0.06]">
+                    <span>Conversations ({conversations.length})</span>
                     <button
                       onClick={() => setIsHistoryOpen(false)}
-                      className="text-muted-foreground hover:text-foreground cursor-pointer"
+                      className="text-zinc-400 hover:text-white cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -1677,15 +1278,15 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         className={cn(
                           "p-3 rounded-xl cursor-pointer transition-all flex items-start justify-between gap-2 group",
                           isActive
-                            ? "bg-indigo-500/15 border border-indigo-500/40 text-indigo-700 dark:text-indigo-300"
-                            : "hover:bg-secondary/70 text-foreground border border-transparent"
+                            ? "bg-white/[0.08] border border-white/[0.12] text-zinc-100"
+                            : "hover:bg-white/[0.04] text-zinc-400 hover:text-zinc-200 border border-transparent"
                         )}
                       >
                         <div className="space-y-1 overflow-hidden">
-                          <div className="text-xs font-bold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                          <div className="text-xs font-semibold truncate group-hover:text-white">
                             {c.title}
                           </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-2">
+                          <div className="text-[10px] text-zinc-500 flex items-center gap-2">
                             <span className="flex items-center gap-1 font-mono">
                               <Clock className="w-3 h-3 opacity-70" />
                               {dateStr}
@@ -1698,7 +1299,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         {conversations.length > 1 && (
                           <button
                             onClick={(e) => handleDeleteConversation(c.id, e)}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-opacity cursor-pointer"
+                            className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-rose-400 transition-opacity cursor-pointer"
                             title="Supprimer cette discussion"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1707,6 +1308,43 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Active Note Context Banner */}
+              {activeNote && (
+                <div className="mx-6 mt-3 px-3.5 py-2 bg-[#141417] border border-white/[0.08] rounded-xl flex items-center justify-between gap-3 text-xs shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" strokeWidth={1.5} />
+                    <span className="text-zinc-400 text-[11px] font-medium shrink-0">Note active :</span>
+                    <span className="font-semibold text-zinc-200 truncate">{activeNote.title}</span>
+                    {activeNote.tags && activeNote.tags.length > 0 && (
+                      <span className="hidden sm:inline-flex text-[10px] text-zinc-500 font-mono">
+                        #{activeNote.tags.slice(0, 3).join(' #')}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06] font-mono shrink-0">
+                    {notes.length} notes indexées
+                  </span>
+                </div>
+              )}
+
+              {/* Selected Passage Banner */}
+              {selectedSnippetContext && (
+                <div className="mx-6 mt-2 px-3.5 py-2 bg-[#18181d] border border-white/[0.08] rounded-xl flex items-center justify-between gap-3 text-xs shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Code className="w-3.5 h-3.5 text-zinc-400 shrink-0" strokeWidth={1.5} />
+                    <span className="text-zinc-400 text-[11px] font-medium shrink-0">Passage ciblé :</span>
+                    <span className="text-zinc-300 italic font-mono text-[11px] truncate">"{selectedSnippetContext}"</span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedSnippetContext('')}
+                    className="text-zinc-400 hover:text-white p-1 rounded transition-colors cursor-pointer"
+                    title="Retirer ce passage ciblé"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )}
 
@@ -1722,70 +1360,129 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   >
                     <div
                       className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold shadow-md',
+                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold shadow-xs',
                         m.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-indigo-600 text-white'
+                          ? 'bg-zinc-800 text-zinc-200 border border-white/[0.1]'
+                          : 'bg-[#18181c] text-zinc-300 border border-white/[0.08]'
                       )}
                     >
-                      {m.role === 'user' ? 'Vous' : <Brain className="w-4 h-4" />}
+                      {m.role === 'user' ? 'Vous' : <Sparkles className="w-4 h-4 text-zinc-300" strokeWidth={1.5} />}
                     </div>
 
                     <div
                       className={cn(
-                        'p-4 rounded-2xl text-xs leading-relaxed max-w-xl font-sans',
+                        'p-4 rounded-2xl text-xs leading-relaxed max-w-xl font-sans space-y-3',
                         m.role === 'user'
-                          ? 'bg-primary text-primary-foreground rounded-tr-none'
-                          : 'bg-secondary/40 border border-border/80 text-foreground rounded-tl-none'
+                          ? 'bg-zinc-800 text-zinc-100 border border-white/[0.08] rounded-tr-none'
+                          : 'bg-[#131316] border border-white/[0.06] text-zinc-200 rounded-tl-none'
                       )}
                     >
                       <Markdown content={m.content} />
-                      {m.timestamp && (
-                        <div className={cn(
-                          "text-[9px] font-mono mt-1 opacity-60 text-right",
-                          m.role === 'user' ? "text-primary-foreground/70" : "text-muted-foreground"
-                        )}>
-                          {m.timestamp}
-                        </div>
-                      )}
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-white/[0.04] text-[10px] text-zinc-500">
+                        <span>{m.timestamp || ''}</span>
+                        {m.role === 'assistant' && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleCopyMessage(m.content, idx)}
+                              className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] transition-colors cursor-pointer"
+                              title="Copier cette réponse"
+                            >
+                              {copiedMessageIndex === idx ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  <span className="text-emerald-400 font-medium">Copié</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copier</span>
+                                </>
+                              )}
+                            </button>
+                            {activeNote && (
+                              <button
+                                onClick={() => handleInsertMessageIntoNote(m.content, idx)}
+                                className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.08] transition-colors cursor-pointer font-medium"
+                                title="Insérer cette explication à la fin de votre note active"
+                              >
+                                {insertedMessageIndex === idx ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                    <span className="text-emerald-400">Ajouté à la note !</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-3 h-3 text-zinc-400" />
+                                    <span>Insérer dans la note</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
 
                 {/* AI Chat Thinking Indicator */}
                 {isChatSending && (
-                  <div className="flex gap-3 mr-auto items-center animate-pulse">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-indigo-300">
-                      <Brain className="w-4 h-4 animate-spin" />
+                  <div className="flex gap-3 mr-auto items-center">
+                    <div className="w-8 h-8 rounded-full bg-[#18181c] border border-white/[0.08] flex items-center justify-center text-zinc-300">
+                      <Sparkles className="w-4 h-4 animate-spin text-zinc-300" strokeWidth={1.5} />
                     </div>
-                    <div className="bg-secondary/40 border border-border/80 px-4 py-3 rounded-2xl rounded-tl-none text-xs text-muted-foreground flex items-center gap-2 font-mono">
-                      <span>L'IA réfléchit</span>
+                    <div className="bg-[#131316] border border-white/[0.06] px-4 py-2.5 rounded-2xl rounded-tl-none text-xs text-zinc-400 flex items-center gap-2 font-mono">
+                      <span>Analyse et élaboration pédagogique</span>
                       <span className="inline-flex gap-1">
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" />
+                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.4s]" />
                       </span>
                     </div>
                   </div>
                 )}
               </div>
 
+              {/* Suggestion Chips */}
+              <div className="px-4 py-2 flex flex-wrap items-center gap-1.5 border-t border-white/[0.04] bg-[#141417]/70">
+                <span className="text-[10px] uppercase font-semibold tracking-wider text-zinc-500 mr-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" strokeWidth={1.5} />
+                  Suggestions :
+                </span>
+                {[
+                  { label: "Expliquer en détail", prompt: "Explique-moi les concepts clés et détails essentiels de cette note en profondeur, sans survoler." },
+                  { label: "Analogie concrète (sport / quotidien)", prompt: "Donne-moi une analogie concrète et intuitive (ex: football ou vie courante) pour comprendre le mécanisme exact." },
+                  { label: "Décortiquer le code pas à pas", prompt: "Décortique le code de cette note ligne par ligne, avec les mécanismes sous le capot et les pièges à éviter." },
+                  { label: "Lier avec mes autres notes", prompt: "Fais des liens avec mes autres notes de cours pour situer ce concept dans ma progression d'apprentissage." }
+                ].map((chip, cIdx) => (
+                  <button
+                    key={cIdx}
+                    type="button"
+                    onClick={() => handleSendChat(chip.prompt)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
               {/* Chat Input Bar */}
-              <div className="p-4 border-t border-border/80 bg-secondary/20 flex gap-2">
+              <div className="p-3.5 border-t border-white/[0.06] bg-[#141417] flex gap-2">
                 <input
                   type="text"
-                  placeholder="Posez une question sur vos notes ou demandez des explications de code..."
+                  placeholder="Posez une question sur vos notes, demandez une analogie ou une explication détaillée de code..."
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-                  className="flex-1 bg-secondary/50 border border-border/80 rounded-xl px-4 py-2.5 text-xs text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="flex-1 bg-[#18181c] border border-white/[0.08] rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors font-sans"
                 />
                 <button
-                  onClick={handleSendChat}
+                  onClick={() => handleSendChat()}
                   disabled={!chatInput.trim() || isChatSending}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
                   Envoyer
                 </button>
               </div>
@@ -1982,9 +1679,9 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         onChange={(e) => setBlueprintScope(e.target.value)}
                         className="bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer min-w-[220px]"
                       >
-                        <option value="all">🌐 Tout l'espace de travail ({notes.length} notes, {Object.keys(syntaxDefinitions).length} syntaxes)</option>
+                        <option value="all">Tout l'espace de travail ({notes.length} notes, {Object.keys(syntaxDefinitions).length} syntaxes)</option>
                         {modules.map(m => (
-                          <option key={m.id} value={m.id}>📁 Dossier : {m.name} ({notes.filter(n => n.moduleId === m.id).length} notes)</option>
+                          <option key={m.id} value={m.id}>Dossier : {m.name} ({notes.filter(n => n.moduleId === m.id).length} notes)</option>
                         ))}
                       </select>
                     </div>
@@ -1993,21 +1690,21 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Quick inspirations */}
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-indigo-400" />
+                      <Sparkles className="w-3 h-3 text-zinc-400" strokeWidth={1.5} />
                       Exemples d'idées de projets :
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        "🤖 Système d'Agents IA pour Supermarché (Stocks, Alertes, Catalogue)",
-                        "⚡ Pipeline ETL & Streaming Temps Réel pour Transactions",
-                        "🔐 Plateforme Microservices avec Auth Sécurisée & Cache Redis",
-                        "📊 Moteur d'Analytics et Détection d'Anomalies avec Pandas"
+                        "Système d'Agents IA pour Supermarché (Stocks, Alertes, Catalogue)",
+                        "Pipeline ETL & Streaming Temps Réel pour Transactions",
+                        "Plateforme Microservices avec Auth Sécurisée & Cache Redis",
+                        "Moteur d'Analytics et Détection d'Anomalies avec Pandas"
                       ].map((idea, idx) => (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => setBlueprintPrompt(idea)}
-                          className="px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary border border-border hover:border-indigo-500/40 text-[11px] text-muted-foreground hover:text-foreground transition-all text-left cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary border border-border hover:border-zinc-500/40 text-[11px] text-muted-foreground hover:text-foreground transition-all text-left cursor-pointer"
                         >
                           {idea}
                         </button>
@@ -2043,7 +1740,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <button
                       onClick={() => handleGenerateBlueprint()}
                       disabled={isArchitectProcessing || !blueprintPrompt.trim()}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg shadow-indigo-500/20"
+                      className="flex items-center gap-2 px-6 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 disabled:opacity-40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
                     >
                       {isArchitectProcessing ? (
                         <>
@@ -2177,12 +1874,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                               </div>
 
                               <div className="space-y-1 text-xs">
-                                <p className="text-rose-400/90 text-[11px] font-semibold">⚠️ Le Défi :</p>
+                                <p className="text-rose-400/90 text-[11px] font-semibold flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3 text-rose-400" strokeWidth={1.5} />
+                                  Le Défi :
+                                </p>
                                 <p className="text-muted-foreground text-[11px] leading-relaxed">{cp.problemDescription}</p>
                               </div>
 
                               <div className="space-y-1 text-xs pt-1">
-                                <p className="text-emerald-400 font-semibold text-[11px]">💡 Stratégie & Solution :</p>
+                                <p className="text-emerald-400 font-semibold text-[11px] flex items-center gap-1">
+                                  <Lightbulb className="w-3 h-3 text-emerald-400" strokeWidth={1.5} />
+                                  Stratégie & Solution :
+                                </p>
                                 <p className="text-foreground/90 text-[11px] leading-relaxed">{cp.solutionStrategy}</p>
                               </div>
                             </div>
@@ -2266,8 +1969,9 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                               {step.keyDeliverables && step.keyDeliverables.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5 pt-1">
                                   {step.keyDeliverables.map((del, dIdx) => (
-                                    <span key={dIdx} className="px-2 py-0.5 rounded-md bg-secondary text-[10px] text-foreground/80 border border-border/50">
-                                      ✓ {del}
+                                    <span key={dIdx} className="px-2 py-0.5 rounded-md bg-secondary text-[10px] text-foreground/80 border border-border/50 flex items-center gap-1">
+                                      <Check className="w-2.5 h-2.5 text-emerald-400" strokeWidth={2} />
+                                      {del}
                                     </span>
                                   ))}
                                 </div>

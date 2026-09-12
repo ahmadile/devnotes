@@ -126,11 +126,11 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ x, y, onFormat
                 onExplain();
                 onClose();
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-xs"
-              title="Expliquer ce passage avec l'IA (Pédagogie & Analogies)"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/[0.1] rounded-lg text-xs font-medium transition-all cursor-pointer shadow-xs"
+              title="Poser une question ou demander d'expliquer ce passage"
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Expliquer</span>
+              <Sparkles className="w-3.5 h-3.5 text-zinc-300" strokeWidth={1.5} />
+              <span>Demander à l'IA</span>
             </button>
           </>
         )}

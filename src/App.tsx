@@ -85,12 +85,12 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer'>('generator');
+  const [aiModalTab, setAiModalTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>('generator');
   const [aiModalTopic, setAiModalTopic] = useState<string | undefined>(undefined);
   const [aiModalSelectedText, setAiModalSelectedText] = useState<string | undefined>(undefined);
 
   const openAiAssistant = (
-    tab: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer' = 'generator',
+    tab: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' = 'generator',
     topic?: string,
     selectedText?: string
   ) => {
@@ -687,66 +687,59 @@ export default function App() {
           <main className="flex-1 flex flex-col h-full bg-background relative min-w-0 transition-colors duration-300">
             {/* Header */}
             <header className="h-16 flex items-center justify-between px-6 border-b border-border sticky top-0 bg-background/80 backdrop-blur-sm z-20 transition-colors">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1 mr-4">
                 <button 
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-secondary rounded-md transition-all"
+                  className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-secondary rounded-md transition-all shrink-0"
                 >
                   <Layout className="w-5 h-5" strokeWidth="1.5" />
                 </button>
-                <div className="flex items-center gap-3">
-                  <div className="w-px h-4 bg-border mx-1 hidden md:block" />
-                  <h1 className="text-xl font-semibold tracking-tight text-foreground flex items-center gap-3">
-                    {activeNote?.title || 'Untitled Note'}
-                  </h1>
-                </div>
+                <div className="w-px h-4 bg-border shrink-0 hidden md:block" />
+                <h1 
+                  className="text-base sm:text-lg font-semibold tracking-tight text-zinc-100 truncate max-w-sm md:max-w-md lg:max-w-lg"
+                  title={activeNote?.title || 'Untitled Note'}
+                >
+                  {activeNote?.title || 'Untitled Note'}
+                </h1>
               </div>
               
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2 mr-4">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 mr-2">
                   {isSaving ? (
                     <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-primary animate-pulse">
                       <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                       Saving...
                     </div>
                   ) : lastSaved ? (
-                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground hidden lg:block">
-                      Last local save: {new Date(lastSaved).toLocaleTimeString()}
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70 hidden xl:block font-mono">
+                      Save: {new Date(lastSaved).toLocaleTimeString()}
                     </div>
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-2 text-muted-foreground border-l border-white/[0.06] pl-4">
+                <div className="flex items-center gap-2 text-muted-foreground border-l border-white/[0.06] pl-3">
                   <button
                     onClick={() => openAiAssistant('architect')}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#141416] hover:bg-[#1c1c20] border border-white/[0.08] hover:border-white/[0.18] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-[#141417] hover:bg-[#1c1c20] hover:text-white border border-white/[0.08] hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Concevoir un Projet & Architecture Solution (Tech Lead)"
                   >
-                    <Briefcase className="w-3.5 h-3.5 text-purple-400 shrink-0" strokeWidth={1.5} />
-                    <span>Architecte Pro</span>
+                    <Briefcase className="w-3.5 h-3.5 text-zinc-400 group-hover:text-purple-400 transition-colors" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">Architecte Pro</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('revision', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#141416] hover:bg-[#1c1c20] border border-white/[0.08] hover:border-white/[0.18] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-[#141417] hover:bg-[#1c1c20] hover:text-white border border-white/[0.08] hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Lancer le Mode Révision & Entraînement (Flashcards, Quiz, Défis Code)"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-sky-400 shrink-0" strokeWidth={1.5} />
-                    <span>Réviser & Pratiquer</span>
+                    <GraduationCap className="w-3.5 h-3.5 text-zinc-400 group-hover:text-sky-400 transition-colors" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">Réviser</span>
                   </button>
                   <button
-                    onClick={() => openAiAssistant('explainer', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-200 bg-[#171410] hover:bg-[#221c14] border border-amber-500/25 hover:border-amber-500/40 shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
-                    title="Expliquer & Vulgariser cette note (Analogies universelles & liens avec vos autres notes)"
+                    onClick={() => openAiAssistant('chat', activeNote?.title)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#19191d] hover:bg-[#222227] hover:text-white border border-white/[0.1] hover:border-white/[0.2] shadow-xs transition-all cursor-pointer group"
+                    title="Ouvrir l'Assistant IA (Discussion, Explications, Analogies, Questions sur la note)"
                   >
-                    <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0" strokeWidth={1.5} />
-                    <span>Expliquer & Approfondir</span>
-                  </button>
-                  <button
-                    onClick={() => openAiAssistant('generator')}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#17171c] hover:bg-[#202026] border border-white/[0.1] hover:border-white/[0.2] shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all cursor-pointer mr-1 group"
-                    title="Ouvrir l'Assistant IA DevNotes & Générateur de Note"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" strokeWidth={1.5} />
+                    <Sparkles className="w-3.5 h-3.5 text-zinc-400 group-hover:text-indigo-400 transition-colors" strokeWidth={1.5} />
                     <span>Assistant IA</span>
                   </button>
                   <button 
@@ -1042,18 +1035,7 @@ export default function App() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Note Content</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openAiAssistant('explainer', activeNote.title)}
-                            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 rounded-lg transition-all cursor-pointer shadow-xs"
-                            title="Demander à l'IA d'approfondir et d'expliquer cette note avec des analogies concrètes"
-                          >
-                            <Lightbulb className="w-3 h-3 text-amber-400" />
-                            <span>💡 Expliquer cette note</span>
-                          </button>
-
-                          <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
+                        <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
                             <button
                               type="button"
                               onClick={() => setEditorTab('write')}
@@ -1082,7 +1064,6 @@ export default function App() {
                             </button>
                           </div>
                         </div>
-                      </div>
 
                       <div className="relative group min-h-[100px] px-1">
                         {editorTab === 'write' ? (
@@ -1107,7 +1088,7 @@ export default function App() {
                                 onClose={() => setSelection(null)}
                                 onExplain={() => {
                                   const selectedSnippet = activeNote.content.slice(selection.start, selection.end);
-                                  openAiAssistant('explainer', activeNote.title, selectedSnippet);
+                                  openAiAssistant('chat', activeNote.title, selectedSnippet);
                                 }}
                               />
                             )}
