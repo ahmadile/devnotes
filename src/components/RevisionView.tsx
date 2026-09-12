@@ -218,17 +218,17 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
               onChange={(e) => setTopicInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && startRevision()}
               placeholder="Ex: Les décorateurs en Python, Fonctions imbriquées, Gestion des dates..."
-              className="w-full bg-secondary/70 border border-border/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full bg-secondary/70 border border-border/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
             />
           </div>
           <button
             onClick={() => startRevision()}
             disabled={isLoading || !topicInput.trim()}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm shadow-md shadow-indigo-500/20 disabled:opacity-50 transition-all cursor-pointer shrink-0"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-sm shadow-md shadow-amber-400/10 disabled:opacity-50 transition-all cursor-pointer shrink-0"
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin" />
                 <span>Génération...</span>
               </>
             ) : (
@@ -254,7 +254,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                   setTopicInput(top);
                   startRevision(top);
                 }}
-                className="text-xs px-2.5 py-1 rounded-lg bg-secondary hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 border border-border/60 transition-all cursor-pointer"
+                className="text-xs px-2.5 py-1 rounded-lg bg-secondary hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-300 border border-border/60 transition-all cursor-pointer"
               >
                 {top}
               </button>
@@ -268,8 +268,8 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
         {isLoading && (
           <div className="flex flex-col items-center justify-center h-72 gap-4 text-center">
             <div className="relative flex items-center justify-center">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center animate-pulse">
-                <Brain className="w-8 h-8 text-indigo-500 animate-spin" />
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center animate-pulse">
+                <Brain className="w-8 h-8 text-amber-500 animate-spin" />
               </div>
             </div>
             <div>
@@ -283,8 +283,8 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
 
         {!isLoading && !session && (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center max-w-lg mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-4">
-              <GraduationCap className="w-8 h-8 text-indigo-500" />
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+              <GraduationCap className="w-8 h-8 text-amber-500" />
             </div>
             <h3 className="text-lg font-bold text-foreground">Entraînement & Révision Intelligente</h3>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
@@ -293,7 +293,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-6 text-left">
               <div className="p-3.5 rounded-xl bg-card border border-border/70 flex flex-col gap-1.5 shadow-sm">
-                <div className="flex items-center gap-2 text-indigo-500 font-bold text-xs">
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs">
                   <FileText className="w-4 h-4" />
                   <span>Fiche Mémo</span>
                 </div>
@@ -323,10 +323,10 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
         {!isLoading && session && (
           <div className="flex flex-col gap-5 max-w-4xl mx-auto">
             {/* Header info & Tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent border border-indigo-500/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-zinc-100 dark:bg-[#16161a] border border-zinc-200 dark:border-white/[0.08]">
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500 text-white shadow-sm">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-zinc-950 shadow-xs">
                     Session de Révision
                   </span>
                   {session.isFromExistingNotes ? (
@@ -353,7 +353,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                     "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer",
                     isSavedToNotes
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                      : "bg-secondary hover:bg-indigo-500/10 border-border hover:border-indigo-500/40 text-foreground"
+                      : "bg-secondary hover:bg-amber-500/10 border-border hover:border-amber-500/40 text-foreground"
                   )}
                 >
                   {isSavedToNotes ? (
@@ -363,7 +363,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                     </>
                   ) : (
                     <>
-                      <Plus className="w-4 h-4 text-indigo-500" />
+                      <Plus className="w-4 h-4 text-amber-500" />
                       <span>Ajouter la fiche à mes Notes</span>
                     </>
                   )}
@@ -378,7 +378,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0",
                   activeSessionTab === 'memo'
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                    ? "bg-zinc-900 text-white dark:bg-[#222228] dark:text-amber-300 border border-border/80 shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                 )}
               >
@@ -391,7 +391,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0",
                   activeSessionTab === 'flashcards'
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                    ? "bg-zinc-900 text-white dark:bg-[#222228] dark:text-amber-300 border border-border/80 shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                 )}
               >
@@ -404,7 +404,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0",
                   activeSessionTab === 'quiz'
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                    ? "bg-zinc-900 text-white dark:bg-[#222228] dark:text-amber-300 border border-border/80 shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                 )}
               >
@@ -417,7 +417,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0",
                   activeSessionTab === 'code'
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                    ? "bg-zinc-900 text-white dark:bg-[#222228] dark:text-amber-300 border border-border/80 shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                 )}
               >
@@ -437,7 +437,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                   <div className="mt-4 pt-4 border-t border-border/60">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                        <Code2 className="w-3.5 h-3.5 text-indigo-500" />
+                        <Code2 className="w-3.5 h-3.5 text-amber-500" />
                         {session.suggestedNote.snippets[0].title || "Exemple de code annoté"}
                       </span>
                       <span className="text-[10px] font-mono bg-secondary px-2 py-0.5 rounded text-muted-foreground">
@@ -458,7 +458,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                 <div className="w-full flex items-center justify-between text-xs text-muted-foreground">
                   <span>Carte {currentCardIndex + 1} sur {session.flashcards.length}</span>
                   <div className="flex items-center gap-1">
-                    <Award className="w-4 h-4 text-indigo-500" />
+                    <Award className="w-4 h-4 text-amber-500" />
                     <span>{Object.values(masteredCards).filter(Boolean).length} / {session.flashcards.length} maîtrisées</span>
                   </div>
                 </div>
@@ -472,15 +472,15 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                       className={cn(
                         "w-full min-h-[260px] p-8 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between select-none shadow-md",
                         isCardFlipped
-                          ? "bg-indigo-950/20 dark:bg-indigo-950/40 border-indigo-500/40"
-                          : "bg-card hover:border-indigo-500/30 border-border/80"
+                          ? "bg-amber-950/15 dark:bg-amber-950/30 border-amber-500/40"
+                          : "bg-card hover:border-amber-400/40 border-border/80"
                       )}
                     >
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-semibold uppercase tracking-wider text-[10px]">
                           {isCardFlipped ? "💡 Réponse & Explication" : "❓ Question de Réflexion"}
                         </span>
-                        <span className="text-[11px] text-indigo-500 font-medium flex items-center gap-1">
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
                           <RotateCcw className="w-3 h-3" />
                           Cliquez pour retourner
                         </span>
@@ -497,7 +497,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                               {card.answer}
                             </p>
                             {card.keyTakeaway && (
-                              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-600 dark:text-indigo-300 font-semibold flex items-center gap-2">
+                              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-2">
                                 <Lightbulb className="w-4 h-4 shrink-0 text-amber-500" />
                                 <span>À retenir : {card.keyTakeaway}</span>
                               </div>
@@ -560,7 +560,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                       setCurrentCardIndex(prev => Math.min(session.flashcards.length - 1, prev + 1));
                     }}
                     disabled={currentCardIndex === session.flashcards.length - 1}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30 text-xs font-semibold transition-all cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold disabled:opacity-30 text-xs transition-all cursor-pointer shadow-xs shadow-amber-400/10"
                   >
                     Suivant
                   </button>
@@ -573,7 +573,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border/60 text-xs">
                   <span className="font-semibold text-foreground">Score au Quiz :</span>
-                  <span className="font-mono font-bold text-indigo-500">
+                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
                     {correctQuizCount} / {session.quiz.length} ({Math.round((correctQuizCount / session.quiz.length) * 100)}%)
                   </span>
                 </div>
@@ -587,7 +587,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                     <div key={q.id} className="p-6 rounded-2xl bg-card border border-border/80 shadow-sm flex flex-col gap-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center shrink-0">
+                          <span className="w-6 h-6 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
                             {qIdx + 1}
                           </span>
                           <h3 className="text-sm font-bold text-foreground">{q.question}</h3>
@@ -623,7 +623,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                               btnStyle = "bg-rose-500/15 border-rose-500/50 text-rose-600 dark:text-rose-300 font-semibold";
                             }
                           } else if (isChosen) {
-                            btnStyle = "bg-indigo-500/15 border-indigo-500 text-indigo-600 dark:text-indigo-300 font-semibold";
+                            btnStyle = "bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300 font-semibold";
                           }
 
                           return (
@@ -682,7 +682,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                       className={cn(
                         "flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0",
                         activeExerciseIndex === idx
-                          ? "bg-indigo-500/15 border border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                          ? "bg-amber-500/15 border border-amber-500 text-amber-700 dark:text-amber-300"
                           : "bg-secondary border border-border/60 text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -706,7 +706,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                       {/* Exercise Header & Instructions */}
                       <div>
                         <h3 className="text-base font-black text-foreground flex items-center gap-2">
-                          <Code2 className="w-5 h-5 text-indigo-500" />
+                          <Code2 className="w-5 h-5 text-amber-500" />
                           {currentEx.title}
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed bg-muted/30 p-3 rounded-xl border border-border/40">
@@ -750,7 +750,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                           value={currentCode}
                           onChange={(e) => setUserCodes(prev => ({ ...prev, [currentEx.id]: e.target.value }))}
                           rows={10}
-                          className="w-full bg-[#1e1e1e] text-slate-100 font-mono text-xs p-4 rounded-xl border border-border/80 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 leading-relaxed custom-scrollbar"
+                          className="w-full bg-[#18181c] text-zinc-100 font-mono text-xs p-4 rounded-xl border border-border/80 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 leading-relaxed custom-scrollbar"
                           placeholder="# Tapez votre code ici..."
                           spellCheck={false}
                         />
@@ -809,11 +809,11 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                         <button
                           onClick={() => evaluateCodeAttempt(currentEx)}
                           disabled={isEvaluatingCode}
-                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 disabled:opacity-50 transition-all cursor-pointer"
+                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-xs font-bold shadow-md shadow-amber-400/10 disabled:opacity-50 transition-all cursor-pointer"
                         >
                           {isEvaluatingCode ? (
                             <>
-                              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <div className="w-3.5 h-3.5 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin" />
                               <span>Vérification IA...</span>
                             </>
                           ) : (

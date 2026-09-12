@@ -27,7 +27,7 @@ export const renderTextWithCodeHighlights = (node: React.ReactNode): React.React
         return (
           <code 
             key={index}
-            className="font-mono text-xs bg-[#141417] text-zinc-200 border border-white/[0.08] px-1.5 py-0.5 rounded-md font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] inline-block mx-0.5 my-0.5"
+            className="font-mono text-xs bg-zinc-100 dark:bg-[#18181c] text-amber-700 dark:text-[#f1c262] border border-zinc-300/80 dark:border-white/[0.08] px-1.5 py-0.5 rounded font-medium inline-block mx-0.5 my-0.5"
           >
             {part}
           </code>
@@ -75,7 +75,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             if (isInline) {
               return (
                 <code 
-                  className="font-mono text-xs bg-[#161619] text-zinc-200 border border-white/[0.08] px-1.5 py-0.5 rounded font-medium"
+                  className="font-mono text-xs bg-zinc-100 dark:bg-[#18181c] text-amber-700 dark:text-[#f1c262] border border-zinc-300/80 dark:border-white/[0.08] px-1.5 py-0.5 rounded font-medium"
                   {...props}
                 >
                   {children}
@@ -89,37 +89,37 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             return <Callout>{renderTextWithCodeHighlights(children)}</Callout>;
           },
           h1: ({ children }) => (
-            <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight border-b border-white/[0.08] pb-2.5 mt-7 mb-4 font-sans">
+            <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight border-b border-zinc-200 dark:border-white/[0.08] pb-2.5 mt-7 mb-4 font-sans">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-semibold text-zinc-100 tracking-tight mt-7 mb-3 font-sans border-l-2 border-zinc-600 pl-3 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight mt-7 mb-3 font-sans border-l-2 border-amber-500/70 dark:border-amber-400/80 pl-3 flex items-center gap-2">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-semibold text-zinc-200 tracking-tight mt-6 mb-2 font-sans border-l-2 border-zinc-700 pl-2.5">
+            <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight mt-6 mb-2 font-sans border-l-2 border-zinc-400 dark:border-zinc-700 pl-2.5">
               {children}
             </h3>
           ),
           p: ({ children }) => (
-            <p className="leading-relaxed text-zinc-300 my-3 text-sm font-sans whitespace-pre-line">
+            <p className="leading-relaxed text-zinc-700 dark:text-zinc-300 my-3 text-sm font-sans whitespace-pre-line">
               {renderTextWithCodeHighlights(children)}
             </p>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-zinc-300 text-sm font-sans">
+            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-zinc-700 dark:text-zinc-300 text-sm font-sans">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-zinc-300 text-sm font-sans">
+            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-zinc-700 dark:text-zinc-300 text-sm font-sans">
               {children}
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed text-zinc-300 font-sans marker:text-zinc-500">
+            <li className="leading-relaxed text-zinc-700 dark:text-zinc-300 font-sans marker:text-zinc-400 dark:marker:text-zinc-500">
               {renderTextWithCodeHighlights(children)}
             </li>
           ),
@@ -128,13 +128,13 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
               href={href} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-zinc-200 hover:text-white underline underline-offset-4 decoration-zinc-500/40 transition-colors font-medium"
+              className="text-amber-600 dark:text-amber-400 hover:underline underline-offset-4 font-medium transition-colors"
             >
               {children}
             </a>
           ),
           strong: ({ children }) => (
-            <strong className="font-semibold text-zinc-100 dark:text-zinc-100">
+            <strong className="font-bold text-zinc-950 dark:text-white">
               {renderTextWithCodeHighlights(children)}
             </strong>
           ),
@@ -292,34 +292,34 @@ const Callout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const styleMap = {
     note: {
-      border: 'border-l-2 border-sky-400/80 bg-[#0f0f12] border border-white/[0.06]',
-      icon: <Info className="w-4 h-4 text-sky-400/90 shrink-0 mt-0.5" strokeWidth={1.5} />,
+      border: 'border-l-2 border-sky-500 bg-sky-50/50 dark:bg-[#151a24] border border-sky-200/60 dark:border-white/[0.08]',
+      icon: <Info className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" strokeWidth={1.5} />,
       title: 'Note',
-      badgeClass: 'text-sky-400/90 font-mono text-[11px] uppercase tracking-wider'
+      badgeClass: 'text-sky-700 dark:text-sky-300 font-mono text-[11px] uppercase tracking-wider'
     },
     tip: {
-      border: 'border-l-2 border-emerald-400/80 bg-[#0f0f12] border border-white/[0.06]',
-      icon: <Lightbulb className="w-4 h-4 text-emerald-400/90 shrink-0 mt-0.5" strokeWidth={1.5} />,
+      border: 'border-l-2 border-emerald-500 bg-emerald-50/50 dark:bg-[#131e18] border border-emerald-200/60 dark:border-white/[0.08]',
+      icon: <Lightbulb className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" strokeWidth={1.5} />,
       title: 'Astuce',
-      badgeClass: 'text-emerald-400/90 font-mono text-[11px] uppercase tracking-wider'
+      badgeClass: 'text-emerald-700 dark:text-emerald-300 font-mono text-[11px] uppercase tracking-wider'
     },
     warning: {
-      border: 'border-l-2 border-amber-400/80 bg-[#0f0f12] border border-white/[0.06]',
-      icon: <AlertTriangle className="w-4 h-4 text-amber-400/90 shrink-0 mt-0.5" strokeWidth={1.5} />,
+      border: 'border-l-2 border-amber-500 bg-amber-50/50 dark:bg-[#221c13] border border-amber-200/60 dark:border-white/[0.08]',
+      icon: <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" strokeWidth={1.5} />,
       title: 'Attention',
-      badgeClass: 'text-amber-400/90 font-mono text-[11px] uppercase tracking-wider'
+      badgeClass: 'text-amber-700 dark:text-amber-300 font-mono text-[11px] uppercase tracking-wider'
     },
     important: {
-      border: 'border-l-2 border-rose-400/80 bg-[#0f0f12] border border-white/[0.06]',
-      icon: <Star className="w-4 h-4 text-rose-400/90 shrink-0 mt-0.5" strokeWidth={1.5} />,
+      border: 'border-l-2 border-rose-500 bg-rose-50/50 dark:bg-[#241618] border border-rose-200/60 dark:border-white/[0.08]',
+      icon: <Star className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" strokeWidth={1.5} />,
       title: 'Important',
-      badgeClass: 'text-rose-400/90 font-mono text-[11px] uppercase tracking-wider'
+      badgeClass: 'text-rose-700 dark:text-rose-300 font-mono text-[11px] uppercase tracking-wider'
     },
     info: {
-      border: 'border-l-2 border-zinc-500/80 bg-[#0f0f12] border border-white/[0.06]',
-      icon: <HelpCircle className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" strokeWidth={1.5} />,
+      border: 'border-l-2 border-zinc-400 dark:border-zinc-600 bg-zinc-50 dark:bg-[#18181c] border border-zinc-200 dark:border-white/[0.08]',
+      icon: <HelpCircle className="w-4 h-4 text-zinc-600 dark:text-zinc-400 shrink-0 mt-0.5" strokeWidth={1.5} />,
       title: 'Info',
-      badgeClass: 'text-zinc-400 font-mono text-[11px] uppercase tracking-wider'
+      badgeClass: 'text-zinc-700 dark:text-zinc-300 font-mono text-[11px] uppercase tracking-wider'
     }
   };
 
@@ -339,7 +339,7 @@ const Callout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </span>
           </div>
         )}
-        <div className="text-zinc-300 leading-relaxed text-sm">{cleanChildren}</div>
+        <div className="text-zinc-800 dark:text-zinc-200 leading-relaxed text-sm">{cleanChildren}</div>
       </div>
     </div>
   );

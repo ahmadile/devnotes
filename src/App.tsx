@@ -696,7 +696,7 @@ export default function App() {
                 </button>
                 <div className="w-px h-4 bg-border shrink-0 hidden md:block" />
                 <h1 
-                  className="text-base sm:text-lg font-semibold tracking-tight text-zinc-100 truncate max-w-sm md:max-w-md lg:max-w-lg"
+                  className="text-base sm:text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 truncate max-w-sm md:max-w-md lg:max-w-lg"
                   title={activeNote?.title || 'Untitled Note'}
                 >
                   {activeNote?.title || 'Untitled Note'}
@@ -717,42 +717,42 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-2 text-muted-foreground border-l border-white/[0.06] pl-3">
+                <div className="flex items-center gap-2 text-muted-foreground border-l border-zinc-200 dark:border-white/[0.06] pl-3">
                   <button
                     onClick={() => openAiAssistant('architect')}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-[#141417] hover:bg-[#1c1c20] hover:text-white border border-white/[0.08] hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Concevoir un Projet & Architecture Solution (Tech Lead)"
                   >
-                    <Briefcase className="w-3.5 h-3.5 text-zinc-400 group-hover:text-purple-400 transition-colors" strokeWidth={1.5} />
+                    <Briefcase className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Architecte Pro</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('revision', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-[#141417] hover:bg-[#1c1c20] hover:text-white border border-white/[0.08] hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Lancer le Mode Révision & Entraînement (Flashcards, Quiz, Défis Code)"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-zinc-400 group-hover:text-sky-400 transition-colors" strokeWidth={1.5} />
+                    <GraduationCap className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-sky-500 dark:group-hover:text-sky-400 transition-colors" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Réviser</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('chat', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-200 bg-[#19191d] hover:bg-[#222227] hover:text-white border border-white/[0.1] hover:border-white/[0.2] shadow-xs transition-all cursor-pointer group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-900 dark:text-zinc-100 bg-amber-500/10 dark:bg-[#19191d] hover:bg-amber-500/15 dark:hover:bg-[#222227] border border-amber-500/30 dark:border-amber-400/20 shadow-xs transition-all cursor-pointer group"
                     title="Ouvrir l'Assistant IA (Discussion, Explications, Analogies, Questions sur la note)"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-zinc-400 group-hover:text-indigo-400 transition-colors" strokeWidth={1.5} />
-                    <span>Assistant IA</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 transition-colors" strokeWidth={1.5} />
+                    <span className="font-semibold">Assistant IA</span>
                   </button>
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
+                    className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md cursor-pointer"
                     title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                   >
                     {theme === 'dark' ? <Sun className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />}
                   </button>
-                  <div className="w-px h-3.5 bg-white/[0.08] mx-0.5" />
+                  <div className="w-px h-3.5 bg-zinc-200 dark:bg-white/[0.08] mx-0.5" />
                   <button 
                     onClick={manualSave}
-                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
+                    className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md cursor-pointer"
                     title="Save locally"
                   >
                     <Save className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -760,7 +760,7 @@ export default function App() {
                   <button
                     onClick={syncToCloud}
                     disabled={isSyncing}
-                    className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md disabled:opacity-30 cursor-pointer"
+                    className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md disabled:opacity-30 cursor-pointer"
                     title="Sync to cloud"
                   >
                     <CloudUpload className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -1035,7 +1035,18 @@ export default function App() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Note Content</span>
-                        <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openAiAssistant('chat', `Explique-moi cette note ("${activeNote.title}") en profondeur avec des analogies concrètes, le décorticage du code pas à pas et les pièges à éviter.`)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-amber-700 dark:text-[#f1c262] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 dark:border-amber-400/20 transition-all cursor-pointer shadow-2xs"
+                            title="Demander à l'assistant d'expliquer cette note en détail avec analogies"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-600 dark:text-[#f1c262]" />
+                            <span>Expliquer cette note</span>
+                          </button>
+
+                          <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
                             <button
                               type="button"
                               onClick={() => setEditorTab('write')}
@@ -1064,6 +1075,7 @@ export default function App() {
                             </button>
                           </div>
                         </div>
+                      </div>
 
                       <div className="relative group min-h-[100px] px-1">
                         {editorTab === 'write' ? (
