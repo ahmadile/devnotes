@@ -76,18 +76,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={cn(
           "w-full text-left py-1.5 pl-6 pr-3 rounded-lg border transition-all group relative flex items-center justify-between cursor-pointer",
           activeNoteId === note.id 
-            ? "bg-[#18181c] border-white/[0.08] text-white shadow-sm" 
-            : "hover:bg-white/[0.03] border-transparent text-zinc-400 hover:text-zinc-200"
+            ? "bg-zinc-200/80 dark:bg-[#18181c] border-zinc-300 dark:border-white/[0.08] text-zinc-950 dark:text-white shadow-xs" 
+            : "hover:bg-zinc-100 dark:hover:bg-white/[0.03] border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
         )}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <FileText className={cn(
             "w-3.5 h-3.5 shrink-0",
-            activeNoteId === note.id ? "text-zinc-200" : "text-zinc-500"
+            activeNoteId === note.id ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500"
           )} strokeWidth={1.5} />
           <span className={cn(
             "text-xs truncate transition-colors",
-            activeNoteId === note.id ? "font-semibold text-white" : "font-medium text-zinc-400 group-hover:text-zinc-200"
+            activeNoteId === note.id ? "font-semibold text-zinc-950 dark:text-white" : "font-medium text-zinc-700 dark:text-zinc-400 group-hover:text-zinc-950 dark:group-hover:text-zinc-200"
           )}>
             {note.title || 'Untitled Note'}
           </span>
@@ -181,7 +181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />}
             </button>
             {isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-amber-400/80 shrink-0" strokeWidth={1.5} />
+              <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={1.5} />
             ) : (
               <Folder className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={1.5} />
             )}
@@ -356,19 +356,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-4 flex flex-col gap-3">
         <button 
           onClick={() => onNewNote(null)}
-          className="w-full flex items-center justify-center gap-2 shiny-btn py-2 rounded-lg text-xs font-medium text-zinc-200 hover:text-white transition-all cursor-pointer group"
+          className="w-full flex items-center justify-center gap-2 shiny-btn py-2 rounded-lg text-xs font-medium transition-all cursor-pointer group"
         >
-          <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform text-zinc-400 group-hover:text-white" strokeWidth={1.5} />
+          <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white" strokeWidth={1.5} />
           <span>New Note</span>
         </button>
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" strokeWidth={1.5} />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 pointer-events-none" strokeWidth={1.5} />
           <input 
             type="text" 
             placeholder="Search notes (use # for tags)..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#121215] border border-white/[0.06] hover:border-white/[0.12] focus:border-zinc-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none transition-all font-sans"
+            className="w-full bg-zinc-100 dark:bg-[#121215] border border-zinc-200 dark:border-white/[0.06] hover:border-zinc-300 dark:hover:border-white/[0.12] focus:border-blue-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none transition-all font-sans"
           />
         </div>
       </div>

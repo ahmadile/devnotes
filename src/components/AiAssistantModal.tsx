@@ -827,7 +827,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <Zap className={cn("w-3.5 h-3.5", activeTab === 'generator' ? "text-amber-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <Zap className={cn("w-3.5 h-3.5", activeTab === 'generator' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Générateur de Note</span>
               </button>
               <button
@@ -839,7 +839,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <MessageSquare className={cn("w-3.5 h-3.5", activeTab === 'chat' ? "text-amber-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <MessageSquare className={cn("w-3.5 h-3.5", activeTab === 'chat' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Assistant & Pédagogie</span>
               </button>
               <button
@@ -851,7 +851,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <Briefcase className={cn("w-3.5 h-3.5", activeTab === 'architect' ? "text-amber-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <Briefcase className={cn("w-3.5 h-3.5", activeTab === 'architect' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Architecte Pro</span>
               </button>
               <button
@@ -863,7 +863,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <GraduationCap className={cn("w-3.5 h-3.5", activeTab === 'revision' ? "text-sky-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <GraduationCap className={cn("w-3.5 h-3.5", activeTab === 'revision' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Révision</span>
               </button>
               <button
@@ -875,7 +875,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <Settings className={cn("w-3.5 h-3.5", activeTab === 'settings' ? "text-amber-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <Settings className={cn("w-3.5 h-3.5", activeTab === 'settings' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Configuration IA</span>
               </button>
             </div>
@@ -988,7 +988,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <button
                   onClick={handleProcessNote}
                   disabled={!inputContent.trim() || isProcessing}
-                  className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 rounded-xl text-xs font-bold transition-all shadow-md shadow-amber-400/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
                 >
                   {isProcessing ? (
                     <>
@@ -1008,7 +1008,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               <div className="p-6 flex flex-col h-full bg-card overflow-y-auto space-y-5">
                 <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                    <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     Aperçu Interactif de la Note Générée
                   </span>
 
@@ -1017,7 +1017,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       {activeNote && (
                         <button
                           onClick={() => handleCreateNoteFromAi(true)}
-                          className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 rounded-lg text-xs font-bold transition-all shadow-md shadow-amber-400/10 flex items-center gap-1.5 cursor-pointer"
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center gap-1.5 cursor-pointer"
                           title="Met à jour la note actuellement ouverte"
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
@@ -1040,18 +1040,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 {isProcessing ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4">
                     <div className="relative">
-                      <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center animate-pulse">
-                        <Brain className="w-8 h-8 text-amber-400 animate-spin" />
+                      <div className="w-16 h-16 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center animate-pulse">
+                        <Brain className="w-8 h-8 text-blue-500 dark:text-blue-400 animate-spin" />
                       </div>
-                      <div className="absolute inset-0 rounded-2xl bg-amber-400/20 blur-xl opacity-40 animate-pulse" />
+                      <div className="absolute inset-0 rounded-2xl bg-blue-400/20 blur-xl opacity-40 animate-pulse" />
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-sm font-bold text-foreground flex items-center justify-center gap-2">
                         L'IA analyse et réfléchit à votre note...
                         <span className="inline-flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" />
-                          <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-                          <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
                         </span>
                       </h4>
                       <p className="text-xs text-muted-foreground max-w-sm">
@@ -1062,7 +1062,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 ) : !aiResult ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground space-y-3">
                     <div className="p-4 bg-secondary/50 rounded-full border border-border">
-                      <Brain className="w-8 h-8 text-amber-500 dark:text-amber-400 opacity-60" />
+                      <Brain className="w-8 h-8 text-blue-500 dark:text-blue-400 opacity-60" />
                     </div>
                     <p className="text-xs max-w-sm">
                       Cliquez sur <strong>"Générer et Structurer la Note"</strong> pour prévisualiser le titre, les tags, le résumé visuel et les sous-notes de code.
@@ -1073,7 +1073,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     {/* Note Header Card */}
                     <div className="bg-secondary/25 border border-border/80 p-4 rounded-xl space-y-3">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
                         <h3 className="text-base font-extrabold text-foreground">{aiResult.title}</h3>
                       </div>
 
@@ -1088,7 +1088,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                                 "px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 border transition-all",
                                 hasSyntax
                                   ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                  : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+                                  : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20"
                               )}
                             >
                               <Tag className="w-2.5 h-2.5" />
@@ -1114,7 +1114,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     {aiResult.snippets && aiResult.snippets.length > 0 && (
                       <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <Code className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                          <Code className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
                           Snippet de Code & Sous-notes de Ligne ({aiResult.snippets[0].annotations.length} sous-notes)
                         </h4>
 
@@ -1137,7 +1137,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                                     key={lIdx}
                                     className={cn(
                                       'flex gap-3 py-0.5 px-1 rounded transition-colors',
-                                      matchingAnn ? 'bg-amber-500/10 border-l-2 border-amber-400' : 'hover:bg-white/5'
+                                      matchingAnn ? 'bg-blue-500/10 border-l-2 border-blue-500' : 'hover:bg-white/5'
                                     )}
                                   >
                                     <span className="text-muted-foreground/50 w-6 text-right select-none">{lineNum}</span>
@@ -1158,7 +1158,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                             {/* Annotations List */}
                             <div className="space-y-2 pt-2 border-t border-border/40">
                               <h5 className="text-[11px] font-bold text-foreground/80 flex items-center gap-1">
-                                <Layers className="w-3 h-3 text-amber-500 dark:text-amber-400" />
+                                <Layers className="w-3 h-3 text-blue-500 dark:text-blue-400" />
                                 Sous-notes rattachées au code :
                               </h5>
                               <div className="grid grid-cols-1 gap-2">
@@ -1168,7 +1168,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                                     className="bg-secondary/40 border border-border/60 rounded-lg p-2.5 text-xs font-sans space-y-1"
                                   >
                                     <div className="flex items-center justify-between font-bold">
-                                      <span className="text-amber-600 dark:text-[#f1c262] font-mono text-[10px]">
+                                      <span className="text-blue-600 dark:text-[#60a5fa] font-mono text-[10px]">
                                         Ligne {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
                                       </span>
                                       <span
@@ -1329,10 +1329,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       type="button"
                       onClick={() => handleSendChat(`Explique-moi cette note ("${activeNote.title}") en profondeur avec des analogies concrètes, le décorticage du code pas à pas et les pièges à éviter.`)}
                       disabled={isChatSending}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 transition-all cursor-pointer shadow-xs shadow-amber-400/10"
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all cursor-pointer shadow-xs shadow-blue-500/15"
                       title="Expliquer cette note en profondeur avec analogies et détails"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-900" />
+                      <Sparkles className="w-3 h-3 text-white" />
                       <span>Expliquer cette note</span>
                     </button>
                     <span className="text-[10px] text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06] font-mono shrink-0 hidden md:inline-block">
@@ -1492,7 +1492,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <button
                   onClick={() => handleSendChat()}
                   disabled={!chatInput.trim() || isChatSending}
-                  className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs shadow-amber-400/10"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs shadow-blue-500/15"
                 >
                   <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
                   Envoyer
@@ -1506,7 +1506,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             <div className="flex-1 p-8 max-w-2xl mx-auto space-y-6 overflow-y-auto">
               <div className="space-y-2">
                 <h3 className="text-base font-extrabold text-foreground flex items-center gap-2">
-                  <Cpu className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+                  <Cpu className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                   Configuration de l'IA (OpenRouter, Gemini, Ollama)
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1522,11 +1522,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   className={cn(
                     "p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer",
                     aiProvider === 'openrouter'
-                      ? "bg-amber-400/10 border-amber-400/50 text-amber-700 dark:text-amber-300"
+                      ? "bg-blue-500/10 border-blue-500/50 text-blue-700 dark:text-blue-300"
                       : "bg-secondary/20 border-border/60 text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Globe className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+                  <Globe className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                   <div>
                     <div className="text-xs font-bold">OpenRouter</div>
                     <div className="text-[10px] opacity-75">Tous les modèles (Claude, Llama, Gemini)</div>
@@ -1539,7 +1539,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   className={cn(
                     "p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer",
                     aiProvider === 'gemini'
-                      ? "bg-amber-400/10 border-amber-400/50 text-amber-700 dark:text-amber-300"
+                      ? "bg-blue-500/10 border-blue-500/50 text-blue-700 dark:text-blue-300"
                       : "bg-secondary/20 border-border/60 text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -1556,7 +1556,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   className={cn(
                     "p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer",
                     aiProvider === 'ollama'
-                      ? "bg-amber-400/10 border-amber-400/50 text-amber-700 dark:text-amber-300"
+                      ? "bg-blue-500/10 border-blue-500/50 text-blue-700 dark:text-blue-300"
                       : "bg-secondary/20 border-border/60 text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -1580,13 +1580,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       placeholder="sk-or-v1-..."
                       value={openRouterKey}
                       onChange={(e) => setOpenRouterKey(e.target.value)}
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-amber-400"
+                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
                     />
                     <a
                       href="https://openrouter.ai/keys"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline inline-block font-semibold"
+                      className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline inline-block font-semibold"
                     >
                       Obtenir une clé API OpenRouter &rarr;
                     </a>
@@ -1603,13 +1603,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       placeholder="AIzaSy..."
                       value={geminiApiKey}
                       onChange={(e) => setGeminiApiKey(e.target.value)}
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-amber-400"
+                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
                     />
                     <a
                       href="https://aistudio.google.com/app/apikey"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline inline-block font-semibold"
+                      className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline inline-block font-semibold"
                     >
                       Obtenir une clé API Gemini gratuite &rarr;
                     </a>
@@ -1626,7 +1626,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       placeholder="http://localhost:11434"
                       value={ollamaUrl}
                       onChange={(e) => setOllamaUrl(e.target.value)}
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-amber-400"
+                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 )}
@@ -1640,14 +1640,14 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     placeholder="google/gemini-2.5-flash ou anthropic/claude-3.5-sonnet ou meta-llama/llama-3.3-70b-instruct"
                     value={aiModel}
                     onChange={(e) => setAiModel(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-amber-400"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div className="flex items-center justify-end pt-3">
                   <button
                     onClick={handleSaveSettings}
-                    className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-zinc-950 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-amber-400/10"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-500/15"
                   >
                     Enregistrer les Paramètres
                   </button>
@@ -1671,7 +1671,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Banner */}
                   <div className="p-5 rounded-2xl bg-zinc-100 dark:bg-[#16161a] border border-zinc-200 dark:border-white/[0.08] shadow-xs space-y-2">
                     <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-bold text-sm">
-                      <Briefcase className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                      <Briefcase className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                       <span>Architecte Logiciel & Tech Lead Solution</span>
                     </div>
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -1682,14 +1682,14 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Scope Selector */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-100 dark:bg-[#16161a] border border-zinc-200 dark:border-white/[0.08]">
                     <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+                      <Layers className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
                       <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Connaissances ciblées :</span>
                     </div>
                     <div className="flex items-center gap-2 flex-1 sm:justify-end">
                       <select
                         value={blueprintScope}
                         onChange={(e) => setBlueprintScope(e.target.value)}
-                        className="bg-white dark:bg-[#202026] border border-zinc-300 dark:border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-400 cursor-pointer min-w-[220px]"
+                        className="bg-white dark:bg-[#202026] border border-zinc-300 dark:border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 cursor-pointer min-w-[220px]"
                       >
                         <option value="all">Tout l'espace de travail ({notes.length} notes, {Object.keys(syntaxDefinitions).length} syntaxes)</option>
                         {modules.map(m => (
@@ -1702,7 +1702,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Quick inspirations */}
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-amber-500 dark:text-amber-400" strokeWidth={1.5} />
+                      <Sparkles className="w-3 h-3 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
                       Exemples d'idées de projets :
                     </span>
                     <div className="flex flex-wrap gap-2">
@@ -1716,7 +1716,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                           key={idx}
                           type="button"
                           onClick={() => setBlueprintPrompt(idea)}
-                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1a1a1f] hover:bg-amber-500/10 dark:hover:bg-[#24242c] border border-zinc-200 dark:border-white/[0.08] hover:border-amber-400/40 text-[11px] font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-amber-300 transition-all text-left cursor-pointer shadow-2xs"
+                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1a1a1f] hover:bg-blue-500/10 dark:hover:bg-[#24242c] border border-zinc-200 dark:border-white/[0.08] hover:border-blue-400/40 text-[11px] font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-blue-300 transition-all text-left cursor-pointer shadow-2xs"
                         >
                           {idea}
                         </button>
@@ -1735,7 +1735,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       value={blueprintPrompt}
                       onChange={(e) => setBlueprintPrompt(e.target.value)}
                       placeholder="Ex: Je souhaite concevoir un système complet d'agents IA pour un supermarché. Les agents doivent gérer la prédiction des ruptures de stock, surveiller les dates de péremption, et alerter les managers via WebSocket..."
-                      className="w-full bg-white dark:bg-[#16161a] border border-zinc-300 dark:border-white/[0.08] rounded-xl p-4 text-xs font-sans text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all resize-none shadow-2xs leading-relaxed"
+                      className="w-full bg-white dark:bg-[#16161a] border border-zinc-300 dark:border-white/[0.08] rounded-xl p-4 text-xs font-sans text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all resize-none shadow-2xs leading-relaxed"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                           handleGenerateBlueprint();
@@ -1752,11 +1752,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <button
                       onClick={() => handleGenerateBlueprint()}
                       disabled={isArchitectProcessing || !blueprintPrompt.trim()}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 disabled:opacity-40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-amber-400/10"
+                      className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-500/15"
                     >
                       {isArchitectProcessing ? (
                         <>
-                          <Brain className="w-4 h-4 animate-spin text-zinc-950" />
+                          <Brain className="w-4 h-4 animate-spin text-white" />
                           <span>Conception architecturale en cours...</span>
                         </>
                       ) : (
@@ -1793,9 +1793,9 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
                       <button
                         onClick={handleSaveBlueprintAsNote}
-                        className="flex items-center gap-2 px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 rounded-lg text-xs font-bold transition-all shadow-md shadow-amber-400/10 cursor-pointer"
+                        className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-500/15 cursor-pointer"
                       >
-                        {blueprintSavedSuccess ? <CheckCircle2 className="w-3.5 h-3.5 text-zinc-950" /> : <Plus className="w-3.5 h-3.5" />}
+                        {blueprintSavedSuccess ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Plus className="w-3.5 h-3.5" />}
                         <span>{blueprintSavedSuccess ? 'Projet Enregistré !' : 'Créer la Note Projet'}</span>
                       </button>
                     </div>
@@ -1804,7 +1804,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Overview Header Card */}
                   <div className="p-6 rounded-2xl bg-card border border-border shadow-md space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 font-mono">
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 font-mono">
                         Dossier d'Architecture
                       </span>
                       {(blueprintResult.suggestedTags || []).map(t => (
@@ -1826,7 +1826,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                       <div className="space-y-2 p-3.5 rounded-xl bg-secondary/20 border border-border/50">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                          <Cpu className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                          <Cpu className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
                           Stack Technique Recommandée :
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -1858,7 +1858,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Architecture Breakdown */}
                   <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-4">
                     <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
-                      <Globe className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                      <Globe className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                       <span>Spécifications & Architecture Système</span>
                     </h3>
                     <div className="prose dark:prose-invert prose-xs max-w-none">
@@ -1922,7 +1922,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {blueprintResult.snippets && blueprintResult.snippets.length > 0 && (
                     <div className="p-6 rounded-2xl bg-card border border-border shadow-sm space-y-4">
                       <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
-                        <Code className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                        <Code className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                         <span>Modèles de Code Clés & Annotations</span>
                       </h3>
 
@@ -1946,7 +1946,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                                 <div className="space-y-1.5">
                                   {snip.annotations.map((ann, aIdx) => (
                                     <div key={aIdx} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-background/60 border border-border/40">
-                                      <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-[#f1c262] shrink-0">
+                                      <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-[#60a5fa] shrink-0">
                                         Ligne {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
                                       </span>
                                       <span className="text-[11px] text-muted-foreground">{ann.text}</span>
@@ -1972,7 +1972,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       <div className="space-y-3">
                         {blueprintResult.roadmapSteps.map((step, idx) => (
                           <div key={idx} className="p-3.5 rounded-xl bg-secondary/25 border border-border/60 flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                               {idx + 1}
                             </div>
                             <div className="flex-1 min-w-0 space-y-1">

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-border: var(--border);
   --color-input: var(--input);
@@ -35,59 +37,57 @@
 }
 
 @layer base {
-  :root {
-    --background: #09090b;
-    --foreground: #f4f4f5; /* zinc-100 */
-    --card: #0c0c0e;
-    --card-foreground: #f4f4f5;
-    --popover: #09090b;
-    --popover-foreground: #f4f4f5;
-    --primary: #6366f1; /* indigo-500 */
-    --primary-foreground: #ffffff;
-    --secondary: #18181b; /* zinc-900 */
-    --secondary-foreground: #f4f4f5;
-    --muted: #18181b; /* zinc-900 for dark mode secondary elements */
-    --muted-foreground: #71717a; /* zinc-500 */
-    --accent: #6366f1;
-    --accent-foreground: #ffffff;
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: #27272a; /* zinc-800 */
-    --input: #18181b;
-    --ring: #6366f1;
-    --radius: 0.75rem;
-
-    /* Theme-aware non-shadcn variables */
-    --glass-bg: rgba(12, 12, 14, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.05);
-    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  }
-
-  .light {
+  :root, .light {
     --background: #ffffff;
     --foreground: #09090b;
     --card: #ffffff;
     --card-foreground: #09090b;
     --popover: #ffffff;
     --popover-foreground: #09090b;
-    --primary: #4f46e5; /* indigo-600 */
+    --primary: #2563eb; /* Cobalt Blue 600 */
     --primary-foreground: #ffffff;
     --secondary: #f4f4f5; /* zinc-100 */
     --secondary-foreground: #18181b;
     --muted: #f4f4f5; /* zinc-100 */
-    --muted-foreground: #52525b; /* zinc-600 - darker for better contrast */
-    --accent: #4f46e5;
+    --muted-foreground: #52525b; /* zinc-600 */
+    --accent: #2563eb;
     --accent-foreground: #ffffff;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
     --border: #e4e4e7; /* zinc-200 */
     --input: #f4f4f5;
-    --ring: #4f46e5;
+    --ring: #2563eb;
+    --radius: 0.75rem;
 
-    /* Light Mode special variables */
-    --glass-bg: rgba(255, 255, 255, 0.8);
-    --glass-border: rgba(0, 0, 0, 0.05);
-    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  }
+
+  .dark {
+    --background: #0e0e11;
+    --foreground: #f4f4f5; /* zinc-100 */
+    --card: #141418;
+    --card-foreground: #f4f4f5;
+    --popover: #0e0e11;
+    --popover-foreground: #f4f4f5;
+    --primary: #3b82f6; /* Blue 500 */
+    --primary-foreground: #ffffff;
+    --secondary: #18181c; /* Carbon Anthracite */
+    --secondary-foreground: #f4f4f5;
+    --muted: #18181c;
+    --muted-foreground: #a1a1aa; /* zinc-400 */
+    --accent: #3b82f6;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #26262b;
+    --input: #18181c;
+    --ring: #3b82f6;
+
+    --glass-bg: rgba(14, 14, 17, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -148,23 +148,45 @@
 }
 
 .floating-card {
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border);
+  background: var(--card);
+  backdrop-filter: blur(12px);
+}
+
+.dark .floating-card {
   box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #141417;
-  backdrop-filter: blur(12px);
+  background: #141418;
 }
 
 .shiny-btn {
   position: relative;
-  background: #141416;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  color: #18181b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
 }
 
 .shiny-btn:hover {
-  background: #1c1c20;
-  border-color: rgba(255, 255, 255, 0.18);
+  background: #f4f4f5;
+  border-color: #d4d4d8;
+  color: #09090b;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.dark .shiny-btn {
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e4e4e7;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .shiny-btn:hover {
+  background: #1c1c22;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }

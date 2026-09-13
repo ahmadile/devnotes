@@ -27,7 +27,7 @@ export const renderTextWithCodeHighlights = (node: React.ReactNode): React.React
         return (
           <code 
             key={index}
-            className="font-mono text-xs bg-zinc-100 dark:bg-[#18181c] text-amber-700 dark:text-[#f1c262] border border-zinc-300/80 dark:border-white/[0.08] px-1.5 py-0.5 rounded font-medium inline-block mx-0.5 my-0.5"
+            className="font-mono text-xs bg-blue-50/80 dark:bg-[#18181c] text-blue-700 dark:text-[#60a5fa] border border-blue-200/70 dark:border-white/[0.08] px-1.5 py-0.5 rounded font-medium inline-block mx-0.5 my-0.5"
           >
             {part}
           </code>
@@ -75,7 +75,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             if (isInline) {
               return (
                 <code 
-                  className="font-mono text-xs bg-zinc-100 dark:bg-[#18181c] text-amber-700 dark:text-[#f1c262] border border-zinc-300/80 dark:border-white/[0.08] px-1.5 py-0.5 rounded font-medium"
+                  className="font-mono text-xs bg-blue-50/80 dark:bg-[#18181c] text-blue-700 dark:text-[#60a5fa] border border-blue-200/70 dark:border-white/[0.08] px-1.5 py-0.5 rounded font-medium"
                   {...props}
                 >
                   {children}
@@ -94,7 +94,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight mt-7 mb-3 font-sans border-l-2 border-amber-500/70 dark:border-amber-400/80 pl-3 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight mt-7 mb-3 font-sans border-l-2 border-blue-600 dark:border-blue-500 pl-3 flex items-center gap-2">
               {children}
             </h2>
           ),
@@ -104,22 +104,22 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
             </h3>
           ),
           p: ({ children }) => (
-            <p className="leading-relaxed text-zinc-700 dark:text-zinc-300 my-3 text-sm font-sans whitespace-pre-line">
+            <p className="leading-relaxed text-zinc-800 dark:text-zinc-300 my-3 text-sm font-sans whitespace-pre-line">
               {renderTextWithCodeHighlights(children)}
             </p>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-zinc-700 dark:text-zinc-300 text-sm font-sans">
+            <ul className="list-disc list-inside space-y-1.5 my-3 pl-2 text-zinc-800 dark:text-zinc-300 text-sm font-sans">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-zinc-700 dark:text-zinc-300 text-sm font-sans">
+            <ol className="list-decimal list-inside space-y-1.5 my-3 pl-2 text-zinc-800 dark:text-zinc-300 text-sm font-sans">
               {children}
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed text-zinc-700 dark:text-zinc-300 font-sans marker:text-zinc-400 dark:marker:text-zinc-500">
+            <li className="leading-relaxed text-zinc-800 dark:text-zinc-300 font-sans marker:text-zinc-400 dark:marker:text-zinc-500">
               {renderTextWithCodeHighlights(children)}
             </li>
           ),
@@ -128,7 +128,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
               href={href} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-amber-600 dark:text-amber-400 hover:underline underline-offset-4 font-medium transition-colors"
+              className="text-blue-600 dark:text-blue-400 hover:underline underline-offset-4 font-medium transition-colors"
             >
               {children}
             </a>

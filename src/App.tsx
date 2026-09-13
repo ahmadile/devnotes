@@ -252,7 +252,8 @@ export default function App() {
   // Theme support
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    document.documentElement.classList.toggle('light', theme === 'light');
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
     setSettings(prev => ({ ...prev, theme }));
   }, [theme]);
 
@@ -723,7 +724,7 @@ export default function App() {
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Concevoir un Projet & Architecture Solution (Tech Lead)"
                   >
-                    <Briefcase className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors" strokeWidth={1.5} />
+                    <Briefcase className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Architecte Pro</span>
                   </button>
                   <button
@@ -731,15 +732,15 @@ export default function App() {
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Lancer le Mode Révision & Entraînement (Flashcards, Quiz, Défis Code)"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-sky-500 dark:group-hover:text-sky-400 transition-colors" strokeWidth={1.5} />
+                    <GraduationCap className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Réviser</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('chat', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-900 dark:text-zinc-100 bg-amber-500/10 dark:bg-[#19191d] hover:bg-amber-500/15 dark:hover:bg-[#222227] border border-amber-500/30 dark:border-amber-400/20 shadow-xs transition-all cursor-pointer group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-900 dark:text-zinc-100 bg-blue-500/10 dark:bg-[#19191d] hover:bg-blue-500/15 dark:hover:bg-[#222227] border border-blue-500/30 dark:border-blue-400/20 shadow-xs transition-all cursor-pointer group"
                     title="Ouvrir l'Assistant IA (Discussion, Explications, Analogies, Questions sur la note)"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 transition-colors" strokeWidth={1.5} />
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 transition-colors" strokeWidth={1.5} />
                     <span className="font-semibold">Assistant IA</span>
                   </button>
                   <button 
@@ -868,16 +869,16 @@ export default function App() {
                               className={cn(
                                 "group flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono border select-none transition-all relative",
                                 hasSyntax 
-                                  ? "bg-[#122218] text-[#86efac] border-[#1e462c] hover:border-[#2e6b43] shadow-sm cursor-pointer"
-                                  : "bg-[#141416] hover:bg-[#1b1b1e] text-zinc-300 hover:text-white border-white/[0.08] hover:border-white/[0.15]"
+                                  ? "bg-emerald-50 dark:bg-[#122218] text-emerald-700 dark:text-[#86efac] border-emerald-200 dark:border-[#1e462c] hover:border-emerald-300 dark:hover:border-[#2e6b43] shadow-xs cursor-pointer"
+                                  : "bg-zinc-100 dark:bg-[#141416] hover:bg-zinc-200 dark:hover:bg-[#1b1b1e] text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white border-zinc-200 dark:border-white/[0.08]"
                               )}
                             >
                               #{tag}
                               {hasSyntax && (
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 bg-[#141417] text-zinc-200 text-[10px] rounded-lg border border-white/[0.1] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-30 font-sans backdrop-blur-md">
-                                  <div className="font-bold border-b border-white/[0.08] pb-1 mb-1 font-mono text-[#86efac]">#{tag} Reference</div>
-                                  <div className="line-clamp-2 text-zinc-400">{syntaxDefinitions[tag.toLowerCase().trim()].text}</div>
-                                  <div className="text-[9px] text-zinc-400 mt-1 font-medium">Click to expand details</div>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 bg-white dark:bg-[#141417] text-zinc-800 dark:text-zinc-200 text-[10px] rounded-lg border border-zinc-200 dark:border-white/[0.1] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-2xl z-30 font-sans backdrop-blur-md">
+                                  <div className="font-bold border-b border-zinc-200 dark:border-white/[0.08] pb-1 mb-1 font-mono text-emerald-600 dark:text-[#86efac]">#{tag} Reference</div>
+                                  <div className="line-clamp-2 text-zinc-600 dark:text-zinc-400">{syntaxDefinitions[tag.toLowerCase().trim()].text}</div>
+                                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 mt-1 font-medium">Click to expand details</div>
                                 </div>
                               )}
                               <button 
@@ -1039,10 +1040,10 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => openAiAssistant('chat', `Explique-moi cette note ("${activeNote.title}") en profondeur avec des analogies concrètes, le décorticage du code pas à pas et les pièges à éviter.`)}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-amber-700 dark:text-[#f1c262] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 dark:border-amber-400/20 transition-all cursor-pointer shadow-2xs"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-400/20 transition-all cursor-pointer shadow-2xs"
                             title="Demander à l'assistant d'expliquer cette note en détail avec analogies"
                           >
-                            <Sparkles className="w-3 h-3 text-amber-600 dark:text-[#f1c262]" />
+                            <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                             <span>Expliquer cette note</span>
                           </button>
 
