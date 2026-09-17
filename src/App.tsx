@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -136,6 +136,7 @@ export default function App() {
     y: number;
   } | null>(null);
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleTextareaMouseUp = (e: React.MouseEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
@@ -176,9 +177,133 @@ export default function App() {
     setSelection(null);
   };
 
-  // Standard paste behavior keeps pasted content intact inside Note Content
-  const handleTextareaPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    // Default native paste behavior preserves all pasted text, markdown, code blocks, spaces and formatting without interruption
+  const insertTextIntoNote = (textToInsert: string) => {
+    if (!activeNote) return;
+    const textarea = noteTextareaRef.current;
+    if (!textarea) {
+      updateNote({
+        ...activeNote,
+        content: (activeNote.content ? activeNote.content + '\n\n' : '') + textToInsert,
+      });
+      return;
+    }
+
+    const start = textarea.selectionStart ?? activeNote.content.length;
+    const end = textarea.selectionEnd ?? activeNote.content.length;
+    const prevContent = activeNote.content || '';
+    const newContent = prevContent.slice(0, start) + textToInsert + prevContent.slice(end);
+
+    updateNote({
+      ...activeNote,
+      content: newContent,
+    });
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = start + textToInsert.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 50);
+  };
+
+  const uploadAndInsertImage = async (fileOrBlob: Blob, defaultName: string = 'image') => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      let finalUrl = base64;
+
+      try {
+        const res = await fetch('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: base64,
+            filename: defaultName.replace(/\.[^/.]+$/, ''),
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.url) {
+            finalUrl = data.url;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend image upload failed, using data URL fallback:', err);
+      }
+
+      insertTextIntoNote(`\n\n![${defaultName}](${finalUrl})\n\n`);
+    };
+    reader.readAsDataURL(fileOrBlob);
+  };
+
+  // Paste handler supporting text, code, and direct clipboard image paste (Ctrl+V)
+  const handleTextareaPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    // 1. Check for image files in clipboard
+    const items = Array.from(clipboardData.items || []);
+    const imageItem = items.find(item => item.type.startsWith('image/'));
+
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        e.preventDefault();
+        await uploadAndInsertImage(file, file.name || 'image_note.png');
+        return;
+      }
+    }
+
+    // 2. Check if clipboard has HTML with <img> tags and no plain text
+    const html = clipboardData.getData('text/html');
+    const plainText = clipboardData.getData('text/plain');
+
+    if (html && !plainText && html.includes('<img')) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const img = doc.querySelector('img');
+      if (img && img.src) {
+        e.preventDefault();
+        insertTextIntoNote(`\n\n![Image](${img.src})\n\n`);
+        return;
+      }
+    }
+  };
+
+  const handlePasteImageFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(type => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            await uploadAndInsertImage(blob, 'image_presse_papier.png');
+            return;
+          }
+        }
+      }
+      alert("Aucune image trouvée dans le presse-papiers. Copiez d'abord une image ou utilisez Ctrl+V directement dans l'éditeur.");
+    } catch (err) {
+      alert("Pour coller une image, placez votre curseur dans le texte et appuyez sur Ctrl+V.");
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadAndInsertImage(file, file.name);
+    }
+    e.target.value = '';
+  };
+
+  const handleTextareaDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        e.preventDefault();
+        await uploadAndInsertImage(file, file.name);
+      }
+    }
   };
 
   // Auto-grow note content textarea height and prevent scroll jumping
@@ -1058,6 +1183,35 @@ export default function App() {
                             <span>Expliquer cette note</span>
                           </button>
 
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={handlePasteImageFromClipboard}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 bg-secondary/50 hover:bg-secondary border border-border/50 transition-all cursor-pointer shadow-2xs"
+                              title="Coller l'image depuis le presse-papiers (ou faites Ctrl+V dans l'éditeur)"
+                            >
+                              <ClipboardPaste className="w-3 h-3 text-blue-500" />
+                              <span className="hidden sm:inline">Coller image</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => imageFileInputRef.current?.click()}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 bg-secondary/50 hover:bg-secondary border border-border/50 transition-all cursor-pointer shadow-2xs"
+                              title="Importer une image depuis votre ordinateur"
+                            >
+                              <ImageIcon className="w-3 h-3 text-emerald-500" />
+                              <span className="hidden sm:inline">Image</span>
+                            </button>
+                            <input 
+                              ref={imageFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleImageFileChange}
+                            />
+                          </div>
+
                           <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/40">
                             <button
                               type="button"
@@ -1089,7 +1243,11 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="relative group min-h-[100px] px-1">
+                      <div 
+                        className="relative group min-h-[100px] px-1"
+                        onDrop={handleTextareaDrop}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+                      >
                         {editorTab === 'write' ? (
                           <>
                             <div className="absolute -left-4 inset-y-0 w-1 bg-primary/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />

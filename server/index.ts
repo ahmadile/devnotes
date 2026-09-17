@@ -9,6 +9,8 @@ import { getMongoClient, getMongoDbName } from './db.js';
 import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept, ingestCurriculumFromImageOrText } from './aiService.js';
 import dns from 'dns';
 
+import fs from 'fs';
+
 // Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
 try { dns.setDefaultResultOrder('ipv4first'); } catch (e) {}
 
@@ -24,6 +26,11 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3001);
 
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 type StoredNotesDoc = {
   userId: string;
   notes: unknown[];
@@ -35,23 +42,27 @@ type StoredNotesDoc = {
 const app = express();
 
 // Security Middlewares
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "script-src": ["'self'", "'unsafe-inline'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
-        "connect-src": ["'self'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
-        "img-src": ["'self'", "data:", "img.clerk.com"],
-        "worker-src": ["'self'", "blob:"],
-        "font-src": ["'self'", "fonts.gstatic.com"],
-        "style-src": ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
-      },
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", "'unsafe-inline'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
+      "connect-src": ["'self'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
+      "img-src": ["'self'", "data:", "blob:", "https:", "http:", "img.clerk.com"],
+      "worker-src": ["'self'", "blob:"],
+      "font-src": ["'self'", "fonts.gstatic.com"],
+      "style-src": ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
     },
-  }));
-  app.use(cors());
-  app.use(clerkMiddleware());
-  
-  app.use(express.json({ limit: '2mb' }));
+  },
+}));
+app.use(cors());
+app.use(clerkMiddleware());
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Serve uploaded images statically
+app.use('/uploads', express.static(uploadsDir));
 
   function getAuthUserId(req: any): string | null {
     const apiKey = req.headers['x-api-key'];
@@ -63,6 +74,41 @@ const app = express();
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.post('/api/upload-image', async (req, res) => {
+    try {
+      const { image, filename } = req.body || {};
+      if (!image) {
+        res.status(400).json({ error: 'No image data provided' });
+        return;
+      }
+
+      // Check if it's a base64 data URL
+      const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!match) {
+        if (typeof image === 'string' && (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/uploads/'))) {
+          res.json({ ok: true, url: image });
+          return;
+        }
+        res.status(400).json({ error: 'Invalid image format' });
+        return;
+      }
+
+      const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+      const base64Data = match[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      const cleanName = (filename || 'note_image').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+      const fileName = `${cleanName}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const filePath = path.join(uploadsDir, fileName);
+
+      await fs.promises.writeFile(filePath, buffer);
+      res.json({ ok: true, url: `/uploads/${fileName}` });
+    } catch (err: any) {
+      console.error('Image upload error:', err);
+      res.status(500).json({ error: err.message || 'Failed to save image' });
+    }
   });
 
   app.get('/api/notes', async (req, res) => {

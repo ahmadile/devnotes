@@ -55,18 +55,109 @@ export const renderTextWithCodeHighlights = (node: React.ReactNode): React.React
   return node;
 };
 
-// Preserve raw text as authored or pasted by the user without destructive regex backtick insertion
+// Auto-format naked code blocks and format raw markdown cleanly
 export const autoFormatMarkdown = (text: string): string => {
-  return text || '';
+  if (!text) return '';
+  
+  const lines = text.split('\n');
+  const processed: string[] = [];
+  let inFenced = false;
+  let inNaked = false;
+  let nakedLang = 'python';
+  let nakedLines: string[] = [];
+
+  const isLangHeader = (l: string) => /^(python|javascript|typescript|sql|bash|sh|css|html|json)$/i.test(l.trim());
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      if (inNaked) {
+        processed.push('```' + nakedLang);
+        processed.push(...nakedLines);
+        processed.push('```\n');
+        inNaked = false;
+        nakedLines = [];
+      }
+      inFenced = !inFenced;
+      processed.push(line);
+      continue;
+    }
+
+    if (inFenced) {
+      processed.push(line);
+      continue;
+    }
+
+    if (!inNaked && isLangHeader(trimmed)) {
+      inNaked = true;
+      nakedLang = trimmed.toLowerCase();
+      nakedLines = [];
+      continue;
+    }
+
+    if (inNaked) {
+      if (trimmed.startsWith('###') || /^\d+[.)]/.test(trimmed) || trimmed.startsWith('Schéma') || trimmed.startsWith('🔴') || trimmed.startsWith('⚫') || trimmed.startsWith('Analogie') || trimmed.startsWith('>')) {
+        processed.push('```' + nakedLang);
+        processed.push(...nakedLines);
+        processed.push('```\n');
+        inNaked = false;
+        nakedLines = [];
+        processed.push(line);
+      } else {
+        nakedLines.push(line);
+      }
+      continue;
+    }
+
+    processed.push(line);
+  }
+
+  if (inNaked) {
+    processed.push('```' + nakedLang);
+    processed.push(...nakedLines);
+    processed.push('```\n');
+  }
+
+  return processed.join('\n');
 };
 
 export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
+  const formattedContent = autoFormatMarkdown(content);
+
   return (
     <div className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
+          img: ({ src, alt, ...props }) => {
+            return (
+              <figure className="my-6 flex flex-col items-center group/img">
+                <div className="relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100/50 dark:bg-zinc-900/40 p-2 shadow-md transition-all hover:border-blue-500/40 hover:shadow-lg">
+                  <img 
+                    src={src} 
+                    alt={alt || 'Image de note'} 
+                    className="max-h-[600px] w-auto max-w-full rounded-xl object-contain cursor-zoom-in transition-transform duration-200 group-hover/img:scale-[1.01]" 
+                    loading="lazy"
+                    onClick={() => {
+                      if (src) window.open(src, '_blank');
+                    }}
+                    {...props} 
+                  />
+                  <div className="absolute top-3 right-3 opacity-0 group-hover/img:opacity-100 transition-opacity bg-zinc-900/80 backdrop-blur-sm text-zinc-200 text-xs px-2.5 py-1 rounded-md border border-white/10 flex items-center gap-1.5 pointer-events-none">
+                    <span>Agrandir</span>
+                  </div>
+                </div>
+                {alt && alt !== 'Image' && alt !== 'Image de note' && (
+                  <figcaption className="mt-2.5 text-xs text-zinc-500 dark:text-zinc-400 font-sans text-center max-w-md">
+                    {alt}
+                  </figcaption>
+                )}
+              </figure>
+            );
+          },
           code({ className: codeClassName, children, ...props }) {
             const match = /language-(\w+)/.exec(codeClassName || '');
             const isInline = !match;
@@ -172,7 +263,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
           ),
         }}
       >
-        {content}
+        {formattedContent}
       </ReactMarkdown>
     </div>
   );

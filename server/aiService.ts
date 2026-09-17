@@ -51,65 +51,113 @@ const ANNOTATION_COLORS: Record<string, string> = {
 function formatContentWithSchemas(rawSummary: string): string {
   if (!rawSummary) return '';
   const lines = rawSummary.split('\n');
-  const result: string[] = [];
+  const processedLines: string[] = [];
+  let inFenced = false;
+  let inNakedCode = false;
+  let nakedCodeLang = 'python';
+  let nakedCodeLines: string[] = [];
   let inAsciiBlock = false;
   let asciiBlockLines: string[] = [];
 
   const isBoxCharLine = (l: string) => /[│┌─┐▼▲┼├└═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬]/.test(l);
+  const isLangHeader = (l: string) => /^(python|javascript|typescript|sql|bash|sh|css|html|json)$/i.test(l.trim());
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
     if (trimmed.startsWith('```')) {
+      if (inNakedCode) {
+        processedLines.push('```' + nakedCodeLang);
+        processedLines.push(...nakedCodeLines);
+        processedLines.push('```\n');
+        inNakedCode = false;
+        nakedCodeLines = [];
+      }
       if (inAsciiBlock) {
-        result.push('```text');
-        result.push(...asciiBlockLines);
-        result.push('```');
+        processedLines.push('```text');
+        processedLines.push(...asciiBlockLines);
+        processedLines.push('```\n');
         inAsciiBlock = false;
         asciiBlockLines = [];
       }
-      result.push(line);
+      inFenced = !inFenced;
+      processedLines.push(line);
       continue;
     }
 
+    if (inFenced) {
+      processedLines.push(line);
+      continue;
+    }
+
+    // Check for naked language header like "python" on its own line
+    if (!inNakedCode && !inAsciiBlock && isLangHeader(trimmed)) {
+      inNakedCode = true;
+      nakedCodeLang = trimmed.toLowerCase();
+      nakedCodeLines = [];
+      continue;
+    }
+
+    if (inNakedCode) {
+      // If we encounter a heading, schema, or end marker, close the code block
+      if (trimmed.startsWith('###') || /^\d+[.)]/.test(trimmed) || trimmed.startsWith('Schéma') || trimmed.startsWith('🔴') || trimmed.startsWith('⚫') || trimmed.startsWith('Analogie')) {
+        processedLines.push('```' + nakedCodeLang);
+        processedLines.push(...nakedCodeLines);
+        processedLines.push('```\n');
+        inNakedCode = false;
+        nakedCodeLines = [];
+      } else {
+        nakedCodeLines.push(line);
+        continue;
+      }
+    }
+
+    // Box character detection for ASCII schemas
     if (isBoxCharLine(line)) {
       inAsciiBlock = true;
       asciiBlockLines.push(line);
-    } else {
-      if (inAsciiBlock) {
-        if (!trimmed && i + 1 < lines.length && isBoxCharLine(lines[i + 1])) {
-          asciiBlockLines.push(line);
-          continue;
-        }
-        result.push('```text');
-        result.push(...asciiBlockLines);
-        result.push('```\n');
-        inAsciiBlock = false;
-        asciiBlockLines = [];
+      continue;
+    } else if (inAsciiBlock) {
+      if (!trimmed && i + 1 < lines.length && isBoxCharLine(lines[i + 1])) {
+        asciiBlockLines.push(line);
+        continue;
       }
-      result.push(line);
+      processedLines.push('```text');
+      processedLines.push(...asciiBlockLines);
+      processedLines.push('```\n');
+      inAsciiBlock = false;
+      asciiBlockLines = [];
     }
+
+    processedLines.push(line);
+  }
+
+  if (inNakedCode) {
+    processedLines.push('```' + nakedCodeLang);
+    processedLines.push(...nakedCodeLines);
+    processedLines.push('```\n');
   }
 
   if (inAsciiBlock) {
-    result.push('```text');
-    result.push(...asciiBlockLines);
-    result.push('```\n');
+    processedLines.push('```text');
+    processedLines.push(...asciiBlockLines);
+    processedLines.push('```\n');
   }
 
-  let formatted = result.join('\n');
+  let formatted = processedLines.join('\n');
+
+  // Convert numbered headings like "1) L'homogénéité..." into "### 1) L'homogénéité..."
+  formatted = formatted.replace(/^(?:\s*)(\d+\)\s+[^\n]+)/gm, '\n### $1\n');
+  formatted = formatted.replace(/^(?:\s*)(\d+\.\s+[A-ZÀ-ÿ][^\n]+)/gm, '\n### $1\n');
 
   // Format schema headings properly as Markdown H3
-  formatted = formatted.replace(/^(?:#+\s*)?(Schéma\s*[-—:]\s*[^\n]+)/gim, '### $1');
+  formatted = formatted.replace(/^(?:#+\s*)?(Schéma\s*[-—:]\s*[^\n]+)/gim, '\n### $1\n');
 
   // Add [!NOTE] callout for Analogie or L'idée centrale if not already in alert format
   if (!formatted.includes('> [!NOTE]')) {
-    if (formatted.includes("Analogie :") || formatted.includes("Analogie:")) {
-      formatted = formatted.replace(/(Analogie\s*:\s*[^\n]+(?:\n[^\n#]+)?)/i, '> [!NOTE]\n> **$1**\n\n');
-    } else if (formatted.includes("L'idée centrale")) {
-      formatted = formatted.replace(/(L'idée centrale[^.\n]*[.\n]?)/i, '> [!NOTE]\n> **$1**\n\n');
-    }
+    formatted = formatted.replace(/(Analogie(?:\s+générale)?\s*:\s*[^\n]+(?:\n[^\n#]+)?)/i, '\n> [!NOTE]\n> **$1**\n\n');
+    formatted = formatted.replace(/(L'idée centrale[^.\n]*[.\n]?)/i, '\n> [!NOTE]\n> **$1**\n\n');
   }
 
   return formatted.trim();
@@ -411,23 +459,13 @@ export function parseVerbatimNote(
       if (trimmed.startsWith('⚪ Titre :') || trimmed.startsWith('⚪ Titre:')) {
         codeSnippetTitle = trimmed.replace(/^⚪ Titre\s*:\s*/, '');
       } else if (trimmed.startsWith('```')) {
-        if (!isInsideFencedCode) {
-          isInsideFencedCode = true;
-          const match = trimmed.match(/```(\w+)/);
-          if (match) codeLanguage = match[1];
-        } else {
-          isInsideFencedCode = false;
-        }
-      } else if (isInsideFencedCode) {
-        if (!trimmed.startsWith('⚫')) {
-          codeLines.push(line);
-        } else {
-          rawLineAnnotations.push({ marker: trimmed, text: trimmed.replace(/^⚫\s*/, '') });
-        }
+        isInsideFencedCode = !isInsideFencedCode;
+        const match = trimmed.match(/```(\w+)/);
+        if (match) codeLanguage = match[1];
       } else if (['python', 'javascript', 'typescript', 'html', 'css', 'sql', 'bash', 'json'].includes(trimmed.toLowerCase())) {
         codeLanguage = trimmed.toLowerCase();
-      } else if (trimmed && !codeSnippetTitle && !codeLines.length && !trimmed.startsWith('⚫')) {
-        codeSnippetTitle = trimmed;
+      } else {
+        codeLines.push(line);
       }
     } else if (currentSection === 'annotations') {
       if (trimmed && rawLineAnnotations.length > 0) {
@@ -436,23 +474,18 @@ export function parseVerbatimNote(
     }
   }
 
-  // If no fenced code block was found, check for plain code lines
-  if (codeLines.length === 0 && currentSection === 'code_block') {
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('⚫') && !trimmed.startsWith('🔴') && !trimmed.startsWith('🟢') && !trimmed.startsWith('🔵') && !trimmed.startsWith('🟡') && !trimmed.startsWith('⚪')) {
-        if (line.includes('def ') || line.includes(' = ') || line.includes('print(') || line.includes('return ') || line.includes('import ') || line.includes('class ')) {
-          codeLines.push(line);
-        }
-      }
-    }
+  // Clean leading and trailing blank lines from code
+  while (codeLines.length > 0 && !codeLines[0].trim()) {
+    codeLines.shift();
+  }
+  while (codeLines.length > 0 && !codeLines[codeLines.length - 1].trim()) {
+    codeLines.pop();
   }
 
-  // Verbatim summary: preserve exact characters and structure authored by user
-  content = summaryLines.join('\n').trim();
+  // Verbatim summary: format with proper code block fences, headings and schemas
+  content = formatContentWithSchemas(summaryLines.join('\n')).trim();
   if (!content) {
-    content = input.trim();
+    content = formatContentWithSchemas(input).trim();
   }
 
   codeText = codeLines.join('\n');
@@ -470,6 +503,21 @@ export function parseVerbatimNote(
 
   // Parse annotations
   const rawAnnotations: GeneratedAnnotation[] = [];
+
+  // If no explicit ⚫ annotations were present, auto-detect section markers in code (e.g. # --- 1) Title ---)
+  if (rawLineAnnotations.length === 0 && codeLines.length > 0) {
+    for (let i = 0; i < codeLines.length; i++) {
+      const cLine = codeLines[i].trim();
+      const sectionMatch = cLine.match(/#\s*---\s*(\d+\)[^-]+)---/);
+      if (sectionMatch) {
+        const sectionTitle = sectionMatch[1].trim();
+        rawLineAnnotations.push({
+          marker: `⚫ Ligne ${i + 1}`,
+          text: `Ligne ${i + 1} : ${sectionTitle} — Étape clé illustrant les concepts abordés dans le cours.`,
+        });
+      }
+    }
+  }
   for (let idx = 0; idx < rawLineAnnotations.length; idx++) {
     const fullText = rawLineAnnotations[idx].text;
     let shortTitle = fullText;
@@ -880,6 +928,9 @@ function enrichAnnotationCodeTerms(text: string, codeTokens: string[]): string {
 }
 
 function sanitizeAndAlignNoteResult(parsed: GeneratedNoteResult): GeneratedNoteResult {
+  if (parsed.content) {
+    parsed.content = formatContentWithSchemas(parsed.content);
+  }
   if (parsed.snippets && Array.isArray(parsed.snippets)) {
     parsed.snippets.forEach(s => {
       // Extract function names, parameters, and identifiers from snippet code
@@ -922,12 +973,8 @@ function sanitizeAndAlignNoteResult(parsed: GeneratedNoteResult): GeneratedNoteR
 export async function processNoteWithAI(req: ProcessNoteRequest): Promise<GeneratedNoteResult> {
   const mode = req.mode || 'auto';
 
-  // If verbatim mode is explicitly requested OR if auto-detect recognizes a structured note
-  const isPreformatted = 
-    req.input.includes('🔵 Titre') || 
-    (req.input.includes('🟢 Résumé') && req.input.includes('🔴 Bloc logique'));
-
-  if (mode === 'verbatim' || (mode === 'auto' && isPreformatted)) {
+  // If verbatim mode is explicitly requested, bypass AI
+  if (mode === 'verbatim') {
     return parseVerbatimNote(req.input, req.modules, req.syntaxDefinitions || {});
   }
 
@@ -935,69 +982,58 @@ export async function processNoteWithAI(req: ProcessNoteRequest): Promise<Genera
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
   const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
 
+  // If no API key is provided and local/offline mode, fall back to our enhanced smart verbatim parser
+  if (!apiKey && provider !== 'ollama') {
+    return parseVerbatimNote(req.input, req.modules, req.syntaxDefinitions || {});
+  }
+
   const syntaxContext = req.syntaxDefinitions 
     ? `\n\nRéférences de syntaxes déjà enregistrées en base de données : ${Object.keys(req.syntaxDefinitions).join(', ')}.`
     : '';
 
   const prompt = `Tu es l'assistant IA d'élite de DevNotes, expert en pédagogie et ingénierie logicielle.
-Ta mission est de transformer l'entrée utilisateur ci-dessous (qu'il s'agisse d'une note brute, d'une TRANSCRIPTION VIDÉO/AUDIO BRUTE en anglais ou en français avec timestamps, ou de code brut) en une fiche de cours de référence "Staff Engineer / Enterprise", approfondie, claire, visuelle et extrêmement pédagogique.${syntaxContext}
+Ta mission est de structurer et d'intégrer l'entrée utilisateur ci-dessous dans DevNotes.
+Il peut s'agir :
+- D'une note DÉJÀ STRUCTURÉE (avec 🔵 Titre, 🟡 Tags, 🟢 Résumé, mini-blocs de code, schéma, et 🔴 Bloc logique du code).
+- D'une TRANSCRIPTION VIDÉO/AUDIO BRUTE (en anglais ou en français avec timestamps).
+- D'un code source ou d'un sujet de cours.${syntaxContext}
 
 --- INPUT BRUT ---
 ${req.input}
 --- FIN INPUT BRUT ---
 
 Directives fondamentales de traitement :
-1. PRÉSERVATION ABSOLUE DE LA RICHESSE TECHNIQUE (NE CONDENSE PAS TROP) :
-   - L'utilisateur a besoin d'une analyse complète et approfondie. NE CONDENSE PAS AU POINT DE PERDRE DES INFORMATIONS.
-   - Préserve TOUS les détails techniques, paramètres, comportements sous le capot, cas limites, exceptions et subtilités abordés dans l'input brut.
-   - Si l'input contient des timestamps (ex: 00:00 - 01:23) ou est une retranscription orale :
-     * Traduis et synthétise TOUT en français technique impeccable, fluide et naturel.
-     * Élimine les bruits oraux ("Welcome back", transitions orales, répétitions, timestamps), mais CONSERVE INTÉGRALEMENT la substance pédagogique et chaque explication de code.
+1. TRAITEMENT D'UNE NOTE DÉJÀ STRUCTURÉE OU RÉSUMÉE :
+   - Si l'entrée utilisateur contient déjà une note (ex: 🔵 Titre, 🟢 Résumé, etc.) :
+     * RESPECTE STRICTEMENT l'intégralité des explications, des points numérotés, des analogies, des comparaisons et des exemples de l'auteur. NE RÉDUIS PAS, NE CONDENSE PAS AU DÉTRIMENT DU SENS.
+     * FORMATAGE DES MINI-BLOCS DE CODE : Tous les blocs précédés du mot "python" ou placés entre deux paragraphes doivent impérativement être formatés dans un vrai bloc Markdown \`\`\`python ... \`\`\` avec leurs sorties commentées (# → ...). JAMAIS de mot "python" isolé en texte simple !
+     * FORMATAGE DES SCHÉMAS : Les schémas de flux fléchés séquentiels doivent être formatés en bloc \`\`\`flow avec les cartes sémantiques [slate], [emerald], [indigo], [terracotta]. Les diagrammes ASCII complexes (arborescences, grilles) doivent être mis dans un bloc \`\`\`text.
+     * EXTRAIS LE CODE COMPLET : Place le script principal dans "snippets" sous le titre de '⚪ Titre', et génère des annotations précises pour les sections numérotées (# --- 1) ... ---).
 
-2. STRUCTURE PÉDAGOGIQUE DU CHAMP "content" (Markdown Haute Précision) :
-   Structure le texte avec clarté et exhaustivité en suivant ces principes :
+2. TRAITEMENT D'UNE TRANSCRIPTION BRUTE OU SUJET :
+   - Produis une fiche de cours de référence "Staff Engineer / DataCamp", approfondie, claire, visuelle et extrêmement pédagogique.
+   - Traduis et synthétise en français technique impeccable sans bruit oral.
+   - Insère des micro-blocs de code commentés (\`\`\`python ... \`\`\`) avec sorties "# → ...".
+   - Schématise le pipeline dans un bloc \`\`\`flow (avec cartes colorées).
+   - Fournis le script complet exécutable dans "snippets" avec des sous-notes précises (annotations) sur les lignes clés.
 
-   - MICRO-BLOCS DE CODE COMMENTÉS INTERCALÉS (RÈGLE MAJEURE DE COMPRÉHENSION) :
-     * Dès qu'un concept s'appuie sur du code (comparaison de syntaxe, accès à des données, opération vectorisée vs boucle, gestion d'erreurs), INSÈRE IMMÉDIATEMENT un mini-bloc de code commenté directement dans le paragraphe (ex: \`\`\`python ... \`\`\`).
-     * Chaque mini-bloc doit comporter des commentaires concis et les sorties attendues avec "# → résultat" ou "# → TypeError: ...".
-     * Le lecteur doit voir immédiatement le code concret sous les yeux, sans devoir imaginer mentalement la syntaxe ou attendre la fin de la note.
+3. STRUCTURE PÉDAGOGIQUE DU CHAMP "content" (Markdown Haute Précision) :
+   - Titres H3 clairs (### 1) ..., ### Le problème que ça résout, etc.).
+   - Alertes GitHub (> [!NOTE] pour les analogies, > [!TIP] pour les bonnes pratiques).
+   - Schémas visuels de flux (\`\`\`flow) ou schémas ASCII (\`\`\`text).
 
-   - SCHÉMAS VISUELS DE FLUX (CARTES DE FLUX FLÉCHÉES) :
-     * Si la notion implique des étapes séquentielles, un pipeline ou un flux de données (ex: Client -> Requête API -> Objet réponse -> Extraction texte), génère un schéma visuel dans un bloc \`\`\`flow :
-       \`\`\`flow
-       [Client OpenAI | instancié via OpenAI(api_key=...) | slate]
-       ↓
-       [chat.completions.create() | envoie model + messages | emerald]
-       ↓
-       [Objet réponse (ChatCompletion) | choices, id, model, created... | indigo]
-       ↓
-       [.choices[0].message.content | le texte généré (str) | terracotta]
-       \`\`\`
-     * Si c'est un schéma conceptuel ou arborescent, utilise un diagramme ASCII Unicode clair (\`\`\`text ... \`\`\`).
-
-   - SECTIONS STRUCTURANTES :
-     * ### Le problème que ça résout
-     * ### Qu'est-ce que [Nom du concept] ?
-     * > [!NOTE]
-       > **Analogie intuitive** : Une analogie concrète, visuelle et marquante.
-     * ### Fonctionnement détaillé & Mécanismes (avec les mini-blocs de code commentés)
-     * ### Pièges courants & Bonnes pratiques
-     * ### Vérification pratique & Inspection
-
-3. CODE SOURCE COMPLET DU COURS & SOUS-NOTES (champ "snippets") :
-   - Fournis le script complet "mini-cours" qui rejoue TOUTE la leçon en un seul morceau cohérent et exécutable.
-   - Fournis des sous-notes précises ("annotations") sur les lignes clés :
-     * 'line' : Numéro de ligne exact (1-indexed).
-     * 'text' : Rappel court du code ciblé.
-     * 'fullContext' : Explication approfondie du "pourquoi", du mécanisme interne et des pièges, avec les identifiants entre \`backticks\`.
-     * 'type' : 'important', 'warning' (piège), 'tip' (astuce) ou 'logic'.
+4. CODE SOURCE COMPLET & ANNOTATIONS (champ "snippets") :
+   - 'title' : Titre clair du script.
+   - 'language' : 'python'.
+   - 'code' : Le script complet commenté.
+   - 'annotations' : Tableau d'annotations avec 'line', 'text', 'fullContext', 'type' ('logic', 'important', 'warning', 'tip'), 'color'.
 
 Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans texte avant ou après) :
 {
   "title": "Titre en français clair",
   "tags": ["tag1", "tag2", "tag3"],
   "moduleName": "Python / Sujet",
-  "content": "Contenu Markdown structuré avec micro-blocs de code, analogie, explications approfondies, pièges, et schéma de flux...",
+  "content": "Contenu Markdown structuré...",
   "snippets": [
     {
       "title": "Titre du script complet de cours",
@@ -1008,7 +1044,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
           "line": 4,
           "endLine": 4,
           "text": "Code court",
-          "fullContext": "Explication avec \`identifiants\`",
+          "fullContext": "Explication approfondie...",
           "type": "important",
           "color": "#f43f5e"
         }

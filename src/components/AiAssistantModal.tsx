@@ -123,87 +123,127 @@ export const DevNotesAiEmblem = ({ isThinking = false, size = "md" }: { isThinki
 };
 
 const DEFAULT_EXAMPLE_INPUT = `🔵 Titre
-Les fonctions en tant qu'objets (les bases avant les décorateurs)
+La puissance des tableaux NumPy
 
 🟡 Tags
-fonction objet, fonction variable, fonction argument, fonction imbriquée, fonction valeur de retour
+NumPy, tableau NumPy, homogénéité, dtype, broadcasting, indexation, indexation booléenne, masque booléen
 
 🟢 Résumé
 
-L'idée centrale, en une phrase
+Qu'est-ce que NumPy, et pourquoi s'y intéresser ?
 
-En Python, une fonction n'est pas un "truc à part" avec des règles spéciales. Une fonction, c'est un objet — exactement comme un nombre (5), une chaîne de texte ("bonjour"), ou une liste ([1, 2, 3]). Et comme tout objet en Python, on peut la stocker, la déplacer, la donner à quelqu'un d'autre, ou la recevoir en retour.
+NumPy (pour Numerical Python) est un package Python fondamental pour le calcul scientifique. C'est un outil indispensable pour les data scientists, car il offre des avantages majeurs liés à l'efficacité du code et de la mémoire. L'élément central est le tableau NumPy (NumPy array).
 
-Cette idée est la base indispensable pour comprendre les décorateurs plus tard.
-
-1. Une fonction peut être rangée dans une variable
-2. Une fonction peut être rangée dans une liste ou un dictionnaire
-3. Un détail crucial : avec ou sans parenthèses ()
-4. On peut donner une fonction en argument à une autre fonction
-5. On peut définir une fonction à l'intérieur d'une autre fonction
-6. Une fonction peut renvoyer... une autre fonction
-
-🔴 Bloc logique du code
-⚪ Titre : Manipuler des fonctions comme n'importe quel autre objet
+Convention universelle : on importe NumPy sous l'alias np, et on crée un tableau avec np.array(...) :
 
 python
-# --- 1) Assigner une fonction à une variable ---
-def my_function():
-    print("Bonjour !")
+import numpy as np
 
-x = my_function          # PAS de parenthèses : on copie juste "l'étiquette"
-x()                        # → "Bonjour !"   (appeler x() = appeler my_function())
+nums_np = np.array([1, 2, 3, 4, 5])
+print(nums_np)
+# → [1 2 3 4 5]
 
-# --- 2) Ranger des fonctions dans une liste ou un dictionnaire ---
-list_of_functions = [my_function, open, print]
-list_of_functions[2]("J'appelle print() via la liste")
+Analogie générale : si une liste Python est une boîte fourre-tout (on peut y ranger n'importe quoi sans contrainte), un tableau NumPy est une caisse à compartiments dédiés : chaque compartiment attend exactement le même type d'objet, ce qui élimine les vérifications internes et accélère considérablement l'accès en mémoire.
 
-dict_of_functions = {
-    'func1': my_function,
-    'func2': open,
-    'func3': print
-}
-dict_of_functions['func3']("J'appelle print() via le dictionnaire")
+1) L'homogénéité : la première grande différence avec les listes
 
-# --- 3) La différence entre "my_function" et "my_function()" ---
-print(my_function)       # → affiche l'OBJET fonction lui-même
-print(my_function())     # → EXÉCUTE la fonction
+Les tableaux NumPy sont homogènes : ils doivent contenir des éléments du même type. On vérifie ce type avec la méthode .dtype.
+Si on mélange des types, NumPy convertit automatiquement vers un type commun compatible :
 
-# --- 4) Passer une fonction en argument à une autre fonction ---
-def has_docstring(func):
-    return func.__doc__ is not None
+python
+nums_np_floats = np.array([1, 3, 2.5])
+print(nums_np_floats)
+# → [1.  3.  2.5]
+print(nums_np_floats.dtype)
+# → float64
 
-def no():
-    return 42
+2) Le broadcasting : appliquer une opération à tous les éléments d'un coup
 
-def yes():
-    """Moi, j'ai une docstring !"""
-    return 42
+Les tableaux NumPy vectorisent les opérations : elles sont exécutées simultanément sur tous les éléments, en une seule instruction C optimisée :
 
-print(has_docstring(no))
-print(has_docstring(yes))
+python
+nums_np = np.array([1, 2, 3, 4, 5])
+sqrd_nums_np = nums_np ** 2
+print(sqrd_nums_np)
+# → [ 1  4  9 16 25]
 
-# --- 5) Définir une fonction À L'INTÉRIEUR d'une autre fonction ---
-def foo(x, y):
-    def in_range(v):
-        return 0 < v < 10
-    if in_range(x) and in_range(y):
-        print(x * y)
+3) L'indexation multi-dimensionnelle compacte
 
-# --- 6) Une fonction qui RENVOIE une autre fonction ---
-def get_function():
-    def print_me(s):
-        print(s)
-    return print_me
+python
+nums2d_np = np.array([[1, 2, 3], [4, 5, 6]])
+# Récupérer le 2e élément de la 1ère ligne
+print(nums2d_np[0, 1])
+# → 2
+# Récupérer toute la première colonne
+print(nums2d_np[:, 0])
+# → [1 4]
 
-new_func = get_function()
-new_func("Ceci fonctionne !")
+4) L'indexation booléenne : filtrer avec une simple inégalité
 
-⚫ Ligne x = my_function : il n'y a pas de parenthèses. Si on écrivait x = my_function(), on exécuterait la fonction tout de suite, et x contiendrait le résultat.
-⚫ list_of_functions[2]("...") : d'abord list_of_functions[2] va chercher la fonction print, puis les parenthèses l'exécutent.
-⚫ has_docstring(func) : func est un nom de variable qui pointe vers la fonction passée en argument.
-⚫ def in_range(v): à l'intérieur de foo() : cette fonction imbriquée n'existe que pendant l'exécution de foo().
-⚫ return print_me (sans parenthèses) : on renvoie la fonction elle-même, pas son résultat.`;
+python
+nums_mixed = np.array([-2, -1, 0, 1, 2, 3])
+mask = nums_mixed > 0
+print(mask)
+# → [False False False  True  True  True]
+
+positive_nums = nums_mixed[nums_mixed > 0]
+print(positive_nums)
+# → [1 2 3]
+
+Schéma — les quatre avantages clés des tableaux NumPy
+
+\`\`\`flow
+[HOMOGÉNÉITÉ | Éléments du même type (.dtype) → Zéro vérification de type = vitesse et mémoire optimisées | slate]
+↓
+[BROADCASTING | Opération vectorisée appliquée à tous les éléments simultanément | emerald]
+↓
+[INDEXATION MULTI-DIM | Syntaxe compacte tableau[0, 1] et slicing de colonne tableau[:, 0] | indigo]
+↓
+[INDEXATION BOOLÉENNE | Filtrage direct par masque conditionnel tableau[tableau > 0] | terracotta]
+\`\`\`
+
+🔴 Bloc logique du code
+
+⚪ Titre : Découvrir l'homogénéité, le broadcasting, l'indexation et l'indexation booléenne des tableaux NumPy
+
+python
+import numpy as np
+
+# --- 1) Création d'un tableau NumPy basique ---
+nums_np = np.array([1, 2, 3, 4, 5])
+print(nums_np)
+# → [1 2 3 4 5]
+print(nums_np.dtype)
+# → int64
+
+# --- 2) Homogénéité : mélange d'entiers et d'un flottant ---
+nums_np_floats = np.array([1, 3, 2.5])
+print(nums_np_floats)
+# → [1.  3.  2.5]
+print(nums_np_floats.dtype)
+# → float64
+
+# --- 3) Broadcasting : élever chaque élément au carré sans boucle ---
+nums = [1, 2, 3, 4, 5]
+sqrd_nums_np = nums_np ** 2
+print(sqrd_nums_np)
+# → [ 1  4  9 16 25]
+
+# --- 4) Indexation : tableau bidimensionnel ---
+nums2d_np = np.array([[1, 2, 3], [4, 5, 6]])
+print(nums2d_np[0, 1])
+# → 2
+print(nums2d_np[:, 0])
+# → [1 4]
+
+# --- 5) Indexation booléenne : filtrer les nombres positifs ---
+nums_mixed = np.array([-2, -1, 0, 1, 2, 3])
+mask = nums_mixed > 0
+print(mask)
+# → [False False False  True  True  True]
+positive_nums = nums_mixed[nums_mixed > 0]
+print(positive_nums)
+# → [1 2 3]`;
 
 export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   isOpen,
@@ -1090,75 +1130,30 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </div>
                 </div>
 
-                {/* Generation Mode Selector */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold">
-                    <span>Mode d'Importation :</span>
-                    <span className="font-mono text-[10px] text-blue-500 dark:text-blue-400 font-semibold">
-                      {generationMode === 'verbatim' 
-                        ? '1:1 Strict sans altération' 
-                        : generationMode === 'transcription' 
-                        ? 'Rédaction IA + Code intercalé' 
-                        : 'Détection intelligente'}
-                    </span>
+                {/* Intelligent AI Ingestion Indicator */}
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-zinc-600 dark:text-zinc-300 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                      <Zap className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div className="flex flex-col">
+                      {inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique')) ? (
+                        <>
+                          <span className="font-semibold text-blue-600 dark:text-blue-400 text-xs">Note structurée détectée</span>
+                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Intégration fidèle 1:1, micro-blocs de code et schémas visuels optimisés sans altérer votre texte.</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-semibold text-foreground text-xs">Intégration Universelle Intelligente</span>
+                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Détection automatique : note rédigée, transcription vidéo brute, ou code.</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-secondary/40 border border-border/70 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setGenerationMode('auto')}
-                      className={cn(
-                        "py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1",
-                        generationMode === 'auto'
-                          ? "bg-background text-foreground shadow-xs border border-border/80"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      title="Détecte automatiquement si la note est déjà structurée (1:1) ou s'il faut la rédiger depuis un transcript brut"
-                    >
-                      <Zap className="w-3 h-3 text-blue-500" />
-                      <span>Auto</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setGenerationMode('verbatim')}
-                      className={cn(
-                        "py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 text-center",
-                        generationMode === 'verbatim'
-                          ? "bg-blue-600 text-white shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      title="Conserve intégralement votre note telle que vous l'avez écrite. Zéro re-résumé par l'IA !"
-                    >
-                      <Check className="w-3 h-3" />
-                      <span>Verbatim 1:1</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setGenerationMode('transcription')}
-                      className={cn(
-                        "py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1",
-                        generationMode === 'transcription'
-                          ? "bg-background text-foreground shadow-xs border border-border/80"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      title="Pour vidéo/audio brut : rédaction complète avec micro-blocs de code et schémas conceptuels"
-                    >
-                      <Sparkles className="w-3 h-3 text-blue-400" />
-                      <span>Transcription IA</span>
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-400/20 shrink-0 font-medium">
+                    Auto-Intelligent
+                  </span>
                 </div>
-
-                {/* Preformatted Note Detected Indicator */}
-                {(inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique'))) && (
-                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2 animate-in fade-in duration-200">
-                    <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span className="leading-tight">
-                      <strong>Note structurée détectée</strong> : Préservation 1:1 garantie. Vos explications et micro-blocs de code seront importés fidèlement sans modification.
-                    </span>
-                  </div>
-                )}
 
                 <textarea
                   placeholder="Collez votre contenu de note, le format Titre, Tags, Résumé, Code ou chargez la note active pour la restructurer..."
@@ -1196,23 +1191,12 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {isProcessing ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      {generationMode === 'verbatim' || (generationMode === 'auto' && (inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique'))))
-                        ? "Importation 1:1 fidèle en cours..."
-                        : "Analyse et structuration par l'IA..."}
+                      <span>Analyse et structuration par l'IA...</span>
                     </>
                   ) : (
                     <>
-                      {generationMode === 'verbatim' || (generationMode === 'auto' && (inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique')))) ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>Importer fidèlement (Verbatim 1:1 sans altération)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4" strokeWidth={1.5} />
-                          <span>Générer et Structurer la Note avec l'IA</span>
-                        </>
-                      )}
+                      <Zap className="w-4 h-4" strokeWidth={1.5} />
+                      <span>Structurer et Intégrer la Note avec l'IA</span>
                     </>
                   )}
                 </button>
