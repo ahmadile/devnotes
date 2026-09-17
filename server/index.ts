@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
-import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept } from './aiService.js';
+import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept, ingestCurriculumFromImageOrText } from './aiService.js';
 import dns from 'dns';
 
 // Force IPv4 resolution to prevent Node.js 18+ from hanging on Clerk API/JWKS fetch via IPv6
@@ -117,16 +117,26 @@ const app = express();
 
   app.post('/api/ai/process-note', async (req, res) => {
     try {
-      const { input, modules, syntaxDefinitions, provider, apiKey, model, ollamaUrl } = req.body || {};
+      const { input, mode, modules, syntaxDefinitions, provider, apiKey, model, ollamaUrl } = req.body || {};
       if (!input || typeof input !== 'string') {
         res.status(400).json({ error: 'Input text is required' });
         return;
       }
 
-      const result = await processNoteWithAI({ input, modules: modules || [], syntaxDefinitions, provider, apiKey, model, ollamaUrl });
+      const result = await processNoteWithAI({ input, mode, modules: modules || [], syntaxDefinitions, provider, apiKey, model, ollamaUrl });
       res.json({ ok: true, note: result });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Processing error' });
+    }
+  });
+
+  app.post('/api/ai/ingest-curriculum', async (req, res) => {
+    try {
+      const { image, text, provider, apiKey, model } = req.body || {};
+      const result = await ingestCurriculumFromImageOrText({ image, text, provider, apiKey, model });
+      res.json({ ok: true, curriculum: result });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Curriculum Ingestion error' });
     }
   });
 

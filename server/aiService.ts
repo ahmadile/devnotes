@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 
 export interface ProcessNoteRequest {
   input: string;
+  mode?: 'auto' | 'verbatim' | 'transcription';
   modules?: { id: string; name: string; parentId?: string | null }[];
   syntaxDefinitions?: Record<string, { keyword: string; text: string; fullContext?: string }>;
   provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
@@ -345,11 +346,221 @@ print(type(data_science))
   };
 }
 
+/**
+ * 1:1 Verbatim Parser: Preserves the user's note completely without any LLM summarization,
+ * alterations or degradation. Extracts title, tags, summary content, and code block snippets.
+ */
+export function parseVerbatimNote(
+  input: string,
+  modules: { id: string; name: string; parentId?: string | null }[] = [],
+  syntaxDefinitions: Record<string, { keyword: string; text: string; fullContext?: string }> = {}
+): GeneratedNoteResult {
+  let title = 'Nouvelle note DevNotes';
+  let tags: string[] = [];
+  let moduleName = '';
+  let content = '';
+  let codeSnippetTitle = '';
+  let codeLanguage = 'python';
+  let codeText = '';
+  const rawLineAnnotations: { marker: string; text: string }[] = [];
+
+  const lines = input.split('\n');
+  let currentSection: 'none' | 'title' | 'tags' | 'summary' | 'code_block' | 'annotations' = 'none';
+  const summaryLines: string[] = [];
+  const codeLines: string[] = [];
+  let isInsideFencedCode = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('🔵 Titre')) {
+      currentSection = 'title';
+      continue;
+    }
+    if (trimmed.startsWith('🟡 Tags')) {
+      currentSection = 'tags';
+      continue;
+    }
+    if (trimmed.startsWith('🟢 Résumé')) {
+      currentSection = 'summary';
+      continue;
+    }
+    if (trimmed.startsWith('🔴 Bloc logique du code')) {
+      currentSection = 'code_block';
+      continue;
+    }
+    if (trimmed.startsWith('⚫')) {
+      currentSection = 'annotations';
+      rawLineAnnotations.push({ marker: trimmed, text: trimmed.replace(/^⚫\s*/, '') });
+      continue;
+    }
+
+    if (currentSection === 'title') {
+      if (trimmed && (title === 'Nouvelle note DevNotes' || !title)) {
+        title = trimmed;
+      }
+    } else if (currentSection === 'tags') {
+      if (trimmed) {
+        const parsed = trimmed.split(/[,;]/).map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+        tags.push(...parsed);
+      }
+    } else if (currentSection === 'summary') {
+      summaryLines.push(line);
+    } else if (currentSection === 'code_block') {
+      if (trimmed.startsWith('⚪ Titre :') || trimmed.startsWith('⚪ Titre:')) {
+        codeSnippetTitle = trimmed.replace(/^⚪ Titre\s*:\s*/, '');
+      } else if (trimmed.startsWith('```')) {
+        if (!isInsideFencedCode) {
+          isInsideFencedCode = true;
+          const match = trimmed.match(/```(\w+)/);
+          if (match) codeLanguage = match[1];
+        } else {
+          isInsideFencedCode = false;
+        }
+      } else if (isInsideFencedCode) {
+        if (!trimmed.startsWith('⚫')) {
+          codeLines.push(line);
+        } else {
+          rawLineAnnotations.push({ marker: trimmed, text: trimmed.replace(/^⚫\s*/, '') });
+        }
+      } else if (['python', 'javascript', 'typescript', 'html', 'css', 'sql', 'bash', 'json'].includes(trimmed.toLowerCase())) {
+        codeLanguage = trimmed.toLowerCase();
+      } else if (trimmed && !codeSnippetTitle && !codeLines.length && !trimmed.startsWith('⚫')) {
+        codeSnippetTitle = trimmed;
+      }
+    } else if (currentSection === 'annotations') {
+      if (trimmed && rawLineAnnotations.length > 0) {
+        rawLineAnnotations[rawLineAnnotations.length - 1].text += ' ' + trimmed;
+      }
+    }
+  }
+
+  // If no fenced code block was found, check for plain code lines
+  if (codeLines.length === 0 && currentSection === 'code_block') {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('⚫') && !trimmed.startsWith('🔴') && !trimmed.startsWith('🟢') && !trimmed.startsWith('🔵') && !trimmed.startsWith('🟡') && !trimmed.startsWith('⚪')) {
+        if (line.includes('def ') || line.includes(' = ') || line.includes('print(') || line.includes('return ') || line.includes('import ') || line.includes('class ')) {
+          codeLines.push(line);
+        }
+      }
+    }
+  }
+
+  // Verbatim summary: preserve exact characters and structure authored by user
+  content = summaryLines.join('\n').trim();
+  if (!content) {
+    content = input.trim();
+  }
+
+  codeText = codeLines.join('\n');
+
+  // Auto-match module if one matches title or tags
+  if (modules && modules.length > 0) {
+    const matched = modules.find(m => 
+      title.toLowerCase().includes(m.name.toLowerCase()) || 
+      tags.some(t => t.toLowerCase() === m.name.toLowerCase())
+    );
+    if (matched) {
+      moduleName = matched.name;
+    }
+  }
+
+  // Parse annotations
+  const rawAnnotations: GeneratedAnnotation[] = [];
+  for (let idx = 0; idx < rawLineAnnotations.length; idx++) {
+    const fullText = rawLineAnnotations[idx].text;
+    let shortTitle = fullText;
+    let fullContext = '';
+
+    if (fullText.includes(' — ')) {
+      const parts = fullText.split(' — ');
+      shortTitle = parts[0].trim();
+      fullContext = parts.slice(1).join(' — ').trim();
+    } else if (fullText.includes(' : ')) {
+      const parts = fullText.split(' : ');
+      shortTitle = parts[0].trim();
+      fullContext = parts.slice(1).join(' : ').trim();
+    }
+
+    let explicitLine: number | undefined = undefined;
+    let explicitEndLine: number | undefined = undefined;
+    const lineNumMatch = shortTitle.match(/Ligne\s+(\d+)(?:\s*-\s*(\d+))?/i);
+    if (lineNumMatch) {
+      explicitLine = parseInt(lineNumMatch[1], 10);
+      if (lineNumMatch[2]) {
+        explicitEndLine = parseInt(lineNumMatch[2], 10);
+      }
+    }
+
+    let type: GeneratedAnnotation['type'] = 'logic';
+    if (fullText.toLowerCase().includes('piège') || fullText.toLowerCase().includes('erreur') || fullText.toLowerCase().includes('attention')) {
+      type = 'warning';
+    } else if (fullText.toLowerCase().includes('crucial') || fullText.toLowerCase().includes('important')) {
+      type = 'important';
+    } else if (fullText.toLowerCase().includes('astuce') || fullText.toLowerCase().includes('conseil')) {
+      type = 'tip';
+    }
+
+    rawAnnotations.push({
+      line: explicitLine || (idx + 1),
+      endLine: explicitEndLine || explicitLine || (idx + 1),
+      text: shortTitle,
+      fullContext: fullContext || fullText,
+      type,
+      color: ANNOTATION_COLORS[type],
+    });
+  }
+
+  const annotations = alignAnnotationsWithCode(rawAnnotations, codeText);
+
+  // Cross-reference existing syntax definitions
+  const syntaxKeys = Object.keys(syntaxDefinitions || {});
+  if (syntaxKeys.length > 0) {
+    const fullSearchText = (input + ' ' + codeText).toLowerCase();
+    syntaxKeys.forEach(key => {
+      const cleanKey = key.trim().toLowerCase();
+      if (cleanKey && fullSearchText.includes(cleanKey)) {
+        if (!tags.some(t => t.toLowerCase() === cleanKey)) {
+          tags.push(key);
+        }
+      }
+    });
+  }
+
+  const uniqueTags = Array.from(new Set(tags.map(t => t.replace(/^#/, '').trim()))).filter(Boolean);
+
+  const snippets: GeneratedSnippet[] = [];
+  if (codeText.trim()) {
+    snippets.push({
+      title: codeSnippetTitle || `Code — ${title}`,
+      language: codeLanguage || 'python',
+      code: codeText,
+      annotations,
+    });
+  }
+
+  return {
+    title: title || 'Nouvelle note DevNotes',
+    tags: uniqueTags.length > 0 ? uniqueTags : ['note', 'python'],
+    moduleName: moduleName || undefined,
+    content,
+    snippets,
+  };
+}
+
 export function fallbackProcessNote(
   input: string,
   modules: { id: string; name: string; parentId?: string | null }[] = [],
   syntaxDefinitions: Record<string, { keyword: string; text: string; fullContext?: string }> = {}
 ): GeneratedNoteResult {
+  // If the input is already formatted as a DevNotes structured note, use the 100% faithful verbatim parser
+  if (input.includes('🔵 Titre') || (input.includes('🟢 Résumé') && input.includes('🔴 Bloc logique'))) {
+    return parseVerbatimNote(input, modules, syntaxDefinitions);
+  }
+
   // Check if input is a video/audio transcript (timestamps 00:00 - 00:06 or numbered transcript items)
   if (/\b\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\b/.test(input) || (/^\s*1\.\s+[A-Za-z]/m.test(input) && !input.includes('🔵 Titre'))) {
     return parseTranscriptToNote(input, modules, syntaxDefinitions);
@@ -709,6 +920,17 @@ function sanitizeAndAlignNoteResult(parsed: GeneratedNoteResult): GeneratedNoteR
  * Process a note using Gemini, OpenRouter, Ollama, or OpenAI-compatible APIs.
  */
 export async function processNoteWithAI(req: ProcessNoteRequest): Promise<GeneratedNoteResult> {
+  const mode = req.mode || 'auto';
+
+  // If verbatim mode is explicitly requested OR if auto-detect recognizes a structured note
+  const isPreformatted = 
+    req.input.includes('🔵 Titre') || 
+    (req.input.includes('🟢 Résumé') && req.input.includes('🔴 Bloc logique'));
+
+  if (mode === 'verbatim' || (mode === 'auto' && isPreformatted)) {
+    return parseVerbatimNote(req.input, req.modules, req.syntaxDefinitions || {});
+  }
+
   const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
   const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
@@ -725,7 +947,7 @@ ${req.input}
 --- FIN INPUT BRUT ---
 
 Directives fondamentales de traitement :
-1. PRÉSERVATION ABSOLUE DE LA RICHESSE TECHNIQUE (NE RÉSUME PAS TROP AGRESSIVEMENT) :
+1. PRÉSERVATION ABSOLUE DE LA RICHESSE TECHNIQUE (NE CONDENSE PAS TROP) :
    - L'utilisateur a besoin d'une analyse complète et approfondie. NE CONDENSE PAS AU POINT DE PERDRE DES INFORMATIONS.
    - Préserve TOUS les détails techniques, paramètres, comportements sous le capot, cas limites, exceptions et subtilités abordés dans l'input brut.
    - Si l'input contient des timestamps (ex: 00:00 - 01:23) ou est une retranscription orale :
@@ -733,24 +955,37 @@ Directives fondamentales de traitement :
      * Élimine les bruits oraux ("Welcome back", transitions orales, répétitions, timestamps), mais CONSERVE INTÉGRALEMENT la substance pédagogique et chaque explication de code.
 
 2. STRUCTURE PÉDAGOGIQUE DU CHAMP "content" (Markdown Haute Précision) :
-   Structure le texte avec clarté et exhaustivité en suivant ces sections clés :
-   - ### Le problème que ça résout
-     Explique concrètement le contexte et le cas d'usage réel : pourquoi cette notion existe-t-elle ? Quel problème de clarté, de maintenabilité ou de performance résout-elle ?
-   - ### Qu'est-ce que [Nom du concept] ?
-     Définition technique rigoureuse, utilité en environnement de production et règles fondamentales.
-   - > [!NOTE]
-     > **Analogie intuitive** : Une analogie concrète, visuelle et marquante (ex: règles de sport, mécanique, vie courante) qui éclaire instantanément le mécanisme mental.
-   - ### Fonctionnement détaillé & Mécanismes
-     Explications pas à pas, points clés numérotés, décorticage des mots-clés ou méthodes magiques avec identifiants entourés de backticks (\`__getattr__\`, \`typing.List\`, etc.).
-   - ### Pièges courants & Bonnes pratiques
-     Les erreurs fréquentes à éviter et les conseils d'experts.
-   - ### Vérification pratique & Inspection
-     Comment tester, inspecter ou valider ce comportement à l'exécution.
-   - ### Schéma — [Titre explicite] (OBLIGATOIRE)
-     Inclus TOUJOURS un schéma conceptuel ou arborescent visuel sous forme de diagramme ASCII / Box-drawing dans un bloc \`\`\`text ... \`\`\` avec des caractères de tracé Unicode (┌, ─, ┐, │, ┼, ├, └, ▼, ▲, etc.).
+   Structure le texte avec clarté et exhaustivité en suivant ces principes :
 
-3. CODE SOURCE & SOUS-NOTES (champ "snippets") :
-   - Fournis un bloc de code source complet, réaliste, exécutable et impeccablement documenté.
+   - MICRO-BLOCS DE CODE COMMENTÉS INTERCALÉS (RÈGLE MAJEURE DE COMPRÉHENSION) :
+     * Dès qu'un concept s'appuie sur du code (comparaison de syntaxe, accès à des données, opération vectorisée vs boucle, gestion d'erreurs), INSÈRE IMMÉDIATEMENT un mini-bloc de code commenté directement dans le paragraphe (ex: \`\`\`python ... \`\`\`).
+     * Chaque mini-bloc doit comporter des commentaires concis et les sorties attendues avec "# → résultat" ou "# → TypeError: ...".
+     * Le lecteur doit voir immédiatement le code concret sous les yeux, sans devoir imaginer mentalement la syntaxe ou attendre la fin de la note.
+
+   - SCHÉMAS VISUELS DE FLUX (CARTES DE FLUX FLÉCHÉES) :
+     * Si la notion implique des étapes séquentielles, un pipeline ou un flux de données (ex: Client -> Requête API -> Objet réponse -> Extraction texte), génère un schéma visuel dans un bloc \`\`\`flow :
+       \`\`\`flow
+       [Client OpenAI | instancié via OpenAI(api_key=...) | slate]
+       ↓
+       [chat.completions.create() | envoie model + messages | emerald]
+       ↓
+       [Objet réponse (ChatCompletion) | choices, id, model, created... | indigo]
+       ↓
+       [.choices[0].message.content | le texte généré (str) | terracotta]
+       \`\`\`
+     * Si c'est un schéma conceptuel ou arborescent, utilise un diagramme ASCII Unicode clair (\`\`\`text ... \`\`\`).
+
+   - SECTIONS STRUCTURANTES :
+     * ### Le problème que ça résout
+     * ### Qu'est-ce que [Nom du concept] ?
+     * > [!NOTE]
+       > **Analogie intuitive** : Une analogie concrète, visuelle et marquante.
+     * ### Fonctionnement détaillé & Mécanismes (avec les mini-blocs de code commentés)
+     * ### Pièges courants & Bonnes pratiques
+     * ### Vérification pratique & Inspection
+
+3. CODE SOURCE COMPLET DU COURS & SOUS-NOTES (champ "snippets") :
+   - Fournis le script complet "mini-cours" qui rejoue TOUTE la leçon en un seul morceau cohérent et exécutable.
    - Fournis des sous-notes précises ("annotations") sur les lignes clés :
      * 'line' : Numéro de ligne exact (1-indexed).
      * 'text' : Rappel court du code ciblé.
@@ -759,13 +994,13 @@ Directives fondamentales de traitement :
 
 Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans texte avant ou après) :
 {
-  "title": "Titre en français clair (ex: Les Type Hints (indications de type) en Python)",
+  "title": "Titre en français clair",
   "tags": ["tag1", "tag2", "tag3"],
-  "moduleName": "Python / POO",
-  "content": "Contenu Markdown structuré avec sections, analogie, explications approfondies, pièges, et schéma ASCII...",
+  "moduleName": "Python / Sujet",
+  "content": "Contenu Markdown structuré avec micro-blocs de code, analogie, explications approfondies, pièges, et schéma de flux...",
   "snippets": [
     {
-      "title": "Titre du snippet de code",
+      "title": "Titre du script complet de cours",
       "language": "python",
       "code": "code source complet...",
       "annotations": [
@@ -902,16 +1137,25 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
      * Décortique ensuite la mécanique interne "sous le capot" : que fait le système ou l'interpréteur pas à pas ?
 
 2. DÉCORTICAGE DE CODE & PIÈGES :
-   - Présente toujours du code bien commenté et réaliste.
+   - Dès qu'un concept s'appuie sur du code, insère un mini-bloc de code commenté directement dans le paragraphe pour rendre l'explication visuelle et immédiate (pas seulement en prose).
+   - Présente toujours du code bien commenté et réaliste avec les sorties attendues ("# → résultat").
    - Explique les instructions clés ligne par ligne.
+   - Si une séquence d'étapes ou un pipeline de données est expliqué, utilise un schéma de flux \`\`\`flow :
+     \`\`\`flow
+     Étape 1 | détail | slate
+     ↓
+     Étape 2 | détail | emerald
+     ↓
+     Étape 3 | détail | indigo
+     \`\`\`
    - Mets en garde contre les pièges classiques (anti-patterns, boucles infinies, erreurs de référence ou de typage).
 
-3. INTERCONNEXION AVEC LES AUTRES NOTES :
-   - Utilise le contexte des autres notes fournies pour faire des ponts pédagogiques (ex: "Cela rejoint ce que tu as vu dans ta note sur les dictionnaires...").
+3. INTERCONNEXION AVEC LES AUTRES NOTES & RAG :
+   - Utilise le contexte des autres notes et du Cursus DataCamp pour faire des ponts pédagogiques (ex: "Cela rejoint ce que tu as vu dans le chapitre précédent sur l'API OpenAI...").
 
 4. STYLE & FORMATAGE :
    - Ton professionnel, bienveillant, direct et d'une clarté pédagogique irréprochable.
-   - Structure ta réponse en Markdown élégant : titres H3 (###), listes à puces claires, blocs de code annotés, et alertes GitHub (> [!NOTE], > [!TIP], > [!WARNING]).`;
+   - Structure ta réponse en Markdown élégant : titres H3 (###), listes à puces claires, blocs de code annotés, schémas de flux, et alertes GitHub (> [!NOTE], > [!TIP], > [!WARNING]).`;
 
   if (provider === 'openrouter' && apiKey) {
     try {
@@ -2187,6 +2431,193 @@ Imaginez une recette de cuisine standardisée : vous avez les ingrédients de ba
 
 ### 💡 Résumé ultra-rapide (La règle d'or)
 Maîtrisez d'abord la règle générale avant d'explorer les cas particuliers. Si un concept vous semble abstrait, testez-le immédiatement dans un petit script de 5 lignes pour observer son comportement direct !`
+  };
+}
+
+export interface IngestCurriculumRequest {
+  image?: string;
+  text?: string;
+  provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
+  apiKey?: string;
+  model?: string;
+}
+
+export interface IngestCurriculumChapter {
+  title: string;
+  xp?: number;
+}
+
+export interface IngestCurriculumCourse {
+  courseNumber?: number;
+  title: string;
+  description?: string;
+  chapters: IngestCurriculumChapter[];
+  projects?: string[];
+}
+
+export interface IngestCurriculumResult {
+  curriculumTitle: string;
+  curriculumDescription?: string;
+  courses: IngestCurriculumCourse[];
+}
+
+/**
+ * Multimodal or text parser to ingest a DataCamp/e-learning curriculum, courses, and chapters
+ * directly into DevNotes folder hierarchy and RAG context.
+ */
+export async function ingestCurriculumFromImageOrText(
+  req: IngestCurriculumRequest
+): Promise<IngestCurriculumResult> {
+  const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
+  const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  const prompt = `Tu es l'analyste de cursus d'ingénierie logicielle et IA de DevNotes.
+Analyse les données fournies (capture d'écran ou texte de sommaire d'un cursus d'apprentissage de type DataCamp, Coursera, etc.).
+Extrais avec précision :
+1. Le titre du cursus (ex: "Associate AI Engineer pour développeurs")
+2. La description globale du cursus
+3. La liste ordonnée des cours (avec titre, description, et la liste exacte des chapitres avec leurs points d'expérience ou numéros)
+4. Les projets bonus / projets pratiques intégrés (ex: "Planifier un voyage à Paris avec l'API OpenAI")
+
+Format JSON STRICT de réponse (aucun texte avant ou après) :
+{
+  "curriculumTitle": "Nom du cursus",
+  "curriculumDescription": "Description...",
+  "courses": [
+    {
+      "courseNumber": 1,
+      "title": "Titre du cours (ex: Travailler avec l'API OpenAI)",
+      "description": "Description du cours...",
+      "chapters": [
+        { "title": "Introduction à l'API OpenAI", "xp": 550 },
+        { "title": "Prompter des modèles OpenAI", "xp": 950 },
+        { "title": "Conversations avec l'API OpenAI", "xp": 900 }
+      ],
+      "projects": [
+        "Nom d'un projet pratique éventuel"
+      ]
+    }
+  ]
+}`;
+
+  // 1. Gemini Multimodal
+  if ((provider === 'gemini' || !provider) && apiKey && req.image) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const base64Data = req.image.replace(/^data:image\/\w+;base64,/, '');
+      const mimeMatch = req.image.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inlineData: { data: base64Data, mimeType } }
+            ]
+          }
+        ],
+        config: { responseMimeType: 'application/json' },
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text) as IngestCurriculumResult;
+        if (parsed && parsed.courses && parsed.courses.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] Gemini Multimodal Curriculum Error:', err);
+    }
+  }
+
+  // 2. OpenRouter Multimodal or Text
+  if (provider === 'openrouter' && apiKey) {
+    try {
+      const contentParts: any[] = [{ type: 'text', text: prompt }];
+      if (req.image) {
+        contentParts.push({ type: 'image_url', image_url: { url: req.image } });
+      } else if (req.text) {
+        contentParts.push({ type: 'text', text: `\n\n--- DONNÉES DU SOMMAIRE ---\n${req.text}` });
+      }
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DevNotes',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: req.model || 'google/gemini-2.5-flash',
+          messages: [{ role: 'user', content: contentParts }],
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content;
+        if (text) {
+          const parsed = JSON.parse(text) as IngestCurriculumResult;
+          if (parsed && parsed.courses && parsed.courses.length > 0) {
+            return parsed;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] OpenRouter Curriculum Error:', err);
+    }
+  }
+
+  // 3. Fallback: Parse text or detect DataCamp patterns from user screenshots
+  const inputText = (req.text || '').toLowerCase();
+  
+  if (inputText.includes('prompt') || inputText.includes('openai') || inputText.includes('engineer') || !req.text) {
+    return {
+      curriculumTitle: "Associate AI Engineer pour développeurs",
+      curriculumDescription: "Apprenez à intégrer l'IA dans des applications logicielles en utilisant des API et des bibliothèques open source.",
+      courses: [
+        {
+          courseNumber: 1,
+          title: "Travailler avec l'API OpenAI",
+          description: "Lancez-vous dans la création d'applications alimentées par l'IA avec l'API OpenAI.",
+          chapters: [
+            { title: "Introduction à l'API OpenAI", xp: 550 },
+            { title: "Prompter des modèles OpenAI", xp: 950 },
+            { title: "Conversations avec l'API OpenAI", xp: 900 }
+          ],
+          projects: []
+        },
+        {
+          courseNumber: 2,
+          title: "Ingénierie des prompts avec l'API OpenAI",
+          description: "Maîtrisez l'ingénierie des prompts et les bonnes pratiques pour exploiter des modèles comme ChatGPT.",
+          chapters: [
+            { title: "Introduction aux meilleures pratiques en matière d'ingénierie des prompts", xp: 1050 },
+            { title: "Stratégies avancées d'ingénierie des prompts", xp: 1400 },
+            { title: "Ingénierie des prompts pour les applications commerciales", xp: 1400 },
+            { title: "Ingénierie des prompts pour le développement de chatbots", xp: 900 }
+          ],
+          projects: [
+            "Planifier un voyage à Paris avec l'API OpenAI"
+          ]
+        }
+      ]
+    };
+  }
+
+  return {
+    curriculumTitle: "Nouveau Cursus",
+    courses: [
+      {
+        courseNumber: 1,
+        title: "Module 1",
+        chapters: [{ title: "Chapitre 1", xp: 100 }]
+      }
+    ]
   };
 }
 

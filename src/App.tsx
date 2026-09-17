@@ -576,6 +576,17 @@ export default function App() {
     persistNotes(nextNotes, syntaxDefinitions, nextModules);
   };
 
+  const handleImportCurriculum = (newModules: Module[], newNotes: Note[]) => {
+    const nextModules = [...modules, ...newModules];
+    const nextNotes = [...newNotes, ...notes];
+    setModules(nextModules);
+    setNotes(nextNotes);
+    if (newNotes.length > 0) {
+      setActiveNoteId(newNotes[0].id);
+    }
+    persistNotes(nextNotes, syntaxDefinitions, nextModules);
+  };
+
   const addSnippet = () => {
     if (!activeNote) return;
     const newSnippet: CodeSnippet = {
@@ -1349,6 +1360,7 @@ export default function App() {
             activeNote={activeNote}
             syntaxDefinitions={syntaxDefinitions}
             onSaveNote={handleSaveAiNote}
+            onImportCurriculum={handleImportCurriculum}
             initialTab={aiModalTab}
             initialTopic={aiModalTopic}
             initialSelectedText={aiModalSelectedText}

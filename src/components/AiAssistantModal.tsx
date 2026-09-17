@@ -67,7 +67,8 @@ interface AiAssistantModalProps {
   activeNote: Note | null;
   syntaxDefinitions?: Record<string, SyntaxDefinition>;
   onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null, updateExistingId?: string | null) => void;
-  initialTab?: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'explainer';
+  onImportCurriculum?: (newModules: Module[], newNotes: Note[]) => void;
+  initialTab?: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'curriculum' | 'explainer';
   initialTopic?: string;
   initialSelectedText?: string;
 }
@@ -212,13 +213,31 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   activeNote,
   syntaxDefinitions = {},
   onSaveNote,
+  onImportCurriculum,
   initialTab = 'generator',
   initialTopic,
   initialSelectedText,
 }) => {
-  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings'>(
+  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'curriculum'>(
     initialTab === 'explainer' ? 'chat' : initialTab
   );
+
+  // Generation Mode: Auto-detect, Verbatim 1:1, or Transcription AI
+  const [generationMode, setGenerationMode] = useState<'auto' | 'verbatim' | 'transcription'>('auto');
+
+  // Curriculum Ingestion & RAG State
+  const [curriculumInputText, setCurriculumInputText] = useState('');
+  const [curriculumImage, setCurriculumImage] = useState<string | null>(null);
+  const [isCurriculumProcessing, setIsCurriculumProcessing] = useState(false);
+  const [curriculumResult, setCurriculumResult] = useState<any | null>(() => {
+    try {
+      const saved = localStorage.getItem('devnotes_rag_curriculum');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [curriculumImportSuccess, setCurriculumImportSuccess] = useState(false);
 
   // Snippet context & Message Actions State for Chat
   const [selectedSnippetContext, setSelectedSnippetContext] = useState(initialSelectedText || '');
@@ -391,6 +410,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           input: inputContent,
+          mode: generationMode,
           modules,
           syntaxDefinitions,
           provider: aiProvider,
@@ -410,6 +430,107 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleIngestCurriculum = async () => {
+    if (!curriculumImage && !curriculumInputText.trim()) return;
+    setIsCurriculumProcessing(true);
+    setCurriculumResult(null);
+    setCurriculumImportSuccess(false);
+
+    try {
+      const res = await fetch('/api/ai/ingest-curriculum', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: curriculumImage || undefined,
+          text: curriculumInputText.trim() || undefined,
+          provider: aiProvider,
+          apiKey: activeApiKey.trim() || undefined,
+          model: aiModel.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.ok && data.curriculum) {
+        setCurriculumResult(data.curriculum);
+        try {
+          localStorage.setItem('devnotes_rag_curriculum', JSON.stringify(data.curriculum));
+        } catch (e) {}
+      }
+    } catch (err: any) {
+      console.error('Failed to ingest curriculum:', err);
+      alert(err.message || "Erreur lors de l'analyse du cursus.");
+    } finally {
+      setIsCurriculumProcessing(false);
+    }
+  };
+
+  const handleApplyCurriculumToDevNotes = () => {
+    if (!curriculumResult || !curriculumResult.courses) return;
+
+    const newModules: Module[] = [];
+    const newNotes: Note[] = [];
+    const now = Date.now();
+
+    const rootModuleId = `mod_curriculum_${Date.now()}`;
+    newModules.push({
+      id: rootModuleId,
+      name: curriculumResult.curriculumTitle || "Associate AI Engineer pour développeurs",
+      parentId: null,
+      createdAt: now,
+    });
+
+    curriculumResult.courses.forEach((course: any, cIdx: number) => {
+      const courseModuleId = `mod_course_${Date.now()}_${cIdx}`;
+      newModules.push({
+        id: courseModuleId,
+        name: `${course.courseNumber ? course.courseNumber + '. ' : ''}${course.title}`,
+        parentId: rootModuleId,
+        createdAt: now + cIdx + 1,
+      });
+
+      (course.chapters || []).forEach((chap: any, chIdx: number) => {
+        const noteId = `note_chap_${Date.now()}_${cIdx}_${chIdx}`;
+        newNotes.push({
+          id: noteId,
+          title: chap.title,
+          content: `### 🎯 Objectifs du Chapitre\n\n- **Sujet** : ${chap.title}\n- **Cours associé** : *${course.title}*\n- **Cursus** : *${curriculumResult.curriculumTitle}*\n${chap.xp ? `- **Points d'expérience** : \`${chap.xp} XP\`\n` : ''}\n> [!TIP]\n> Collez la transcription de la leçon ou vos notes ci-dessous. Le **mode Verbatim** garantit la préservation stricte de vos explications et micro-blocs de code sans aucune altération !\n\n### 📝 Notes & Pratique\n\n*Prêt pour la saisie ou l'import de notes.*`,
+          snippets: [],
+          createdAt: now + (cIdx * 10) + chIdx,
+          updatedAt: now + (cIdx * 10) + chIdx,
+          tags: [
+            curriculumResult.curriculumTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24),
+            course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24),
+            'datacamp'
+          ],
+          moduleId: courseModuleId,
+        });
+      });
+
+      if (course.projects && course.projects.length > 0) {
+        course.projects.forEach((proj: string, pIdx: number) => {
+          newNotes.push({
+            id: `note_proj_${Date.now()}_${cIdx}_${pIdx}`,
+            title: `Projet Pratique : ${proj}`,
+            content: `### 🚀 Projet Pratique DataCamp\n\n**${proj}**\n\n> [!NOTE]\n> Ce projet valide les acquis pratiques du cours *${course.title}*. Utilisez l'Architecte Pro pour concevoir l'architecture et les composants clés de ce projet !\n\n### Cahier des Charges & Livrables\n\n- Implémentation concrète en Python.\n- Exploitation des API étudiées dans ce module.`,
+            snippets: [],
+            createdAt: now + 500 + pIdx,
+            updatedAt: now + 500 + pIdx,
+            tags: ['projet', 'pratique', 'datacamp'],
+            moduleId: courseModuleId,
+          });
+        });
+      }
+    });
+
+    if (onImportCurriculum) {
+      onImportCurriculum(newModules, newNotes);
+    }
+
+    setCurriculumImportSuccess(true);
+    setTimeout(() => setCurriculumImportSuccess(false), 4000);
   };
 
   const handleLoadActiveNote = () => {
@@ -867,6 +988,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <span>Révision</span>
               </button>
               <button
+                onClick={() => setActiveTab('curriculum')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+                  activeTab === 'curriculum'
+                    ? 'bg-[#222228] text-white shadow-xs border border-white/[0.12]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
+                )}
+              >
+                <BookOpen className={cn("w-3.5 h-3.5", activeTab === 'curriculum' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <span>Cursus DataCamp & RAG</span>
+              </button>
+              <button
                 onClick={() => setActiveTab('settings')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
@@ -957,6 +1090,76 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </div>
                 </div>
 
+                {/* Generation Mode Selector */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold">
+                    <span>Mode d'Importation :</span>
+                    <span className="font-mono text-[10px] text-blue-500 dark:text-blue-400 font-semibold">
+                      {generationMode === 'verbatim' 
+                        ? '1:1 Strict sans altération' 
+                        : generationMode === 'transcription' 
+                        ? 'Rédaction IA + Code intercalé' 
+                        : 'Détection intelligente'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-secondary/40 border border-border/70 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setGenerationMode('auto')}
+                      className={cn(
+                        "py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1",
+                        generationMode === 'auto'
+                          ? "bg-background text-foreground shadow-xs border border-border/80"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title="Détecte automatiquement si la note est déjà structurée (1:1) ou s'il faut la rédiger depuis un transcript brut"
+                    >
+                      <Zap className="w-3 h-3 text-blue-500" />
+                      <span>Auto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGenerationMode('verbatim')}
+                      className={cn(
+                        "py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 text-center",
+                        generationMode === 'verbatim'
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title="Conserve intégralement votre note telle que vous l'avez écrite. Zéro re-résumé par l'IA !"
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>Verbatim 1:1</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGenerationMode('transcription')}
+                      className={cn(
+                        "py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1",
+                        generationMode === 'transcription'
+                          ? "bg-background text-foreground shadow-xs border border-border/80"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title="Pour vidéo/audio brut : rédaction complète avec micro-blocs de code et schémas conceptuels"
+                    >
+                      <Sparkles className="w-3 h-3 text-blue-400" />
+                      <span>Transcription IA</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preformatted Note Detected Indicator */}
+                {(inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique'))) && (
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span className="leading-tight">
+                      <strong>Note structurée détectée</strong> : Préservation 1:1 garantie. Vos explications et micro-blocs de code seront importés fidèlement sans modification.
+                    </span>
+                  </div>
+                )}
+
                 <textarea
                   placeholder="Collez votre contenu de note, le format Titre, Tags, Résumé, Code ou chargez la note active pour la restructurer..."
                   value={inputContent}
@@ -993,12 +1196,23 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {isProcessing ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Analyse et structuration par l'IA...
+                      {generationMode === 'verbatim' || (generationMode === 'auto' && (inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique'))))
+                        ? "Importation 1:1 fidèle en cours..."
+                        : "Analyse et structuration par l'IA..."}
                     </>
                   ) : (
                     <>
-                      <Zap className="w-4 h-4" strokeWidth={1.5} />
-                      Générer et Structurer la Note avec l'IA
+                      {generationMode === 'verbatim' || (generationMode === 'auto' && (inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique')))) ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Importer fidèlement (Verbatim 1:1 sans altération)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4" strokeWidth={1.5} />
+                          <span>Générer et Structurer la Note avec l'IA</span>
+                        </>
+                      )}
                     </>
                   )}
                 </button>
@@ -2012,6 +2226,208 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               onSaveNote={onSaveNote}
               initialTopic={initialTopic}
             />
+          )}
+
+          {activeTab === 'curriculum' && (
+            <div className="p-6 overflow-y-auto max-w-4xl mx-auto w-full space-y-6 animate-in fade-in duration-200">
+              {/* Header Banner */}
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-950/25 via-blue-900/10 to-transparent border border-blue-500/20 shadow-sm space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      Ingestion de Cursus DataCamp & RAG Contextuel
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Analysez vos captures d'écran de cours ou collez le sommaire pour générer automatiquement l'arborescence (Cursus ➔ Cours ➔ Chapitres) et enrichir le RAG.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input Area: Image / Screenshot or Text */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Screenshot Upload Dropzone */}
+                <div className="p-5 rounded-2xl bg-card border border-border/80 flex flex-col justify-between space-y-3">
+                  <div>
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5 text-blue-500" />
+                      Capture d'écran du Cursus DataCamp
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Téléversez ou collez une capture d'écran de la vue Cursus, Cours ou Chapitres.
+                    </p>
+                  </div>
+
+                  {curriculumImage ? (
+                    <div className="relative rounded-xl overflow-hidden border border-border/80 bg-black/40 group">
+                      <img src={curriculumImage} alt="Capture Cursus" className="w-full max-h-48 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setCurriculumImage(null)}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 hover:bg-rose-600 text-white text-xs transition-colors cursor-pointer"
+                        title="Supprimer l'image"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="border-2 border-dashed border-border/70 hover:border-blue-500/50 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-secondary/20 hover:bg-secondary/40">
+                      <Sparkles className="w-6 h-6 text-blue-500 mb-2" />
+                      <span className="text-xs font-semibold text-foreground">Cliquez pour téléverser une image</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">PNG, JPG ou capture d'écran</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => setCurriculumImage(reader.result as string);
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Text / Syllabus Paste */}
+                <div className="p-5 rounded-2xl bg-card border border-border/80 flex flex-col space-y-3">
+                  <div>
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-blue-500" />
+                      Ou Texte / Sommaire du Cursus
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Collez le titre du cours, les chapitres ou le plan de cours.
+                    </p>
+                  </div>
+
+                  <textarea
+                    rows={4}
+                    value={curriculumInputText}
+                    onChange={(e) => setCurriculumInputText(e.target.value)}
+                    placeholder="Ex: Cursus Associate AI Engineer pour développeurs&#10;Cours 1: Travailler avec l'API OpenAI&#10;Chapitre: Introduction à l'API OpenAI..."
+                    className="w-full flex-1 bg-secondary/35 border border-border/80 rounded-xl p-3 text-xs font-sans text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 transition-colors resize-none leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={handleIngestCurriculum}
+                disabled={(!curriculumImage && !curriculumInputText.trim()) || isCurriculumProcessing}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+              >
+                {isCurriculumProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Analyse multimodale du Cursus DataCamp...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Analyser et Structurer le Cursus</span>
+                  </>
+                )}
+              </button>
+
+              {/* Results & Folder Tree Generator */}
+              {curriculumResult && (
+                <div className="p-6 rounded-2xl bg-card border border-border/80 shadow-sm space-y-5 animate-in fade-in duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold">
+                          Cursus Détecté
+                        </span>
+                      </div>
+                      <h4 className="text-base font-bold text-foreground mt-1">
+                        {curriculumResult.curriculumTitle}
+                      </h4>
+                      {curriculumResult.curriculumDescription && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {curriculumResult.curriculumDescription}
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleApplyCurriculumToDevNotes}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/15 flex items-center gap-2 cursor-pointer shrink-0"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Créer l'arborescence complète dans DevNotes</span>
+                    </button>
+                  </div>
+
+                  {curriculumImportSuccess && (
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-600 dark:text-emerald-300 font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Arborescence de modules et notes modèles créées avec succès dans la barre latérale !</span>
+                    </div>
+                  )}
+
+                  {/* Courses & Chapters List */}
+                  <div className="space-y-4">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-blue-500" />
+                      Modules & Chapitres Identifiés ({curriculumResult.courses?.length || 0} cours)
+                    </span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(curriculumResult.courses || []).map((c: any, cIdx: number) => (
+                        <div key={cIdx} className="p-4 rounded-xl bg-secondary/25 border border-border/70 space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <h5 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                              <Folder className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <span>{c.courseNumber ? `${c.courseNumber}. ` : ''}{c.title}</span>
+                            </h5>
+                            <span className="text-[10px] font-mono bg-secondary px-1.5 py-0.5 rounded text-muted-foreground shrink-0">
+                              {c.chapters?.length || 0} chapitres
+                            </span>
+                          </div>
+
+                          {c.description && (
+                            <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                              {c.description}
+                            </p>
+                          )}
+
+                          <ul className="space-y-1.5 pt-1 border-t border-border/40">
+                            {(c.chapters || []).map((ch: any, chIdx: number) => (
+                              <li key={chIdx} className="text-[11px] text-foreground/80 flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <FileText className="w-3 h-3 text-zinc-400 shrink-0" />
+                                  <span className="truncate">{ch.title}</span>
+                                </span>
+                                {ch.xp && (
+                                  <span className="text-[9px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.2 rounded shrink-0">
+                                    {ch.xp} XP
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+
+                          {c.projects && c.projects.length > 0 && (
+                            <div className="pt-2 border-t border-border/40">
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                Projet : {c.projects.join(', ')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

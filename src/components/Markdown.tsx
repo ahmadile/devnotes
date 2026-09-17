@@ -4,7 +4,7 @@ import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle } from 'lucide-react';
+import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle, ArrowDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface MarkdownProps {
@@ -178,6 +178,130 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
   );
 };
 
+// Visual Flow Cards representation matching DevNotes carbon palette
+interface FlowStep {
+  title: string;
+  subtitle?: string;
+  color: 'slate' | 'emerald' | 'indigo' | 'terracotta' | 'purple';
+}
+
+const DEFAULT_FLOW_COLORS: ('slate' | 'emerald' | 'indigo' | 'terracotta')[] = [
+  'slate',
+  'emerald',
+  'indigo',
+  'terracotta',
+];
+
+const FLOW_COLOR_STYLES: Record<string, { card: string; title: string; subtitle: string }> = {
+  slate: {
+    card: "bg-zinc-100 dark:bg-zinc-800/90 border-zinc-300 dark:border-zinc-700/80 shadow-sm",
+    title: "text-zinc-900 dark:text-zinc-100 font-bold",
+    subtitle: "text-zinc-600 dark:text-zinc-400 font-mono text-xs",
+  },
+  emerald: {
+    card: "bg-emerald-50 dark:bg-[#064e3b]/90 border-emerald-300 dark:border-[#059669]/60 shadow-sm",
+    title: "text-emerald-950 dark:text-emerald-100 font-bold",
+    subtitle: "text-emerald-800 dark:text-emerald-300/90 font-mono text-xs",
+  },
+  indigo: {
+    card: "bg-blue-50 dark:bg-[#312e81]/90 border-blue-300 dark:border-[#4f46e5]/60 shadow-sm",
+    title: "text-blue-950 dark:text-indigo-100 font-bold",
+    subtitle: "text-blue-800 dark:text-indigo-300/90 font-mono text-xs",
+  },
+  terracotta: {
+    card: "bg-orange-50 dark:bg-[#7c2d12]/90 border-orange-300 dark:border-[#ea580c]/50 shadow-sm",
+    title: "text-orange-950 dark:text-amber-100 font-bold",
+    subtitle: "text-orange-800 dark:text-amber-200/90 font-mono text-xs",
+  },
+  purple: {
+    card: "bg-purple-50 dark:bg-[#581c87]/90 border-purple-300 dark:border-[#9333ea]/50 shadow-sm",
+    title: "text-purple-950 dark:text-purple-100 font-bold",
+    subtitle: "text-purple-800 dark:text-purple-300/90 font-mono text-xs",
+  },
+};
+
+function parseFlowContent(text: string): FlowStep[] {
+  const lines = text.split('\n');
+  const steps: FlowStep[] = [];
+  let colorIdx = 0;
+
+  for (const rawLine of lines) {
+    let line = rawLine.trim();
+    if (!line) continue;
+    if (/^[↓▼|│─\->\s]+$/.test(line)) continue;
+
+    if (line.startsWith('[') && line.endsWith(']')) {
+      line = line.slice(1, -1).trim();
+    }
+    line = line.replace(/^\d+[\.\)]\s*/, '');
+
+    const parts = line.split('|').map(p => p.trim());
+    const title = parts[0] || '';
+    if (!title) continue;
+
+    const subtitle = parts[1] || undefined;
+    const explicitColor = parts[2]?.toLowerCase();
+
+    let color: FlowStep['color'] = DEFAULT_FLOW_COLORS[colorIdx % DEFAULT_FLOW_COLORS.length];
+    if (explicitColor) {
+      if (explicitColor.includes('green') || explicitColor.includes('emerald')) color = 'emerald';
+      else if (explicitColor.includes('blue') || explicitColor.includes('indigo')) color = 'indigo';
+      else if (explicitColor.includes('orange') || explicitColor.includes('amber') || explicitColor.includes('terracotta') || explicitColor.includes('red')) color = 'terracotta';
+      else if (explicitColor.includes('purple') || explicitColor.includes('violet')) color = 'purple';
+      else if (explicitColor.includes('slate') || explicitColor.includes('zinc') || explicitColor.includes('gray')) color = 'slate';
+    }
+
+    steps.push({ title, subtitle, color });
+    colorIdx++;
+  }
+
+  return steps;
+}
+
+const VisualFlowChart: React.FC<{ value: string }> = ({ value }) => {
+  const steps = parseFlowContent(value);
+
+  if (steps.length === 0) {
+    return (
+      <pre className="p-4 sm:p-5 m-0 overflow-x-auto text-xs font-mono text-zinc-200 bg-transparent whitespace-pre">
+        <code>{value}</code>
+      </pre>
+    );
+  }
+
+  return (
+    <div className="p-6 sm:p-8 flex flex-col items-center justify-center gap-0 w-full max-w-xl mx-auto my-2">
+      {steps.map((step, idx) => {
+        const theme = FLOW_COLOR_STYLES[step.color] || FLOW_COLOR_STYLES.slate;
+        return (
+          <React.Fragment key={idx}>
+            <div className={cn(
+              "w-full px-6 py-4 rounded-2xl border text-center transition-all duration-200 hover:scale-[1.01] hover:shadow-lg",
+              theme.card
+            )}>
+              <div className={cn("text-sm sm:text-base leading-snug", theme.title)}>
+                {step.title}
+              </div>
+              {step.subtitle && (
+                <div className={cn("mt-1 opacity-90 leading-relaxed", theme.subtitle)}>
+                  {step.subtitle}
+                </div>
+              )}
+            </div>
+
+            {idx < steps.length - 1 && (
+              <div className="flex flex-col items-center my-2 text-zinc-400 dark:text-zinc-500">
+                <div className="w-0.5 h-3 bg-current opacity-40" />
+                <ArrowDown className="w-4 h-4 text-current -my-0.5" strokeWidth={2} />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
 // Code block with copy functionality
 const CodeBlock: React.FC<{ language: string; value: string }> = ({ language, value }) => {
   const [copied, setCopied] = useState(false);
@@ -192,7 +316,10 @@ const CodeBlock: React.FC<{ language: string; value: string }> = ({ language, va
     }
   };
 
+  const isFlow = language === 'flow' || language === 'flowchart' || (language === 'diagram' && (value.includes('↓') || value.includes('-->') || value.includes('->')) && value.includes('|'));
+
   const isSchemaOrDiagram = 
+    isFlow ||
     language === 'schema' || 
     language === 'ascii' || 
     language === 'diagram' || 
@@ -202,14 +329,27 @@ const CodeBlock: React.FC<{ language: string; value: string }> = ({ language, va
   return (
     <div className={cn(
       "my-4 overflow-hidden rounded-xl border shadow-lg group/code",
-      isSchemaOrDiagram 
-        ? "bg-[#0b0b0e] border-white/[0.08]" 
-        : "bg-secondary/35 border-border/60"
+      isFlow
+        ? "bg-[#0c0c0f] dark:bg-[#0c0c0f] border-border/80"
+        : isSchemaOrDiagram 
+          ? "bg-[#0b0b0e] border-white/[0.08]" 
+          : "bg-secondary/35 border-border/60"
     )}>
       <div className="flex items-center justify-between px-4 py-1.5 bg-white/[0.02] border-b border-white/[0.06] text-[10px] font-mono tracking-widest text-zinc-400 uppercase">
         <span className="flex items-center gap-1.5">
-          {isSchemaOrDiagram && <span className="text-amber-400">📐</span>}
-          <span>{isSchemaOrDiagram ? 'Schéma Conceptuel' : (language || 'code')}</span>
+          {isFlow ? (
+            <>
+              <span className="text-blue-400">⚡</span>
+              <span>Schéma Visuel de Flux</span>
+            </>
+          ) : isSchemaOrDiagram ? (
+            <>
+              <span className="text-blue-400">📐</span>
+              <span>Schéma Conceptuel</span>
+            </>
+          ) : (
+            <span>{language || 'code'}</span>
+          )}
         </span>
         <button
           onClick={handleCopy}
@@ -229,7 +369,9 @@ const CodeBlock: React.FC<{ language: string; value: string }> = ({ language, va
           )}
         </button>
       </div>
-      {isSchemaOrDiagram ? (
+      {isFlow ? (
+        <VisualFlowChart value={value} />
+      ) : isSchemaOrDiagram ? (
         <pre className="p-4 sm:p-5 m-0 overflow-x-auto text-xs font-mono leading-[1.28] text-zinc-200 bg-transparent selection:bg-white/20 whitespace-pre">
           <code>{value}</code>
         </pre>
