@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { RevisionView } from './RevisionView';
-import { cn } from '../lib/utils';
+import { cn, fetchApiWithFallback } from '../lib/utils';
 
 export interface AiConversationMessage {
   role: 'user' | 'assistant';
@@ -528,7 +528,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setCurriculumImportSuccess(false);
 
     try {
-      const res = await fetch('/api/ai/ingest-curriculum', {
+      const res = await fetchApiWithFallback('/api/ai/ingest-curriculum', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -743,7 +743,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
       const notesContext = `${activeNoteSummary}${snippetContextStr}\n=== AUTRES NOTES DE LA BASE DE CONNAISSANCES ===\n${otherNotesSummary}`;
 
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetchApiWithFallback('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -818,7 +818,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
       const targetModule = modules.find(m => m.id === blueprintScope);
 
-      const res = await fetch('/api/ai/architect', {
+      const res = await fetchApiWithFallback('/api/ai/architect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

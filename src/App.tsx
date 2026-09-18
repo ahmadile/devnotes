@@ -209,25 +209,31 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = async () => {
       const base64 = reader.result as string;
-      let finalUrl = base64;
+      let finalUrl = base64; // Default to base64 so image is guaranteed visible
 
-      try {
-        const res = await fetch('/api/upload-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image: base64,
-            filename: defaultName.replace(/\.[^/.]+$/, ''),
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.ok && data.url) {
-            finalUrl = data.url;
+      const cleanFilename = defaultName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const endpoints = ['/api/upload-image', 'http://127.0.0.1:3001/api/upload-image', 'http://localhost:3001/api/upload-image'];
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64,
+              filename: cleanFilename,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.ok && data.url) {
+              finalUrl = data.url;
+              break;
+            }
           }
+        } catch (err) {
+          // Continue to next endpoint or fallback
         }
-      } catch (err) {
-        console.warn('Backend image upload failed, using data URL fallback:', err);
       }
 
       insertTextIntoNote(`\n\n![${defaultName}](${finalUrl})\n\n`);
@@ -240,7 +246,7 @@ export default function App() {
     const clipboardData = e.clipboardData;
     if (!clipboardData) return;
 
-    // 1. Check for image files in clipboard
+    // 1. Check for direct image file in clipboard
     const items = Array.from(clipboardData.items || []);
     const imageItem = items.find(item => item.type.startsWith('image/'));
 
@@ -253,17 +259,16 @@ export default function App() {
       }
     }
 
-    // 2. Check if clipboard has HTML with <img> tags and no plain text
+    // 2. Check if clipboard has HTML with <img> tags (e.g. copied from web page or AI tool)
     const html = clipboardData.getData('text/html');
-    const plainText = clipboardData.getData('text/plain');
-
-    if (html && !plainText && html.includes('<img')) {
+    if (html && html.includes('<img')) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       const img = doc.querySelector('img');
-      if (img && img.src) {
+      if (img && img.src && (img.src.startsWith('http') || img.src.startsWith('data:'))) {
         e.preventDefault();
-        insertTextIntoNote(`\n\n![Image](${img.src})\n\n`);
+        const altText = img.alt || 'image_web.png';
+        insertTextIntoNote(`\n\n![${altText}](${img.src})\n\n`);
         return;
       }
     }
@@ -282,9 +287,11 @@ export default function App() {
           }
         }
       }
-      alert("Aucune image trouvée dans le presse-papiers. Copiez d'abord une image ou utilisez Ctrl+V directement dans l'éditeur.");
-    } catch (err) {
-      alert("Pour coller une image, placez votre curseur dans le texte et appuyez sur Ctrl+V.");
+      // If no image found in clipboard, trigger file selector as seamless fallback
+      imageFileInputRef.current?.click();
+    } catch {
+      // If clipboard permission is restricted by browser, open file picker directly
+      imageFileInputRef.current?.click();
     }
   };
 

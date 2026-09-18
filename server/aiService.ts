@@ -46,6 +46,49 @@ const ANNOTATION_COLORS: Record<string, string> = {
 };
 
 /**
+ * Resilient JSON parser for LLM outputs that strips markdown fences,
+ * extracts JSON substrings, and repairs common control character issues.
+ */
+export function parseJsonSafe<T>(rawText: string): T | null {
+  if (!rawText || typeof rawText !== 'string') return null;
+  let text = rawText.trim();
+
+  // 1. Strip markdown code fences
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // 2. Direct attempt
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Continue
+  }
+
+  // 3. Extract JSON object substring
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = text.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate) as T;
+    } catch {
+      try {
+        const sanitized = candidate.replace(/[\u0000-\u001F]+/g, (match) => {
+          if (match === '\n') return '\\n';
+          if (match === '\r') return '\\r';
+          if (match === '\t') return '\\t';
+          return '';
+        });
+        return JSON.parse(sanitized) as T;
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Intelligent local fallback parser for structured input formats or raw code.
  */
 function formatContentWithSchemas(rawSummary: string): string {
@@ -949,7 +992,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
         const data = await res.json() as any;
         const text = data.choices?.[0]?.message?.content;
         if (text) {
-          const parsed = JSON.parse(text) as GeneratedNoteResult;
+          const parsed = parseJsonSafe<GeneratedNoteResult>(text);
           if (parsed && parsed.title && parsed.content) {
             return sanitizeAndAlignNoteResult(parsed);
           }
@@ -979,7 +1022,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
         const data = await res.json() as any;
         const text = data.message?.content;
         if (text) {
-          const parsed = JSON.parse(text) as GeneratedNoteResult;
+          const parsed = parseJsonSafe<GeneratedNoteResult>(text);
           if (parsed && parsed.title && parsed.content) {
             return sanitizeAndAlignNoteResult(parsed);
           }
@@ -1003,7 +1046,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
 
       const responseText = response.text;
       if (responseText) {
-        const parsed = JSON.parse(responseText) as GeneratedNoteResult;
+        const parsed = parseJsonSafe<GeneratedNoteResult>(responseText);
         if (parsed && parsed.title && parsed.content) {
           return sanitizeAndAlignNoteResult(parsed);
         }
@@ -1911,7 +1954,7 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
         const data = await res.json() as any;
         const text = data.choices?.[0]?.message?.content;
         if (text) {
-          const parsed = JSON.parse(text) as ProjectBlueprintResult;
+          const parsed = parseJsonSafe<ProjectBlueprintResult>(text);
           if (parsed && parsed.projectTitle && parsed.architectureOverview) {
             parsed.id = parsed.id || 'blueprint-' + Math.random().toString(36).substr(2, 9);
             return parsed;
@@ -1933,7 +1976,7 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
         config: { responseMimeType: 'application/json' },
       });
       if (response.text) {
-        const parsed = JSON.parse(response.text) as ProjectBlueprintResult;
+        const parsed = parseJsonSafe<ProjectBlueprintResult>(response.text);
         if (parsed && parsed.projectTitle && parsed.architectureOverview) {
           parsed.id = parsed.id || 'blueprint-' + Math.random().toString(36).substr(2, 9);
           return parsed;
@@ -1962,7 +2005,7 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
         const data = await res.json() as any;
         const text = data.message?.content;
         if (text) {
-          const parsed = JSON.parse(text) as ProjectBlueprintResult;
+          const parsed = parseJsonSafe<ProjectBlueprintResult>(text);
           if (parsed && parsed.projectTitle && parsed.architectureOverview) {
             parsed.id = parsed.id || 'blueprint-' + Math.random().toString(36).substr(2, 9);
             return parsed;

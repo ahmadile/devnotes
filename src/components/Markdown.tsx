@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle, ArrowDown } from 'lucide-react';
+import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle, ArrowDown, Image as ImageIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface MarkdownProps {
@@ -123,6 +123,74 @@ export const autoFormatMarkdown = (text: string): string => {
   return processed.join('\n');
 };
 
+const MarkdownImage: React.FC<{ src?: string; alt?: string; [key: string]: any }> = ({ src, alt, ...props }) => {
+  const [currentSrc, setCurrentSrc] = useState<string | undefined>(src);
+  const [hasError, setHasError] = useState(false);
+  const [retriedDirect, setRetriedDirect] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    setHasError(false);
+    setRetriedDirect(false);
+  }, [src]);
+
+  const handleError = () => {
+    // 1. If relative /uploads/ failed, retry direct via backend port 3001
+    if (!retriedDirect && currentSrc && currentSrc.startsWith('/uploads/')) {
+      setRetriedDirect(true);
+      setCurrentSrc(`http://127.0.0.1:3001${currentSrc}`);
+      return;
+    }
+    // 2. If user copied raw markdown with bare filename e.g. "deepseek_mermaid_...png"
+    if (!retriedDirect && currentSrc && !currentSrc.startsWith('http') && !currentSrc.startsWith('data:') && !currentSrc.startsWith('/')) {
+      setRetriedDirect(true);
+      setCurrentSrc(`/uploads/${currentSrc}`);
+      return;
+    }
+    setHasError(true);
+  };
+
+  if (hasError) {
+    return (
+      <div className="my-6 p-4 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/20 text-center flex flex-col items-center gap-2 max-w-lg mx-auto">
+        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs">
+          <ImageIcon className="w-4 h-4" />
+          <span>Image non chargée : {alt || src}</span>
+        </div>
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-sm">
+          Le fichier n'est pas accessible en local ou n'a pas encore été importé. Vous pouvez l'insérer avec le bouton <strong>"Image"</strong> dans la barre d'outils de la note.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <figure className="my-6 flex flex-col items-center group/img">
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100/50 dark:bg-zinc-900/40 p-2 shadow-md transition-all hover:border-blue-500/40 hover:shadow-lg">
+        <img 
+          src={currentSrc} 
+          alt={alt || 'Image de note'} 
+          className="max-h-[600px] w-auto max-w-full rounded-xl object-contain cursor-zoom-in transition-transform duration-200 group-hover/img:scale-[1.01]" 
+          loading="lazy"
+          onError={handleError}
+          onClick={() => {
+            if (currentSrc) window.open(currentSrc, '_blank');
+          }}
+          {...props} 
+        />
+        <div className="absolute top-3 right-3 opacity-0 group-hover/img:opacity-100 transition-opacity bg-zinc-900/80 backdrop-blur-sm text-zinc-200 text-xs px-2.5 py-1 rounded-md border border-white/10 flex items-center gap-1.5 pointer-events-none">
+          <span>Agrandir</span>
+        </div>
+      </div>
+      {alt && alt !== 'Image' && alt !== 'Image de note' && (
+        <figcaption className="mt-2.5 text-xs text-zinc-500 dark:text-zinc-400 font-sans text-center max-w-md">
+          {alt}
+        </figcaption>
+      )}
+    </figure>
+  );
+};
+
 export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
   const formattedContent = autoFormatMarkdown(content);
 
@@ -132,32 +200,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
-          img: ({ src, alt, ...props }) => {
-            return (
-              <figure className="my-6 flex flex-col items-center group/img">
-                <div className="relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100/50 dark:bg-zinc-900/40 p-2 shadow-md transition-all hover:border-blue-500/40 hover:shadow-lg">
-                  <img 
-                    src={src} 
-                    alt={alt || 'Image de note'} 
-                    className="max-h-[600px] w-auto max-w-full rounded-xl object-contain cursor-zoom-in transition-transform duration-200 group-hover/img:scale-[1.01]" 
-                    loading="lazy"
-                    onClick={() => {
-                      if (src) window.open(src, '_blank');
-                    }}
-                    {...props} 
-                  />
-                  <div className="absolute top-3 right-3 opacity-0 group-hover/img:opacity-100 transition-opacity bg-zinc-900/80 backdrop-blur-sm text-zinc-200 text-xs px-2.5 py-1 rounded-md border border-white/10 flex items-center gap-1.5 pointer-events-none">
-                    <span>Agrandir</span>
-                  </div>
-                </div>
-                {alt && alt !== 'Image' && alt !== 'Image de note' && (
-                  <figcaption className="mt-2.5 text-xs text-zinc-500 dark:text-zinc-400 font-sans text-center max-w-md">
-                    {alt}
-                  </figcaption>
-                )}
-              </figure>
-            );
-          },
+          img: (props) => <MarkdownImage {...props} />,
           code({ className: codeClassName, children, ...props }) {
             const match = /language-(\w+)/.exec(codeClassName || '');
             const isInline = !match;

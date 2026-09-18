@@ -27,7 +27,7 @@ import {
   Eye
 } from 'lucide-react';
 import { Markdown } from './Markdown';
-import { cn } from '../lib/utils';
+import { cn, fetchApiWithFallback } from '../lib/utils';
 
 interface RevisionViewProps {
   notes: Note[];
@@ -107,7 +107,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
     setActiveSessionTab('memo');
 
     try {
-      const response = await fetch('/api/ai/revision', {
+      const response = await fetchApiWithFallback('/api/ai/revision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,7 +147,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
 
     setIsEvaluatingCode(true);
     try {
-      const response = await fetch('/api/ai/revision/evaluate', {
+      const response = await fetchApiWithFallback('/api/ai/revision/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -29,11 +29,19 @@ export default defineConfig(({mode}) => {
             });
           },
         },
+        '/uploads': {
+          target: env.API_URL || 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
       },
     },
     preview: {
       proxy: {
         '/api': {
+          target: env.API_URL || 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
+        '/uploads': {
           target: env.API_URL || 'http://127.0.0.1:3001',
           changeOrigin: true,
         },
