@@ -2596,18 +2596,35 @@ export async function generateDiagramWithAI(req: GenerateDiagramRequest): Promis
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
   const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
 
-  const prompt = `Tu es un Lead Software Architect expert en modélisation visuelle Mermaid.js.
-Génère un diagramme Mermaid (flowchart TD, flowchart LR, graph TD ou sequenceDiagram) clair, structuré et pertinent pour synthétiser visuellement le concept, l'architecture ou le flux de données de la note suivante :
+  const prompt = `Tu es un Lead Software Architect expert en modélisation visuelle Mermaid.js de niveau DeepSeek & Claude.
+Génère un diagramme Mermaid (flowchart TD ou flowchart LR) élégant, compact, moderne et structuré pour synthétiser visuellement le concept, l'architecture ou le flux de données de la note suivante :
 
 Titre : ${req.title || 'Note technique'}
 Contenu :
 ${(req.content || '').slice(0, 3500)}
 
-Règles impératives :
-1. Réponds UNIQUEMENT avec le code Mermaid (soit brut, soit entre balises \`\`\`mermaid ... \`\`\`).
-2. N'ajoute AUCUN texte d'introduction ni de conclusion en dehors du code Mermaid.
-3. Évite les caractères réservés non échappés dans les étiquettes : si un libellé contient des parenthèses ou crochets, utilise des guillemets, exemple : A["Étape 1 (Init)"] --> B["Étape 2 (Process)"].
-4. Utilise des sous-graphes (subgraph) si cela clarifie l'architecture (Frontend / Backend / Données).`;
+Règles fondamentales de design et clarté :
+1. COMPACITÉ & LISIBILITÉ : Évite les diagrammes gigantesques ou interminables à 15 boîtes verticales isolées. Fais un schéma équilibré (4 à 7 étapes clés), avec sous-graphes (subgraph) logiques et parallélisme si pertinent.
+2. PALETTE COULEURS SÉMANTIQUE DEEPSEEK + CLAUDE :
+   Inclus impérativement ces classes de style et applique-les aux nœuds :
+   classDef startNode fill:#082f49,stroke:#38bdf8,stroke-width:1.8px,color:#f0f9ff;
+   classDef actionNode fill:#064e3b,stroke:#34d399,stroke-width:1.8px,color:#ecfdf5;
+   classDef modelNode fill:#312e81,stroke:#a78bfa,stroke-width:1.8px,color:#f5f3ff;
+   classDef decisionNode fill:#78350f,stroke:#fbbf24,stroke-width:1.8px,color:#fef3c7;
+   classDef outputNode fill:#7c2d12,stroke:#fb923c,stroke-width:1.8px,color:#fff7ed;
+   classDef slateNode fill:#1e293b,stroke:#475569,stroke-width:1.8px,color:#f8fafc;
+
+   - Nœud initial / Entrée : applique :::startNode
+   - Actions / Traitements : applique :::actionNode
+   - Modèles / Moteurs / Objets : applique :::modelNode
+   - Décisions / Arbitrages : forme { ... } et applique :::decisionNode
+   - Résultats / Coûts / Sorties : applique :::outputNode
+   - Cartes intermédiaires : applique :::slateNode
+
+3. SYNTAXE STRICTE :
+   - Réponds UNIQUEMENT avec le code Mermaid (sans aucun texte explicatif avant ou après).
+   - Protège TOUS les libellés de nœuds avec des guillemets doubles droits : A["Texte clair"] --> B["Étape 2"].
+   - N'utilise jamais de balises HTML non supportées.`;
 
   const cleanMermaidOutput = (text: string): string => {
     let clean = text.trim();
@@ -2692,16 +2709,25 @@ Règles impératives :
   const safeTitle = (req.title || 'Projet').replace(/["[\]()]/g, '');
   return {
     chart: `flowchart TD
-    subgraph Entree ["📥 Flux d'Entrée"]
-        A["${safeTitle}"] --> B["Analyse & Traitement"]
+    classDef startNode fill:#082f49,stroke:#38bdf8,stroke-width:1.8px,color:#f0f9ff;
+    classDef actionNode fill:#064e3b,stroke:#34d399,stroke-width:1.8px,color:#ecfdf5;
+    classDef modelNode fill:#312e81,stroke:#a78bfa,stroke-width:1.8px,color:#f5f3ff;
+    classDef outputNode fill:#7c2d12,stroke:#fb923c,stroke-width:1.8px,color:#fff7ed;
+
+    subgraph Entree ["📥 Cadrage & Entrée"]
+        A["${safeTitle}"]:::startNode
     end
-    subgraph Traitement ["⚙️ Cœur Logique"]
-        B --> C["Logique Métier"]
-        C --> D["Persistance des Données"]
+    subgraph Traitement ["⚙️ Traitement & Logique"]
+        B["Analyse & Préparation"]:::actionNode
+        C["Moteur IA / Traitement"]:::modelNode
     end
-    subgraph Sortie ["📤 Sortie"]
-        D --> E["Rendu & Exploitation"]
-    end`,
+    subgraph Sortie ["📤 Sortie & Exploitation"]
+        D["Résultats & Métriques"]:::outputNode
+    end
+
+    A --> B
+    B --> C
+    C --> D`,
     title: req.title || 'Schéma Visuel'
   };
 }
