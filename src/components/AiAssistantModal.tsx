@@ -464,6 +464,9 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
+        if (res.status === 500 && !errJson?.error) {
+          throw new Error("Le serveur backend (port 3001) n'a pas répondu. Assurez-vous d'avoir lancé l'application avec 'npm run dev'.");
+        }
         throw new Error(errJson?.error || `Erreur serveur (${res.status})`);
       }
       const data = await res.json();
@@ -474,7 +477,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to process note:', err);
-      setProcessError(err.message || "Erreur lors du traitement. Vérifiez que le serveur backend est bien démarré.");
+      setProcessError(err.message || "Erreur de connexion. Vérifiez que 'npm run dev' est bien actif.");
     } finally {
       setIsProcessing(false);
     }

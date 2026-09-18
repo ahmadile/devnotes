@@ -487,12 +487,32 @@ export function parseVerbatimNote(
     }
   }
 
-  // If no code was found in 🔴 Bloc logique, auto-extract fenced code block from input
+  // If no code was found in 🔴 Bloc logique, auto-extract real code block from input (skipping diagrams/flow)
   if (codeLines.length === 0) {
-    const codeBlockMatch = input.match(/```([a-zA-Z0-9_\-]+)?\s*\n([\s\S]*?)```/);
-    if (codeBlockMatch) {
-      codeLanguage = codeBlockMatch[1] || 'python';
-      const extracted = codeBlockMatch[2].split('\n');
+    const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\s*\n([\s\S]*?)```/g;
+    let match: RegExpExecArray | null;
+    let fallbackBlock: { lang: string; code: string } | null = null;
+    let preferredBlock: { lang: string; code: string } | null = null;
+
+    while ((match = codeBlockRegex.exec(input)) !== null) {
+      const lang = (match[1] || 'python').toLowerCase();
+      const code = match[2];
+      if (['flow', 'text', 'ascii', 'schema', 'mermaid'].includes(lang)) {
+        continue; // Skip visual schemas and diagrams
+      }
+      if (['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'sql', 'bash', 'sh'].includes(lang)) {
+        preferredBlock = { lang, code };
+        break;
+      }
+      if (!fallbackBlock) {
+        fallbackBlock = { lang, code };
+      }
+    }
+
+    const chosen = preferredBlock || fallbackBlock;
+    if (chosen) {
+      codeLanguage = chosen.lang === 'py' ? 'python' : chosen.lang === 'js' ? 'javascript' : chosen.lang === 'ts' ? 'typescript' : chosen.lang;
+      const extracted = chosen.code.split('\n');
       codeLines.push(...extracted);
       if (!codeSnippetTitle) {
         codeSnippetTitle = `Code — ${title}`;
@@ -524,12 +544,14 @@ export function parseVerbatimNote(
 
   codeText = codeLines.join('\n');
 
-  // Auto-match module if one matches title or tags
-  if (modules && modules.length > 0) {
-    const matched = modules.find(m => 
-      title.toLowerCase().includes(m.name.toLowerCase()) || 
-      tags.some(t => t.toLowerCase() === m.name.toLowerCase())
-    );
+  // Auto-match module safely if one matches title or tags
+  if (modules && Array.isArray(modules) && modules.length > 0) {
+    const matched = modules.find(m => {
+      if (!m || typeof m.name !== 'string') return false;
+      const mName = m.name.toLowerCase();
+      return (title && typeof title === 'string' && title.toLowerCase().includes(mName)) || 
+             tags.some(t => typeof t === 'string' && t.toLowerCase() === mName);
+    });
     if (matched) {
       moduleName = matched.name;
     }
