@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
+import mermaid from 'mermaid';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle, ArrowDown, Image as ImageIcon } from 'lucide-react';
+import { Clipboard, Check, Info, Lightbulb, AlertTriangle, Star, HelpCircle, ArrowDown, Image as ImageIcon, Trash2, Layers } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface MarkdownProps {
   content: string;
   className?: string;
+  onDeleteImage?: (src: string, alt?: string) => void;
 }
 
 // Pattern matching functions (e.g. foo(x)), decorators (@decorator), snake_case variables (in_range, run_n_times), and args/kwargs
@@ -123,7 +125,7 @@ export const autoFormatMarkdown = (text: string): string => {
   return processed.join('\n');
 };
 
-const MarkdownImage: React.FC<{ src?: string; alt?: string; [key: string]: any }> = ({ src, alt, ...props }) => {
+const MarkdownImage: React.FC<{ src?: string; alt?: string; onDelete?: (src: string, alt?: string) => void; [key: string]: any }> = ({ src, alt, onDelete, ...props }) => {
   const [currentSrc, setCurrentSrc] = useState<string | undefined>(src);
   const [hasError, setHasError] = useState(false);
   const [retriedDirect, setRetriedDirect] = useState(false);
@@ -155,11 +157,21 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; [key: string]: any }
       <div className="my-6 p-4 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/20 text-center flex flex-col items-center gap-2 max-w-lg mx-auto">
         <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs">
           <ImageIcon className="w-4 h-4" />
-          <span>Image non chargée : {alt || src}</span>
+          <span>Image non disponible : {alt || src}</span>
         </div>
         <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-sm">
-          Le fichier n'est pas accessible en local ou n'a pas encore été importé. Vous pouvez l'insérer avec le bouton <strong>"Image"</strong> dans la barre d'outils de la note.
+          Le fichier n'est pas accessible en local ou n'a pas été importé.
         </p>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(src || '', alt)}
+            className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-500 hover:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer shadow-xs"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Supprimer cette image de la note</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -178,8 +190,31 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; [key: string]: any }
           }}
           {...props} 
         />
-        <div className="absolute top-3 right-3 opacity-0 group-hover/img:opacity-100 transition-opacity bg-zinc-900/80 backdrop-blur-sm text-zinc-200 text-xs px-2.5 py-1 rounded-md border border-white/10 flex items-center gap-1.5 pointer-events-none">
-          <span>Agrandir</span>
+        <div className="absolute top-3 right-3 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center gap-1.5">
+          <button 
+            type="button"
+            onClick={() => {
+              if (currentSrc) window.open(currentSrc, '_blank');
+            }}
+            className="bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-sm text-zinc-200 text-xs px-2.5 py-1 rounded-md border border-white/10 flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Agrandir</span>
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm("Supprimer cette image de la note ?")) {
+                  onDelete(src || '', alt);
+                }
+              }}
+              className="bg-zinc-900/80 hover:bg-rose-900/80 backdrop-blur-sm text-zinc-300 hover:text-rose-200 text-xs p-1.5 rounded-md border border-white/10 transition-colors cursor-pointer"
+              title="Supprimer cette image de la note"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
       {alt && alt !== 'Image' && alt !== 'Image de note' && (
@@ -191,7 +226,87 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; [key: string]: any }
   );
 };
 
-export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
+const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
+  const [svg, setSvg] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  const rawId = useId();
+  const cleanId = rawId.replace(/[^a-zA-Z0-9]/g, '_');
+
+  useEffect(() => {
+    let isMounted = true;
+    const renderChart = async () => {
+      try {
+        setError(null);
+        const isDark = document.documentElement.classList.contains('dark');
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: isDark ? 'dark' : 'neutral',
+          securityLevel: 'loose',
+          fontFamily: 'inherit',
+        });
+        const uniqueId = `mermaid_${cleanId}_${Math.random().toString(36).slice(2, 7)}`;
+        const { svg: renderedSvg } = await mermaid.render(uniqueId, chart.trim());
+        if (isMounted) {
+          setSvg(renderedSvg);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err?.message || 'Erreur de syntaxe Mermaid');
+        }
+      }
+    };
+
+    renderChart();
+    return () => { isMounted = false; };
+  }, [chart, cleanId]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(chart);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  if (error) {
+    return (
+      <div className="my-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs font-mono">
+        <div className="flex items-center justify-between text-amber-500 font-bold mb-2">
+          <span>Diagramme Mermaid (Code)</span>
+          <button onClick={handleCopy} className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer">
+            {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Clipboard className="w-3 h-3" />}
+            <span>{isCopied ? 'Copié' : 'Copier'}</span>
+          </button>
+        </div>
+        <pre className="overflow-x-auto text-zinc-300">{chart}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-6 rounded-2xl border border-border/80 bg-zinc-950/40 backdrop-blur-sm p-4 overflow-hidden shadow-lg group/mermaid relative">
+      <div className="flex items-center justify-between border-b border-border/40 pb-2 mb-3 text-xs text-muted-foreground font-mono">
+        <span className="flex items-center gap-1.5 text-blue-400 font-semibold">
+          <Layers className="w-3.5 h-3.5" />
+          <span>Schéma Visuel d'Architecture</span>
+        </span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-white/10 text-[10px] text-zinc-300 transition-colors cursor-pointer"
+          title="Copier le code Mermaid"
+        >
+          {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Clipboard className="w-3 h-3" />}
+          <span>{isCopied ? 'Copié' : 'Copier'}</span>
+        </button>
+      </div>
+      <div 
+        className="flex justify-center items-center overflow-x-auto p-2 [&>svg]:max-w-full [&>svg]:h-auto"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </div>
+  );
+};
+
+export const Markdown: React.FC<MarkdownProps> = ({ content, className, onDeleteImage }) => {
   const formattedContent = autoFormatMarkdown(content);
 
   return (
@@ -200,11 +315,15 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
-          img: (props) => <MarkdownImage {...props} />,
+          img: (props) => <MarkdownImage {...props} onDelete={onDeleteImage} />,
           code({ className: codeClassName, children, ...props }) {
             const match = /language-(\w+)/.exec(codeClassName || '');
             const isInline = !match;
             const codeString = String(children).replace(/\n$/, '');
+
+            if (match && match[1].toLowerCase() === 'mermaid') {
+              return <MermaidDiagram chart={codeString} />;
+            }
 
             if (isInline) {
               return (

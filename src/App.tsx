@@ -4,12 +4,12 @@ import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
 import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste, Layers, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
 import { AiAssistantModal, DevNotesAiEmblem } from './components/AiAssistantModal';
-import { cn } from './lib/utils';
+import { cn, fetchApiWithFallback } from './lib/utils';
 
 
 const STORAGE_KEY = 'devnotes_data';
@@ -310,6 +310,74 @@ export default function App() {
         e.preventDefault();
         await uploadAndInsertImage(file, file.name);
       }
+    }
+  };
+
+  const handleDeleteImageFromNote = (imgSrc: string, imgAlt?: string) => {
+    if (!activeNote) return;
+    let newContent = activeNote.content;
+
+    if (imgSrc) {
+      const escapedSrc = imgSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`!\\[[^\\]]*\\]\\(${escapedSrc}\\)`, 'g');
+      newContent = newContent.replace(regex, '');
+    }
+
+    if (imgAlt && imgAlt !== 'Image' && imgAlt !== 'Image de note') {
+      const escapedAlt = imgAlt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regexAlt = new RegExp(`!\\[${escapedAlt}\\]\\([^)]*\\)`, 'g');
+      newContent = newContent.replace(regexAlt, '');
+    }
+
+    newContent = newContent.replace(/\n{3,}/g, '\n\n').trim();
+    updateNote({
+      ...activeNote,
+      content: newContent,
+    });
+  };
+
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+
+  const handleGenerateDiagram = async () => {
+    if (!activeNote || !activeNote.content.trim()) {
+      alert("Écrivez d'abord quelques lignes ou du code dans votre note pour que l'IA génère le schéma.");
+      return;
+    }
+
+    setIsGeneratingDiagram(true);
+    try {
+      const res = await fetchApiWithFallback('/api/ai/generate-diagram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeNote.title,
+          content: activeNote.content,
+          provider: aiProvider,
+          apiKey: (aiProvider === 'openrouter' ? openRouterKey : geminiApiKey).trim() || undefined,
+          model: aiModel.trim() || undefined,
+          ollamaUrl: ollamaUrl.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.ok && data.chart) {
+        const diagramMarkdown = `\n\n### 📊 Architecture & Schéma Visuel\n\n\`\`\`mermaid\n${data.chart}\n\`\`\`\n\n`;
+        updateNote({
+          ...activeNote,
+          content: (activeNote.content ? activeNote.content.trim() : '') + diagramMarkdown,
+        });
+        setEditorTab('preview');
+      }
+    } catch (err: any) {
+      console.error('Diagram generation error:', err);
+      alert("Impossible de générer le schéma visuel : " + (err.message || 'erreur de connexion'));
+    } finally {
+      setIsGeneratingDiagram(false);
     }
   };
 
@@ -1187,7 +1255,22 @@ export default function App() {
                             title="Demander à l'assistant d'expliquer cette note en détail avec analogies"
                           >
                             <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                            <span>Expliquer cette note</span>
+                            <span>Expliquer</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleGenerateDiagram}
+                            disabled={isGeneratingDiagram}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 border border-purple-200 dark:border-purple-400/20 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                            title="Générer automatiquement un schéma d'architecture ou de flux avec l'IA"
+                          >
+                            {isGeneratingDiagram ? (
+                              <Loader2 className="w-3 h-3 text-purple-500 animate-spin" />
+                            ) : (
+                              <Layers className="w-3 h-3 text-purple-500" />
+                            )}
+                            <span>{isGeneratingDiagram ? 'Schéma...' : 'Schéma IA'}</span>
                           </button>
 
                           <div className="flex items-center gap-1">
@@ -1285,7 +1368,10 @@ export default function App() {
                         ) : (
                           <div className="max-w-none pb-4 animate-in fade-in duration-200">
                             {activeNote.content ? (
-                              <Markdown content={activeNote.content} />
+                              <Markdown 
+                                content={activeNote.content} 
+                                onDeleteImage={handleDeleteImageFromNote}
+                              />
                             ) : (
                               <p className="text-muted-foreground/30 italic text-sm">Nothing to preview. Write something in Markdown first!</p>
                             )}

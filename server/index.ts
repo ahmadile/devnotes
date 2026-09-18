@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
-import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept, ingestCurriculumFromImageOrText } from './aiService.js';
+import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept, ingestCurriculumFromImageOrText, generateDiagramWithAI } from './aiService.js';
 import dns from 'dns';
 
 import fs from 'fs';
@@ -280,6 +280,29 @@ app.use('/uploads', express.static(uploadsDir));
       res.json({ ok: true, blueprint });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Architect error' });
+    }
+  });
+
+  app.post('/api/ai/generate-diagram', async (req, res) => {
+    try {
+      const { title, content, provider, apiKey, model, ollamaUrl } = req.body || {};
+      if (!content || typeof content !== 'string') {
+        res.status(400).json({ error: 'Content is required to generate diagram' });
+        return;
+      }
+
+      const result = await generateDiagramWithAI({
+        title: title || 'Schéma Visuel',
+        content,
+        provider,
+        apiKey,
+        model,
+        ollamaUrl,
+      });
+
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate diagram' });
     }
   });
 

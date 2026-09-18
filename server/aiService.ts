@@ -2579,5 +2579,133 @@ Format JSON STRICT de réponse (aucun texte avant ou après) :
   };
 }
 
+export interface GenerateDiagramRequest {
+  title?: string;
+  content: string;
+  provider?: 'openrouter' | 'gemini' | 'ollama' | 'openai';
+  apiKey?: string;
+  model?: string;
+  ollamaUrl?: string;
+}
+
+/**
+ * Generates an architectural or process Mermaid diagram from a note's topic and content.
+ */
+export async function generateDiagramWithAI(req: GenerateDiagramRequest): Promise<{ chart: string; title: string }> {
+  const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
+  const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
+
+  const prompt = `Tu es un Lead Software Architect expert en modélisation visuelle Mermaid.js.
+Génère un diagramme Mermaid (flowchart TD, flowchart LR, graph TD ou sequenceDiagram) clair, structuré et pertinent pour synthétiser visuellement le concept, l'architecture ou le flux de données de la note suivante :
+
+Titre : ${req.title || 'Note technique'}
+Contenu :
+${(req.content || '').slice(0, 3500)}
+
+Règles impératives :
+1. Réponds UNIQUEMENT avec le code Mermaid (soit brut, soit entre balises \`\`\`mermaid ... \`\`\`).
+2. N'ajoute AUCUN texte d'introduction ni de conclusion en dehors du code Mermaid.
+3. Évite les caractères réservés non échappés dans les étiquettes : si un libellé contient des parenthèses ou crochets, utilise des guillemets, exemple : A["Étape 1 (Init)"] --> B["Étape 2 (Process)"].
+4. Utilise des sous-graphes (subgraph) si cela clarifie l'architecture (Frontend / Backend / Données).`;
+
+  const cleanMermaidOutput = (text: string): string => {
+    let clean = text.trim();
+    clean = clean.replace(/^```(?:mermaid)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    if (!clean.includes('graph') && !clean.includes('flowchart') && !clean.includes('sequenceDiagram') && !clean.includes('classDiagram')) {
+      clean = `flowchart TD\n${clean}`;
+    }
+    return clean;
+  };
+
+  if (provider === 'openrouter' && apiKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DevNotes Diagram Generator',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content;
+        if (text && text.trim()) {
+          return { chart: cleanMermaidOutput(text), title: req.title || 'Schéma Visuel' };
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] generateDiagram OpenRouter error:', err);
+    }
+  }
+
+  if ((provider === 'gemini' || !provider) && apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
+      const response = await ai.models.generateContent({
+        model: geminiModel,
+        contents: prompt,
+      });
+
+      if (response.text && response.text.trim()) {
+        return { chart: cleanMermaidOutput(response.text), title: req.title || 'Schéma Visuel' };
+      }
+    } catch (err) {
+      console.error('[aiService] generateDiagram Gemini error:', err);
+    }
+  }
+
+  if (provider === 'ollama') {
+    try {
+      const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const res = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelName || 'llama3',
+          messages: [{ role: 'user', content: prompt }],
+          stream: false,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.message?.content;
+        if (text && text.trim()) {
+          return { chart: cleanMermaidOutput(text), title: req.title || 'Schéma Visuel' };
+        }
+      }
+    } catch (err) {
+      console.error('[aiService] generateDiagram Ollama error:', err);
+    }
+  }
+
+  // Fallback intelligent
+  const safeTitle = (req.title || 'Projet').replace(/["[\]()]/g, '');
+  return {
+    chart: `flowchart TD
+    subgraph Entree ["📥 Flux d'Entrée"]
+        A["${safeTitle}"] --> B["Analyse & Traitement"]
+    end
+    subgraph Traitement ["⚙️ Cœur Logique"]
+        B --> C["Logique Métier"]
+        C --> D["Persistance des Données"]
+    end
+    subgraph Sortie ["📤 Sortie"]
+        D --> E["Rendu & Exploitation"]
+    end`,
+    title: req.title || 'Schéma Visuel'
+  };
+}
+
+
 
 

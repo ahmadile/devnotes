@@ -154,18 +154,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return parts.join(' / ');
   };
 
-  const renderModule = (module: Module) => {
+  const getFolderColorConfig = (level: number) => {
+    switch (level) {
+      case 0:
+        return {
+          iconOpen: 'text-blue-600 dark:text-blue-400',
+          iconClosed: 'text-zinc-400',
+          hoverBg: 'hover:bg-secondary/40',
+          borderGuide: 'border-border/30',
+          textClass: 'text-foreground/80 hover:text-foreground font-medium',
+          badge: null as string | null,
+          badgeColor: '',
+        };
+      case 1:
+        return {
+          iconOpen: 'text-emerald-500 dark:text-emerald-400',
+          iconClosed: 'text-emerald-600/70 dark:text-emerald-500/70',
+          hoverBg: 'hover:bg-emerald-500/10',
+          borderGuide: 'border-emerald-500/30',
+          textClass: 'text-foreground/80 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium',
+          badge: 'Sous-dossier',
+          badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        };
+      case 2:
+        return {
+          iconOpen: 'text-purple-500 dark:text-purple-400',
+          iconClosed: 'text-purple-600/70 dark:text-purple-500/70',
+          hoverBg: 'hover:bg-purple-500/10',
+          borderGuide: 'border-purple-500/30',
+          textClass: 'text-foreground/80 hover:text-purple-600 dark:hover:text-purple-400 font-medium',
+          badge: 'Niveau 2',
+          badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+        };
+      default:
+        return {
+          iconOpen: 'text-amber-500 dark:text-amber-400',
+          iconClosed: 'text-amber-600/70 dark:text-amber-500/70',
+          hoverBg: 'hover:bg-amber-500/10',
+          borderGuide: 'border-amber-500/30',
+          textClass: 'text-foreground/80 hover:text-amber-600 dark:hover:text-amber-400 font-medium',
+          badge: `Niv. ${level}`,
+          badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        };
+    }
+  };
+
+  const renderModule = (module: Module, level: number = 0) => {
     const isExpanded = !!expandedModules[module.id];
     const childModules = modules.filter(m => m.parentId === module.id);
     const childNotes = notes.filter(n => n.moduleId === module.id);
     const isRenaming = renamingModuleId === module.id;
+    const config = getFolderColorConfig(level);
 
     return (
       <div key={module.id} className="select-none">
         {/* Module Folder Row */}
         <div 
           className={cn(
-            "flex items-center justify-between py-1.5 pl-2 pr-2 rounded-lg hover:bg-secondary/40 group/module cursor-pointer text-sm font-medium",
+            "flex items-center justify-between py-1.5 pl-2 pr-2 rounded-lg group/module cursor-pointer text-sm font-medium",
+            config.hoverBg,
             "transition-all duration-200"
           )}
           onClick={() => toggleExpand(module.id)}
@@ -181,9 +228,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />}
             </button>
             {isExpanded ? (
-              <FolderOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={1.5} />
+              <FolderOpen className={cn("w-4 h-4 shrink-0", config.iconOpen)} strokeWidth={1.5} />
             ) : (
-              <Folder className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={1.5} />
+              <Folder className={cn("w-4 h-4 shrink-0", config.iconClosed)} strokeWidth={1.5} />
             )}
             
             {isRenaming ? (
@@ -250,7 +297,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
             ) : (
-              <span className="truncate text-foreground/80 hover:text-foreground">{module.name}</span>
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className={cn("truncate", config.textClass)}>{module.name}</span>
+                {level > 0 && config.badge && (
+                  <span className={cn("text-[9px] px-1.5 py-0.2 rounded border font-bold shrink-0 opacity-75 group-hover/module:opacity-100 transition-opacity", config.badgeColor)}>
+                    {config.badge}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -307,11 +361,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Expanded Children — with indentation guide line */}
+        {/* Expanded Children — with level-specific indentation guide line */}
         {isExpanded && (
-          <div className="ml-[18px] pl-3 border-l border-border/30 space-y-0.5">
-            {/* Subfolders */}
-            {childModules.map(child => renderModule(child))}
+          <div className={cn("ml-[18px] pl-3 border-l space-y-0.5 transition-colors", config.borderGuide)}>
+            {/* Subfolders with level + 1 */}
+            {childModules.map(child => renderModule(child, level + 1))}
 
             {/* Inline creation field if active in this module */}
             {creatingModuleInId === module.id && renderInlineCreateForm(module.id)}
