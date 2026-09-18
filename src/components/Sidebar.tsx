@@ -162,9 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           iconClosed: 'text-zinc-400',
           hoverBg: 'hover:bg-secondary/40',
           borderGuide: 'border-border/30',
-          textClass: 'text-foreground/80 hover:text-foreground font-medium',
-          badge: null as string | null,
-          badgeColor: '',
+          textClass: 'text-foreground/90 hover:text-foreground font-medium',
         };
       case 1:
         return {
@@ -172,9 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           iconClosed: 'text-emerald-600/70 dark:text-emerald-500/70',
           hoverBg: 'hover:bg-emerald-500/10',
           borderGuide: 'border-emerald-500/30',
-          textClass: 'text-foreground/80 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium',
-          badge: 'Sous-dossier',
-          badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+          textClass: 'text-foreground/90 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium',
         };
       case 2:
         return {
@@ -182,9 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           iconClosed: 'text-purple-600/70 dark:text-purple-500/70',
           hoverBg: 'hover:bg-purple-500/10',
           borderGuide: 'border-purple-500/30',
-          textClass: 'text-foreground/80 hover:text-purple-600 dark:hover:text-purple-400 font-medium',
-          badge: 'Niveau 2',
-          badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+          textClass: 'text-foreground/90 hover:text-purple-600 dark:hover:text-purple-400 font-medium',
         };
       default:
         return {
@@ -192,9 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           iconClosed: 'text-amber-600/70 dark:text-amber-500/70',
           hoverBg: 'hover:bg-amber-500/10',
           borderGuide: 'border-amber-500/30',
-          textClass: 'text-foreground/80 hover:text-amber-600 dark:hover:text-amber-400 font-medium',
-          badge: `Niv. ${level}`,
-          badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+          textClass: 'text-foreground/90 hover:text-amber-600 dark:hover:text-amber-400 font-medium',
         };
     }
   };
@@ -297,20 +289,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <span className={cn("truncate", config.textClass)}>{module.name}</span>
-                {level > 0 && config.badge && (
-                  <span className={cn("text-[9px] px-1.5 py-0.2 rounded border font-bold shrink-0 opacity-75 group-hover/module:opacity-100 transition-opacity", config.badgeColor)}>
-                    {config.badge}
-                  </span>
-                )}
-              </div>
+              <span className={cn("truncate flex-1 min-w-0 select-none text-left", config.textClass)} title={module.name}>
+                {module.name || 'Sans titre'}
+              </span>
             )}
           </div>
 
           {/* Hover Actions */}
           {!isRenaming && (
-            <div className="flex items-center gap-1 opacity-0 group-hover/module:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-0 group-hover/module:opacity-100 transition-opacity shrink-0 ml-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();

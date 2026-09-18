@@ -346,14 +346,21 @@ export default function App() {
 
     setIsGeneratingDiagram(true);
     try {
+      const savedProvider = (localStorage.getItem('devnotes_ai_provider') as any) || 'openrouter';
+      const openRouterKey = localStorage.getItem('devnotes_openrouter_key') || '';
+      const geminiApiKey = localStorage.getItem('devnotes_gemini_key') || '';
+      const aiModel = localStorage.getItem('devnotes_ai_model') || 'google/gemini-2.0-flash-001';
+      const ollamaUrl = localStorage.getItem('devnotes_ollama_url') || 'http://localhost:11434';
+      const selectedKey = savedProvider === 'openrouter' ? openRouterKey : geminiApiKey;
+
       const res = await fetchApiWithFallback('/api/ai/generate-diagram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: activeNote.title,
           content: activeNote.content,
-          provider: aiProvider,
-          apiKey: (aiProvider === 'openrouter' ? openRouterKey : geminiApiKey).trim() || undefined,
+          provider: savedProvider,
+          apiKey: selectedKey.trim() || undefined,
           model: aiModel.trim() || undefined,
           ollamaUrl: ollamaUrl.trim() || undefined,
         }),
