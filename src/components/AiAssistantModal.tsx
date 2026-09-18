@@ -447,28 +447,66 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setProcessError(null);
 
     try {
-      const res = await fetch('/api/ai/process-note', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: inputContent,
-          mode: generationMode,
-          modules,
-          syntaxDefinitions,
-          provider: aiProvider,
-          apiKey: activeApiKey.trim() || undefined,
-          model: aiModel.trim() || undefined,
-          ollamaUrl: ollamaUrl.trim() || undefined,
-        }),
-      });
+      let res: Response | null = null;
+      let lastError: Error | null = null;
+      const candidateUrls = [
+        '/api/ai/process-note',
+        'http://127.0.0.1:3001/api/ai/process-note',
+        'http://localhost:3001/api/ai/process-note',
+      ];
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        if (res.status === 500 && !errJson?.error) {
-          throw new Error("Le serveur backend (port 3001) n'a pas répondu. Assurez-vous d'avoir lancé l'application avec 'npm run dev'.");
+      for (const url of candidateUrls) {
+        try {
+          const attempt = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              input: inputContent,
+              mode: generationMode,
+              modules,
+              syntaxDefinitions,
+              provider: aiProvider,
+              apiKey: activeApiKey.trim() || undefined,
+              model: aiModel.trim() || undefined,
+              ollamaUrl: ollamaUrl.trim() || undefined,
+            }),
+          });
+          if (attempt.ok) {
+            res = attempt;
+            break;
+          } else if (attempt.status !== 500 && attempt.status !== 502 && attempt.status !== 503 && attempt.status !== 504) {
+            // Client error (400, 401, etc.) - don't retry other urls
+            res = attempt;
+            break;
+          } else {
+            // Server error or proxy failure - record and try direct fallback
+            const errBody = await attempt.text().catch(() => '');
+            lastError = new Error(errBody || `HTTP ${attempt.status}`);
+          }
+        } catch (netErr: any) {
+          lastError = netErr;
         }
-        throw new Error(errJson?.error || `Erreur serveur (${res.status})`);
       }
+
+      if (!res || !res.ok) {
+        let errorDetails = lastError?.message || '';
+        if (res) {
+          try {
+            const rawText = await res.text();
+            try {
+              const parsed = JSON.parse(rawText);
+              errorDetails = parsed?.error || rawText;
+            } catch {
+              errorDetails = rawText;
+            }
+          } catch {}
+        }
+        if (!errorDetails || errorDetails.includes('ECONNREFUSED') || errorDetails.includes('500 Internal Server Error')) {
+          throw new Error("Le serveur backend (port 3001) n'a pas répondu. Assurez-vous que l'application est lancée avec 'npm run dev'.");
+        }
+        throw new Error(errorDetails || `Erreur serveur (${res?.status || 500})`);
+      }
+
       const data = await res.json();
       if (data.ok && data.note) {
         setAiResult(data.note);

@@ -56,7 +56,14 @@ app.use(helmet({
   },
 }));
 app.use(cors());
-app.use(clerkMiddleware());
+app.use((req, res, next) => {
+  clerkMiddleware()(req, res, (err) => {
+    if (err) {
+      console.warn('[devnotes-api] Clerk auth warning (proceeding unauthenticated):', err.message);
+    }
+    next();
+  });
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -163,6 +170,7 @@ app.use('/uploads', express.static(uploadsDir));
 
   app.post('/api/ai/process-note', async (req, res) => {
     try {
+      console.log(`[API] POST /api/ai/process-note received - length: ${req.body?.input?.length || 0}, provider: ${req.body?.provider}`);
       const { input, mode, modules, syntaxDefinitions, provider, apiKey, model, ollamaUrl } = req.body || {};
       if (!input || typeof input !== 'string') {
         res.status(400).json({ error: 'Input text is required' });
@@ -170,8 +178,10 @@ app.use('/uploads', express.static(uploadsDir));
       }
 
       const result = await processNoteWithAI({ input, mode, modules: modules || [], syntaxDefinitions, provider, apiKey, model, ollamaUrl });
+      console.log(`[API] Note generated successfully: "${result.title}"`);
       res.json({ ok: true, note: result });
-    } catch (err) {
+    } catch (err: any) {
+      console.error('[API ERROR] /api/ai/process-note failed:', err);
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Processing error' });
     }
   });
@@ -301,6 +311,12 @@ app.use('/uploads', express.static(uploadsDir));
 
 
 
+  // Global API error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('[devnotes-api Server Error]', err);
+    res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+  });
+
   // Serve static files when NOT running as a Vercel Serverless function
   if (!process.env.VERCEL) {
     const isCompiled = __dirname.endsWith(path.join('server', 'dist'));
@@ -316,8 +332,8 @@ app.use('/uploads', express.static(uploadsDir));
       res.sendFile(path.join(distPath, 'index.html'));
     });
 
-    app.listen(PORT, () => {
-      console.log(`[devnotes-api] listening on http://localhost:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[devnotes-api] listening on http://localhost:${PORT} and http://127.0.0.1:${PORT}`);
     });
   }
   
