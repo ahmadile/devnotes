@@ -474,6 +474,40 @@ export function parseVerbatimNote(
     }
   }
 
+  // If title was not explicitly set via 🔵 Titre, detect from Markdown headings (# Title) or first line
+  if (title === 'Nouvelle note DevNotes' || !title) {
+    const headingMatch = input.match(/^#+\s*(.+)$/m);
+    if (headingMatch) {
+      title = headingMatch[1].trim();
+    } else {
+      const firstLine = lines.find(l => l.trim() && !l.trim().startsWith('```') && !l.trim().startsWith('🟡') && !l.trim().startsWith('🟢') && !l.trim().startsWith('🔴'));
+      if (firstLine) {
+        title = firstLine.trim().slice(0, 80);
+      }
+    }
+  }
+
+  // If no code was found in 🔴 Bloc logique, auto-extract fenced code block from input
+  if (codeLines.length === 0) {
+    const codeBlockMatch = input.match(/```([a-zA-Z0-9_\-]+)?\s*\n([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      codeLanguage = codeBlockMatch[1] || 'python';
+      const extracted = codeBlockMatch[2].split('\n');
+      codeLines.push(...extracted);
+      if (!codeSnippetTitle) {
+        codeSnippetTitle = `Code — ${title}`;
+      }
+    }
+  }
+
+  // Auto-extract tags from #hashtags in input if none provided
+  if (tags.length === 0) {
+    const tagMatches = input.match(/(?:^|\s)#([a-zA-Z0-9_\-]+)/g);
+    if (tagMatches) {
+      tags.push(...tagMatches.map(t => t.trim().replace(/^#/, '')));
+    }
+  }
+
   // Clean leading and trailing blank lines from code
   while (codeLines.length > 0 && !codeLines[0].trim()) {
     codeLines.shift();
@@ -504,17 +538,25 @@ export function parseVerbatimNote(
   // Parse annotations
   const rawAnnotations: GeneratedAnnotation[] = [];
 
-  // If no explicit ⚫ annotations were present, auto-detect section markers in code (e.g. # --- 1) Title ---)
+  // If no explicit ⚫ annotations were present, auto-detect section markers or key elements in code
   if (rawLineAnnotations.length === 0 && codeLines.length > 0) {
     for (let i = 0; i < codeLines.length; i++) {
       const cLine = codeLines[i].trim();
-      const sectionMatch = cLine.match(/#\s*---\s*(\d+\)[^-]+)---/);
+      const sectionMatch = cLine.match(/#\s*(?:---\s*)?(\d+[\.\)\-][^-]+)(?:---)?/);
       if (sectionMatch) {
         const sectionTitle = sectionMatch[1].trim();
         rawLineAnnotations.push({
           marker: `⚫ Ligne ${i + 1}`,
-          text: `Ligne ${i + 1} : ${sectionTitle} — Étape clé illustrant les concepts abordés dans le cours.`,
+          text: `Ligne ${i + 1} : ${sectionTitle} — Étape clé illustrant les concepts abordés dans la note.`,
         });
+      } else if (cLine.startsWith('def ') || cLine.startsWith('class ')) {
+        const defMatch = cLine.match(/(?:def|class)\s+([a-zA-Z0-9_]+)/);
+        if (defMatch) {
+          rawLineAnnotations.push({
+            marker: `⚫ Ligne ${i + 1}`,
+            text: `Ligne ${i + 1} : ${cLine.startsWith('def') ? 'Fonction' : 'Classe'} \`${defMatch[1]}\` — Point d'entrée logique du snippet.`,
+          });
+        }
       }
     }
   }
@@ -604,203 +646,13 @@ export function fallbackProcessNote(
   modules: { id: string; name: string; parentId?: string | null }[] = [],
   syntaxDefinitions: Record<string, { keyword: string; text: string; fullContext?: string }> = {}
 ): GeneratedNoteResult {
-  // If the input is already formatted as a DevNotes structured note, use the 100% faithful verbatim parser
-  if (input.includes('🔵 Titre') || (input.includes('🟢 Résumé') && input.includes('🔴 Bloc logique'))) {
-    return parseVerbatimNote(input, modules, syntaxDefinitions);
-  }
-
   // Check if input is a video/audio transcript (timestamps 00:00 - 00:06 or numbered transcript items)
   if (/\b\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\b/.test(input) || (/^\s*1\.\s+[A-Za-z]/m.test(input) && !input.includes('🔵 Titre'))) {
     return parseTranscriptToNote(input, modules, syntaxDefinitions);
   }
 
-  let title = 'Nouvelle note DevNotes';
-  let tags: string[] = [];
-  let moduleName = '';
-  let content = '';
-  let codeSnippetTitle = '';
-  let codeLanguage = 'python';
-  let codeText = '';
-  const rawLineAnnotations: { marker: string; text: string }[] = [];
-
-  const lines = input.split('\n');
-  let currentSection: 'none' | 'title' | 'tags' | 'summary' | 'code_block' | 'annotations' = 'none';
-  let summaryLines: string[] = [];
-  let codeLines: string[] = [];
-  let isInsideFencedCode = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('🔵 Titre')) {
-      currentSection = 'title';
-      continue;
-    }
-    if (trimmed.startsWith('🟡 Tags')) {
-      currentSection = 'tags';
-      continue;
-    }
-    if (trimmed.startsWith('🟢 Résumé')) {
-      currentSection = 'summary';
-      continue;
-    }
-    if (trimmed.startsWith('🔴 Bloc logique du code')) {
-      currentSection = 'code_block';
-      continue;
-    }
-
-    if (trimmed.startsWith('⚫')) {
-      currentSection = 'annotations';
-      rawLineAnnotations.push({ marker: trimmed, text: trimmed.replace(/^⚫\s*/, '') });
-      continue;
-    }
-
-    if (currentSection === 'title' && trimmed) {
-      if (!title || title === 'Nouvelle note DevNotes') {
-        title = trimmed;
-      }
-    } else if (currentSection === 'tags' && trimmed) {
-      const parsedTags = trimmed.split(/[,;]/).map(t => t.trim().replace(/^#/, '')).filter(Boolean);
-      tags.push(...parsedTags);
-    } else if (currentSection === 'summary') {
-      summaryLines.push(line);
-    } else if (currentSection === 'code_block') {
-      if (trimmed.startsWith('⚪ Titre :') || trimmed.startsWith('⚪ Titre:')) {
-        codeSnippetTitle = trimmed.replace(/^⚪ Titre\s*:\s*/, '');
-      } else if (trimmed.startsWith('```')) {
-        if (!isInsideFencedCode) {
-          isInsideFencedCode = true;
-          const match = trimmed.match(/```(\w+)/);
-          if (match) codeLanguage = match[1];
-        } else {
-          isInsideFencedCode = false;
-        }
-      } else if (isInsideFencedCode) {
-        if (!trimmed.startsWith('⚫')) {
-          codeLines.push(line);
-        } else {
-          rawLineAnnotations.push({ marker: trimmed, text: trimmed.replace(/^⚫\s*/, '') });
-        }
-      } else if (trimmed === 'python' || trimmed === 'javascript' || trimmed === 'typescript' || trimmed === 'html' || trimmed === 'css') {
-        codeLanguage = trimmed;
-      } else if (trimmed && !codeSnippetTitle && !codeLines.length && !trimmed.startsWith('⚫')) {
-        codeSnippetTitle = trimmed;
-      }
-    } else if (currentSection === 'annotations') {
-      if (trimmed) {
-        if (rawLineAnnotations.length > 0) {
-          rawLineAnnotations[rawLineAnnotations.length - 1].text += ' ' + trimmed;
-        }
-      }
-    }
-  }
-
-  // If no fenced code block was found, check for plain code lines
-  if (codeLines.length === 0 && currentSection === 'code_block') {
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('⚫') && !trimmed.startsWith('🔴') && !trimmed.startsWith('🟢') && !trimmed.startsWith('🔵') && !trimmed.startsWith('🟡') && !trimmed.startsWith('⚪')) {
-        if (line.includes('def ') || line.includes(' = ') || line.includes('print(') || line.includes('return ') || line.includes('import ')) {
-          codeLines.push(line);
-        }
-      }
-    }
-  }
-
-  codeText = codeLines.join('\n');
-
-  // Format content markdown with rich visual elements, callouts, and schemas
-  if (summaryLines.length > 0) {
-    content = formatContentWithSchemas(summaryLines.join('\n'));
-  } else {
-    content = `### 📌 Vue d'ensemble\n\nNote générée pour **${title}**.\n\n> [!TIP]\n> Revois les détails du code et des sous-notes ci-dessous pour une meilleure assimilation.`;
-  }
-
-  // Generate precision Annotations mapped to line numbers in codeText
-  const rawAnnotations: GeneratedAnnotation[] = [];
-
-  for (let idx = 0; idx < rawLineAnnotations.length; idx++) {
-    const item = rawLineAnnotations[idx];
-    const fullText = item.text;
-    let shortTitle = fullText;
-    let fullContext = '';
-
-    // Handle "code — explanation" or "Ligne X : code — explanation" or "code : explanation"
-    if (fullText.includes(' — ')) {
-      const parts = fullText.split(' — ');
-      shortTitle = parts[0].trim();
-      fullContext = parts.slice(1).join(' — ').trim();
-    } else if (fullText.includes(' : ')) {
-      const parts = fullText.split(' : ');
-      shortTitle = parts[0].trim();
-      fullContext = parts.slice(1).join(' : ').trim();
-    }
-
-    let explicitLine: number | undefined = undefined;
-    let explicitEndLine: number | undefined = undefined;
-
-    const lineNumMatch = shortTitle.match(/Ligne\s+(\d+)(?:\s*-\s*(\d+))?/i);
-    if (lineNumMatch) {
-      explicitLine = parseInt(lineNumMatch[1], 10);
-      if (lineNumMatch[2]) {
-        explicitEndLine = parseInt(lineNumMatch[2], 10);
-      }
-    }
-
-    let type: GeneratedAnnotation['type'] = 'logic';
-    if (fullText.toLowerCase().includes('piège') || fullText.toLowerCase().includes('erreur') || fullText.toLowerCase().includes('attention')) {
-      type = 'warning';
-    } else if (fullText.toLowerCase().includes('crucial') || fullText.toLowerCase().includes('important')) {
-      type = 'important';
-    } else if (fullText.toLowerCase().includes('astuce') || fullText.toLowerCase().includes('imbriquée')) {
-      type = 'tip';
-    }
-
-    rawAnnotations.push({
-      line: explicitLine || (idx + 1),
-      endLine: explicitEndLine || explicitLine || (idx + 1),
-      text: shortTitle,
-      fullContext: fullContext || fullText,
-      type,
-      color: ANNOTATION_COLORS[type],
-    });
-  }
-
-  // Align annotations with exact line numbers in codeText
-  const annotations = alignAnnotationsWithCode(rawAnnotations, codeText);
-
-  // Cross-reference existing syntax definitions to auto-add green tag references
-  const syntaxKeys = Object.keys(syntaxDefinitions || {});
-  if (syntaxKeys.length > 0) {
-    const fullSearchText = (input + ' ' + codeText).toLowerCase();
-    syntaxKeys.forEach(key => {
-      const cleanKey = key.trim().toLowerCase();
-      if (cleanKey && fullSearchText.includes(cleanKey)) {
-        if (!tags.some(t => t.toLowerCase() === cleanKey)) {
-          tags.push(key);
-        }
-      }
-    });
-  }
-
-  const uniqueTags = Array.from(new Set(tags.map(t => t.replace(/^#/, '').trim()))).filter(Boolean);
-
-  return {
-    title: title || 'Note sans titre',
-    tags: uniqueTags.length > 0 ? uniqueTags : ['note', 'python'],
-    moduleName: moduleName || 'Python / Fonctions',
-    content,
-    snippets: [
-      {
-        title: codeSnippetTitle || 'Bloc de code principal',
-        language: codeLanguage || 'python',
-        code: codeText,
-        annotations,
-      },
-    ],
-  };
+  // Use our smart, resilient parser for structured notes, markdown, and plain text
+  return parseVerbatimNote(input, modules, syntaxDefinitions);
 }
 
 /**
@@ -980,11 +832,11 @@ export async function processNoteWithAI(req: ProcessNoteRequest): Promise<Genera
 
   const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
 
-  // If no API key is provided and local/offline mode, fall back to our enhanced smart verbatim parser
+  // If no API key is provided and local/offline mode, fall back to our smart parser
   if (!apiKey && provider !== 'ollama') {
-    return parseVerbatimNote(req.input, req.modules, req.syntaxDefinitions || {});
+    return fallbackProcessNote(req.input, req.modules, req.syntaxDefinitions || {});
   }
 
   const syntaxContext = req.syntaxDefinitions 
@@ -1065,7 +917,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelName,
+          model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
         }),
@@ -1120,8 +972,9 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
   if ((provider === 'gemini' || !provider) && apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1155,7 +1008,7 @@ export async function chatWithAI(params: {
 }): Promise<string> {
   const provider = params.provider || (params.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = params.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-  const modelName = params.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+  const modelName = params.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
   const userQuery = params.messages[params.messages.length - 1]?.content || '';
 
   const systemPrompt = `Tu es l'Assistant Pédagogique et Expert Technique de DevNotes.
@@ -1186,12 +1039,11 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
      \`\`\`
    - Mets en garde contre les pièges classiques (anti-patterns, boucles infinies, erreurs de référence ou de typage).
 
-3. INTERCONNEXION AVEC LES AUTRES NOTES & RAG :
-   - Utilise le contexte des autres notes et du Cursus DataCamp pour faire des ponts pédagogiques (ex: "Cela rejoint ce que tu as vu dans le chapitre précédent sur l'API OpenAI...").
-
-4. STYLE & FORMATAGE :
-   - Ton professionnel, bienveillant, direct et d'une clarté pédagogique irréprochable.
-   - Structure ta réponse en Markdown élégant : titres H3 (###), listes à puces claires, blocs de code annotés, schémas de flux, et alertes GitHub (> [!NOTE], > [!TIP], > [!WARNING]).`;
+Directives de réponse :
+- Explications claires, rigoureuses et vivantes.
+- Utilise Markdown complet (titres, listes, mini-blocs de code commentés \`\`\`python ... \`\`\`).
+- Si une question porte sur un code précis, donne la correction immédiate avec commentaires # → résultat.
+- Sois concis tout en étant exhaustif sur le fond.`;
 
   if (provider === 'openrouter' && apiKey) {
     try {
@@ -1204,7 +1056,7 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelName,
+          model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
           messages: [
             { role: 'system', content: systemPrompt },
             ...params.messages,
@@ -1214,7 +1066,7 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
 
       if (res.ok) {
         const data = await res.json() as any;
-        return data.choices?.[0]?.message?.content || "Aucune réponse reçue d'OpenRouter.";
+        return data.choices?.[0]?.message?.content || "Aucune réponse reçue du modèle.";
       }
     } catch (err: any) {
       console.error('[aiService] OpenRouter chat error:', err);
@@ -1249,8 +1101,9 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
   if ((provider === 'gemini' || !provider) && apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nQuestion de l'utilisateur : ${userQuery}` }] }],
       });
 
@@ -1512,7 +1365,7 @@ export function fallbackRevisionSession(
 export async function generateRevisionSession(req: RevisionRequest): Promise<GeneratedRevisionSession> {
   const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
 
   // Search existing notes for matches with the requested topic
   const topicWords = req.topic.toLowerCase().split(/\s+/).filter(w => w.length > 2);
@@ -1647,8 +1500,9 @@ Renvoie UNIQUEMENT un objet JSON valide conforme à ce schéma :
   if ((provider === 'gemini' || !provider) && apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         contents: systemPrompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1684,7 +1538,7 @@ export async function evaluateRevisionCode(params: {
 }): Promise<{ score: number; isCorrect: boolean; feedback: string; suggestion?: string }> {
   const provider = params.provider || (params.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = params.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-  const modelName = params.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+  const modelName = params.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
 
   const prompt = `Évalue le code écrit par l'étudiant pour l'exercice suivant :
 Exercice : ${params.exerciseTitle}
@@ -1721,7 +1575,7 @@ Renvoie UNIQUEMENT un JSON conforme à ce format :
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelName,
+          model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
         }),
@@ -1740,8 +1594,9 @@ Renvoie UNIQUEMENT un JSON conforme à ce format :
   if ((provider === 'gemini' || !provider) && apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1937,7 +1792,7 @@ class SolutionOrchestrator:
 export async function generateProjectBlueprint(req: ProjectBlueprintRequest): Promise<ProjectBlueprintResult> {
   const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
 
   // Build summarized context from all notes
   const notesOverview = (req.notesContext || []).map(n => {
@@ -2024,7 +1879,7 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelName,
+          model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
         }),
@@ -2049,8 +1904,9 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
   if ((provider === 'gemini' || !provider) && apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -2132,7 +1988,7 @@ export interface ExplainNoteResponse {
 export async function explainNoteConcept(req: ExplainNoteRequest): Promise<ExplainNoteResponse> {
   const provider = req.provider || (req.apiKey?.startsWith('sk-or-') ? 'openrouter' : 'gemini');
   const apiKey = req.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.5-flash' : provider === 'ollama' ? 'llama3' : 'gemini-2.5-flash');
+  const modelName = req.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : provider === 'ollama' ? 'llama3' : 'gemini-2.0-flash');
 
   const analogyMode = req.analogyMode || 'universal';
 
@@ -2200,7 +2056,7 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelName,
+          model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
           messages: [{ role: 'user', content: systemPrompt }],
         }),
       });
@@ -2225,8 +2081,9 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
   if ((provider === 'gemini' || !provider) && apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const geminiModel = (modelName || 'gemini-2.0-flash').replace(/^google\//, '').replace('2.5', '2.0');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: geminiModel,
         contents: systemPrompt,
       });
 
@@ -2544,7 +2401,7 @@ Format JSON STRICT de réponse (aucun texte avant ou après) :
       const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash',
         contents: [
           {
             role: 'user',
@@ -2587,7 +2444,7 @@ Format JSON STRICT de réponse (aucun texte avant ou après) :
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: req.model || 'google/gemini-2.5-flash',
+          model: (req.model || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
           messages: [{ role: 'user', content: contentParts }],
           response_format: { type: 'json_object' },
         }),

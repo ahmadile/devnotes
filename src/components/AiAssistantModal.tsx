@@ -315,10 +315,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   );
   const [openRouterKey, setOpenRouterKey] = useState(() => localStorage.getItem('devnotes_openrouter_key') || '');
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('devnotes_gemini_key') || '');
-  const [aiModel, setAiModel] = useState(() => localStorage.getItem('devnotes_ai_model') || 'google/gemini-2.5-flash');
+  const [aiModel, setAiModel] = useState(() => localStorage.getItem('devnotes_ai_model') || 'google/gemini-2.0-flash-001');
   const [ollamaUrl, setOllamaUrl] = useState(() => localStorage.getItem('devnotes_ollama_url') || 'http://localhost:11434');
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
 
   // Persistent Chat History state
   const [conversations, setConversations] = useState<AiConversation[]>(() => {
@@ -443,6 +444,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     if (!inputContent.trim()) return;
     setIsProcessing(true);
     setAiResult(null);
+    setProcessError(null);
 
     try {
       const res = await fetch('/api/ai/process-note', {
@@ -460,13 +462,19 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         }),
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || `Erreur serveur (${res.status})`);
+      }
       const data = await res.json();
       if (data.ok && data.note) {
         setAiResult(data.note);
+      } else {
+        throw new Error(data.error || "Impossible de structurer la note.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to process note:', err);
+      setProcessError(err.message || "Erreur lors du traitement. Vérifiez que le serveur backend est bien démarré.");
     } finally {
       setIsProcessing(false);
     }
@@ -1200,6 +1208,16 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     </>
                   )}
                 </button>
+
+                {processError && (
+                  <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2.5 animate-fadeIn">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="font-bold text-rose-300 block">Erreur de génération :</span>
+                      <p className="text-[11px] text-rose-200/90 leading-relaxed">{processError}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right Column: Live Interactive Preview */}
@@ -1835,7 +1853,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="google/gemini-2.5-flash ou anthropic/claude-3.5-sonnet ou meta-llama/llama-3.3-70b-instruct"
+                    placeholder="google/gemini-2.0-flash-001 ou anthropic/claude-3.5-sonnet ou meta-llama/llama-3.3-70b-instruct"
                     value={aiModel}
                     onChange={(e) => setAiModel(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
