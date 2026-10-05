@@ -924,20 +924,23 @@ Directives fondamentales de traitement :
    - Si l'entrée utilisateur contient déjà une note (ex: 🔵 Titre, 🟢 Résumé, etc.) :
      * RESPECTE STRICTEMENT l'intégralité des explications, des points numérotés, des analogies, des comparaisons et des exemples de l'auteur. NE RÉDUIS PAS, NE CONDENSE PAS AU DÉTRIMENT DU SENS.
      * FORMATAGE DES MINI-BLOCS DE CODE : Tous les blocs précédés du mot "python" ou placés entre deux paragraphes doivent impérativement être formatés dans un vrai bloc Markdown \`\`\`python ... \`\`\` avec leurs sorties commentées (# → ...). JAMAIS de mot "python" isolé en texte simple !
-     * FORMATAGE DES SCHÉMAS : Les schémas de flux fléchés séquentiels doivent être formatés en bloc \`\`\`flow avec les cartes sémantiques [slate], [emerald], [indigo], [terracotta]. Les diagrammes ASCII complexes (arborescences, grilles) doivent être mis dans un bloc \`\`\`text.
+     * FORMATAGE DES SCHÉMAS : Si la note contient un schéma de flux ou si le sujet s'y prête, génère et formate le schéma visuel directement dès le départ : soit en bloc \`\`\`flow avec les cartes sémantiques [slate], [emerald], [indigo], [terracotta], soit en bloc \`\`\`mermaid (flowchart TD), soit en bloc \`\`\`text pour les arborescences ASCII.
      * EXTRAIS LE CODE COMPLET : Place le script principal dans "snippets" sous le titre de '⚪ Titre', et génère des annotations précises pour les sections numérotées (# --- 1) ... ---).
 
-2. TRAITEMENT D'UNE TRANSCRIPTION BRUTE OU SUJET :
+2. TRAITEMENT D'UNE TRANSCRIPTION BRUTE OU D'UN SUJET (GÉNÉRATION COMPLÈTE & SCHÉMA DÈS LE DÉPART) :
    - Produis une fiche de cours de référence "Staff Engineer / DataCamp", approfondie, claire, visuelle et extrêmement pédagogique.
    - Traduis et synthétise en français technique impeccable sans bruit oral.
    - Insère des micro-blocs de code commentés (\`\`\`python ... \`\`\`) avec sorties "# → ...".
-   - Schématise le pipeline dans un bloc \`\`\`flow (avec cartes colorées).
+   - SCHÉMA VISUEL DÈS LE DÉPART (OBLIGATOIRE) : Inclus SYSTÉMATIQUEMENT dès la création de la note une section dédiée "### 📊 Architecture & Schéma Visuel" ou "### ⚡ Flux Logique" qui schématise les étapes clés, le pipeline de données ou l'arborescence des concepts :
+     * Soit un bloc \`\`\`flow avec des cartes d'étapes séquentielles colorées (format : Titre de l'étape | Description courte | slate/emerald/indigo/terracotta/purple).
+     * Soit un bloc \`\`\`mermaid (flowchart TD compact avec sous-graphes et classes sémantiques).
+     * Soit un schéma conceptuel ASCII précis dans un bloc \`\`\`text.
    - Fournis le script complet exécutable dans "snippets" avec des sous-notes précises (annotations) sur les lignes clés.
 
 3. STRUCTURE PÉDAGOGIQUE DU CHAMP "content" (Markdown Haute Précision) :
-   - Titres H3 clairs (### 1) ..., ### Le problème que ça résout, etc.).
+   - Titres H3 clairs (### Le problème que ça résout, ### Qu'est-ce que ..., etc.).
    - Alertes GitHub (> [!NOTE] pour les analogies, > [!TIP] pour les bonnes pratiques).
-   - Schémas visuels de flux (\`\`\`flow) ou schémas ASCII (\`\`\`text).
+   - Section Schéma Visuel dès le départ ("### 📊 Architecture & Schéma Visuel" ou "### ⚡ Flux Logique") intégrée directement au texte.
 
 4. CODE SOURCE COMPLET & ANNOTATIONS (champ "snippets") :
    - 'title' : Titre clair du script.

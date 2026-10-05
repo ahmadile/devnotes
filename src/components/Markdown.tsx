@@ -419,7 +419,7 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         .replace(/\bstyle="[^"]*"/gi, '')
         .replace(/\bwidth="[^"]*"/gi, '')
         .replace(/\bheight="[^"]*"/gi, '');
-      return `<svg ${clean} width="100%" height="100%" style="max-width:100%; max-height:100%; display:block; margin:auto;" preserveAspectRatio="xMidYMid meet">`;
+      return `<svg ${clean} width="100%" style="width: 100%; max-width: 100%; height: auto; min-width: 280px; display: block; margin: auto;">`;
     });
   };
 
@@ -538,8 +538,8 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     return (
       <div 
         className={cn(
-          "w-full relative overflow-hidden bg-[#090b10] flex items-center justify-center p-3 select-none",
-          inFullscreen ? "h-full" : "h-[360px] md:h-[420px]"
+          "w-full relative bg-[#090b10] flex items-center justify-center p-4 sm:p-6 select-none",
+          inFullscreen ? "h-full overflow-hidden" : "min-h-[280px] max-h-[620px] overflow-auto"
         )}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -548,7 +548,7 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
       >
         <div 
           className={cn(
-            "w-full h-full flex items-center justify-center transition-transform duration-75",
+            "w-full flex items-center justify-center transition-transform duration-75",
             isDragging ? "cursor-grabbing" : "cursor-grab",
             // Rounded corners on node rects and clean edge strokes
             "[&_.node_rect]:rx-2 [&_.node_rect]:ry-2 [&_.node_polygon]:stroke-[1.5px]"

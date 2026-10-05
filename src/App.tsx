@@ -3,8 +3,7 @@ import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
 import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
-import { Note, CodeSnippet, AppSettings, SyntaxDefinition, Module } from './types';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste, Layers, Loader2 } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -336,57 +335,7 @@ export default function App() {
     });
   };
 
-  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
 
-  const handleGenerateDiagram = async () => {
-    if (!activeNote || !activeNote.content.trim()) {
-      alert("Écrivez d'abord quelques lignes ou du code dans votre note pour que l'IA génère le schéma.");
-      return;
-    }
-
-    setIsGeneratingDiagram(true);
-    try {
-      const savedProvider = (localStorage.getItem('devnotes_ai_provider') as any) || 'openrouter';
-      const openRouterKey = localStorage.getItem('devnotes_openrouter_key') || '';
-      const geminiApiKey = localStorage.getItem('devnotes_gemini_key') || '';
-      const aiModel = localStorage.getItem('devnotes_ai_model') || 'google/gemini-2.0-flash-001';
-      const ollamaUrl = localStorage.getItem('devnotes_ollama_url') || 'http://localhost:11434';
-      const selectedKey = savedProvider === 'openrouter' ? openRouterKey : geminiApiKey;
-
-      const res = await fetchApiWithFallback('/api/ai/generate-diagram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: activeNote.title,
-          content: activeNote.content,
-          provider: savedProvider,
-          apiKey: selectedKey.trim() || undefined,
-          model: aiModel.trim() || undefined,
-          ollamaUrl: ollamaUrl.trim() || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.ok && data.chart) {
-        const diagramMarkdown = `\n\n### 📊 Architecture & Schéma Visuel\n\n\`\`\`mermaid\n${data.chart}\n\`\`\`\n\n`;
-        updateNote({
-          ...activeNote,
-          content: (activeNote.content ? activeNote.content.trim() : '') + diagramMarkdown,
-        });
-        setEditorTab('preview');
-      }
-    } catch (err: any) {
-      console.error('Diagram generation error:', err);
-      alert("Impossible de générer le schéma visuel : " + (err.message || 'erreur de connexion'));
-    } finally {
-      setIsGeneratingDiagram(false);
-    }
-  };
 
   // Auto-grow note content textarea height and prevent scroll jumping
   useEffect(() => {
@@ -1263,21 +1212,6 @@ export default function App() {
                           >
                             <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                             <span>Expliquer</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleGenerateDiagram}
-                            disabled={isGeneratingDiagram}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 border border-purple-200 dark:border-purple-400/20 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                            title="Générer automatiquement un schéma d'architecture ou de flux avec l'IA"
-                          >
-                            {isGeneratingDiagram ? (
-                              <Loader2 className="w-3 h-3 text-purple-500 animate-spin" />
-                            ) : (
-                              <Layers className="w-3 h-3 text-purple-500" />
-                            )}
-                            <span>{isGeneratingDiagram ? 'Schéma...' : 'Schéma IA'}</span>
                           </button>
 
                           <div className="flex items-center gap-1">
