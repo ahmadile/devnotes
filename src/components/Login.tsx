@@ -16,7 +16,7 @@ export const Login: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 neon-glow">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4 shadow-sm">
             <Logo size={40} className="w-10 h-10" />
           </div>
           <h1 className="text-3xl font-black tracking-tight mb-2">DevNotes</h1>
@@ -36,7 +36,7 @@ export const Login: React.FC = () => {
                 headerTitle: "hidden",
                 headerSubtitle: "hidden",
                 socialButtonsBlockButton: "bg-white/5 border-white/10 hover:bg-white/10 text-foreground transition-all",
-                formButtonPrimary: "bg-primary hover:bg-primary/80 transition-all",
+                formButtonPrimary: "bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold transition-all",
                 footerActionText: "text-muted-foreground",
                 footerActionLink: "text-primary hover:text-primary/80",
                 identityPreviewText: "text-foreground",

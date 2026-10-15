@@ -3,7 +3,7 @@ import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
 import { Sidebar } from './components/Sidebar';
 import { CodeEditor } from './components/CodeEditor';
 import { Login } from './components/Login';
-import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste } from 'lucide-react';
+import { Plus, Save, Trash2, Tag, Layout, CloudUpload, CloudDownload, Download, Upload, Settings as SettingsIcon, Sun, Moon, ChevronUp, Edit3, Eye, ChevronDown, BookOpen, Folder, Sparkles, GraduationCap, Briefcase, X, Lightbulb, Image as ImageIcon, ClipboardPaste, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
@@ -891,7 +891,7 @@ export default function App() {
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Concevoir un Projet & Architecture Solution (Tech Lead)"
                   >
-                    <Briefcase className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" strokeWidth={1.5} />
+                    <Layers className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Architecte Pro</span>
                   </button>
                   <button
@@ -899,16 +899,16 @@ export default function App() {
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] shadow-xs transition-all cursor-pointer group"
                     title="Lancer le Mode Révision & Entraînement (Flashcards, Quiz, Défis Code)"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" strokeWidth={1.5} />
+                    <BookOpen className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Réviser</span>
                   </button>
                   <button
                     onClick={() => openAiAssistant('chat', activeNote?.title)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-900 dark:text-zinc-100 bg-blue-500/10 dark:bg-[#19191d] hover:bg-blue-500/15 dark:hover:bg-[#222227] border border-blue-500/30 dark:border-blue-400/20 shadow-xs transition-all cursor-pointer group"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 border border-zinc-800 dark:border-white/20 shadow-xs transition-all cursor-pointer group"
                     title="Ouvrir l'Assistant IA (Discussion, Explications, Analogies, Questions sur la note)"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 transition-colors" strokeWidth={1.5} />
-                    <span className="font-semibold">Assistant IA</span>
+                    <Sparkles className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-700 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" strokeWidth={1.5} />
+                    <span>Assistant IA</span>
                   </button>
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -1207,10 +1207,10 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => openAiAssistant('chat', `Explique-moi cette note ("${activeNote.title}") en profondeur avec des analogies concrètes, le décorticage du code pas à pas et les pièges à éviter.`)}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-400/20 transition-all cursor-pointer shadow-2xs"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.06] hover:bg-zinc-200 dark:hover:bg-white/[0.1] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all cursor-pointer shadow-2xs group"
                             title="Demander à l'assistant d'expliquer cette note en détail avec analogies"
                           >
-                            <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                            <Sparkles className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
                             <span>Expliquer</span>
                           </button>
 
@@ -1218,20 +1218,20 @@ export default function App() {
                             <button
                               type="button"
                               onClick={handlePasteImageFromClipboard}
-                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 bg-secondary/50 hover:bg-secondary border border-border/50 transition-all cursor-pointer shadow-2xs"
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.06] hover:bg-zinc-200 dark:hover:bg-white/[0.1] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all cursor-pointer shadow-2xs group"
                               title="Coller l'image depuis le presse-papiers (ou faites Ctrl+V dans l'éditeur)"
                             >
-                              <ClipboardPaste className="w-3 h-3 text-blue-500" />
+                              <ClipboardPaste className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
                               <span className="hidden sm:inline">Coller image</span>
                             </button>
 
                             <button
                               type="button"
                               onClick={() => imageFileInputRef.current?.click()}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 bg-secondary/50 hover:bg-secondary border border-border/50 transition-all cursor-pointer shadow-2xs"
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.06] hover:bg-zinc-200 dark:hover:bg-white/[0.1] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all cursor-pointer shadow-2xs group"
                               title="Importer une image depuis votre ordinateur"
                             >
-                              <ImageIcon className="w-3 h-3 text-emerald-500" />
+                              <ImageIcon className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
                               <span className="hidden sm:inline">Image</span>
                             </button>
                             <input 
@@ -1418,9 +1418,9 @@ export default function App() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
                   onClick={scrollToTop}
-                  className="fixed bottom-8 right-8 p-3 bg-primary text-white rounded-full shadow-lg hover:scale-110 transition-all z-50 neon-glow"
+                  className="fixed bottom-8 right-8 p-3 bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 rounded-full shadow-lg hover:scale-105 border border-zinc-700/60 dark:border-white/20 transition-all z-50 cursor-pointer"
                 >
-                  <ChevronUp className="w-6 h-6" />
+                  <ChevronUp className="w-5 h-5" strokeWidth={1.5} />
                 </motion.button>
               )}
             </AnimatePresence>

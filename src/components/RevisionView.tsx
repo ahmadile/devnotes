@@ -224,16 +224,16 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
           <button
             onClick={() => startRevision()}
             disabled={isLoading || !topicInput.trim()}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md shadow-blue-500/15 disabled:opacity-50 transition-all cursor-pointer shrink-0"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 font-semibold text-xs shadow-xs disabled:opacity-40 transition-all cursor-pointer shrink-0"
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-white dark:border-zinc-400 dark:border-t-zinc-900 rounded-full animate-spin" />
                 <span>Génération...</span>
               </>
             ) : (
               <>
-                <GraduationCap className="w-4 h-4" />
+                <BookOpen className="w-4 h-4" strokeWidth={1.5} />
                 <span>Lancer la Révision</span>
               </>
             )}
@@ -254,7 +254,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                   setTopicInput(top);
                   startRevision(top);
                 }}
-                className="text-xs px-2.5 py-1 rounded-lg bg-secondary hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-300 border border-border/60 transition-all cursor-pointer"
+                className="text-xs px-2.5 py-1 rounded-lg bg-secondary hover:bg-zinc-200 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white border border-border/60 transition-all cursor-pointer"
               >
                 {top}
               </button>
@@ -326,7 +326,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-zinc-100 dark:bg-[#16161a] border border-zinc-200 dark:border-white/[0.08]">
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-600 text-white shadow-xs">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs">
                     Session de Révision
                   </span>
                   {session.isFromExistingNotes ? (
@@ -335,8 +335,8 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                       Basé sur vos notes ({session.sourceNoteTitles?.length || 1})
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" />
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-200 dark:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-white/[0.1] flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
                       Fiche générée par l'IA
                     </span>
                   )}
@@ -560,7 +560,7 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                       setCurrentCardIndex(prev => Math.min(session.flashcards.length - 1, prev + 1));
                     }}
                     disabled={currentCardIndex === session.flashcards.length - 1}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-30 text-xs transition-all cursor-pointer shadow-xs shadow-blue-500/10"
+                    className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 font-semibold disabled:opacity-30 text-xs transition-all cursor-pointer shadow-xs"
                   >
                     Suivant
                   </button>
@@ -809,16 +809,16 @@ export const RevisionView: React.FC<RevisionViewProps> = ({
                         <button
                           onClick={() => evaluateCodeAttempt(currentEx)}
                           disabled={isEvaluatingCode}
-                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-500/10 disabled:opacity-50 transition-all cursor-pointer"
+                          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 text-xs font-semibold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
                         >
                           {isEvaluatingCode ? (
                             <>
-                              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-white dark:border-zinc-400 dark:border-t-zinc-900 rounded-full animate-spin" />
                               <span>Vérification IA...</span>
                             </>
                           ) : (
                             <>
-                              <Sparkles className="w-3.5 h-3.5" />
+                              <Sparkles className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-700" strokeWidth={1.5} />
                               <span>Vérifier mon code avec l'IA</span>
                             </>
                           )}

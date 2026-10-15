@@ -1297,24 +1297,24 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     Texte Brut / Format de la Note
                   </label>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setInputContent(TEMPLATE_5_BLOCKS)}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.04] hover:bg-zinc-200 dark:hover:bg-white/[0.08] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs group"
                       title="Insérer la structure standard des 5 blocs (Titre, Tags, Résumé, Code, Annotations)"
                     >
-                      <ClipboardList className="w-3 h-3" />
-                      Modèle 5 Blocs
+                      <Layers className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
+                      <span>Modèle 5 Blocs</span>
                     </button>
                     <button
                       type="button"
                       onClick={handlePasteImageFromClipboard}
-                      className="text-xs text-sky-400 hover:text-sky-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.04] hover:bg-zinc-200 dark:hover:bg-white/[0.08] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs group"
                       title="Coller une image ou capture d'écran du diagramme depuis le presse-papier ou importer un fichier"
                     >
-                      <ImageIcon className="w-3 h-3" />
-                      Coller Image / Schéma
+                      <ImageIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
+                      <span>Coller Image / Schéma</span>
                     </button>
                     <input
                       ref={hiddenImageInputRef}
@@ -1326,19 +1326,19 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setInputContent(DEFAULT_EXAMPLE_INPUT)}
-                      className="text-xs text-zinc-400 hover:text-zinc-200 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.04] hover:bg-zinc-200 dark:hover:bg-white/[0.08] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs group"
                     >
-                      <Sparkles className="w-3 h-3" />
-                      Exemple
+                      <BookOpen className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
+                      <span>Exemple</span>
                     </button>
                     {inputContent && (
                       <button
                         type="button"
                         onClick={handleClearInput}
-                        className="text-xs text-rose-400 hover:text-rose-300 font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-500 hover:text-rose-500 dark:hover:text-rose-400 bg-zinc-100 dark:bg-white/[0.04] hover:bg-zinc-200 dark:hover:bg-white/[0.08] border border-zinc-200 dark:border-white/[0.08] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                       >
-                        <Eraser className="w-3 h-3" />
-                        Réinitialiser
+                        <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>Réinitialiser</span>
                       </button>
                     )}
                   </div>
@@ -1347,8 +1347,8 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 {/* Intelligent AI Ingestion Indicator */}
                 <div className="p-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-zinc-600 dark:text-zinc-300 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                      <Zap className="w-4 h-4 text-blue-500" />
+                    <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-white/[0.06] border border-zinc-300 dark:border-white/[0.1] flex items-center justify-center shrink-0">
+                      <Zap className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" strokeWidth={1.5} />
                     </div>
                     <div className="flex flex-col">
                       {inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique')) ? (
@@ -1374,7 +1374,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     "text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0 font-medium",
                     inputContent.includes('🔵 Titre') 
                       ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-400/20"
-                      : "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-400/20"
+                      : "bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-white/[0.1]"
                   )}>
                     {inputContent.includes('🔵 Titre') ? '5 Blocs Détectés' : 'Auto-Intelligent'}
                   </span>
@@ -1414,13 +1414,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   <button
                     onClick={() => handleProcessNote('verbatim')}
                     disabled={!inputContent.trim() || isProcessing}
-                    className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none group text-left"
+                    className="py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-900 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:active:bg-white/[0.14] dark:text-zinc-100 border border-zinc-300 dark:border-white/[0.12] rounded-xl text-xs font-semibold transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none group text-left"
                     title="Intégrer directement la note sans appeler d'IA externe (0 délai, 0 token, extraction fidèle des 5 blocs)"
                   >
-                    <Zap className="w-4 h-4 text-emerald-200 shrink-0 group-hover:scale-110 transition-transform" strokeWidth={2} />
+                    <Zap className="w-4 h-4 text-zinc-600 dark:text-zinc-300 shrink-0 group-hover:scale-105 transition-transform" strokeWidth={1.5} />
                     <div className="flex flex-col min-w-0">
-                      <span className="font-bold leading-tight truncate">Passer directement</span>
-                      <span className="text-[10px] font-normal text-emerald-100/80 leading-tight">Sans IA · 0s · 5 Blocs</span>
+                      <span className="font-semibold leading-tight truncate">Passer directement</span>
+                      <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400 leading-tight">Sans IA · 0s · 5 Blocs</span>
                     </div>
                   </button>
 
@@ -1428,23 +1428,23 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   <button
                     onClick={() => handleProcessNote('auto')}
                     disabled={!inputContent.trim() || isProcessing}
-                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none group text-left"
+                    className="py-2.5 px-3 bg-zinc-950 hover:bg-zinc-800 active:bg-zinc-900 text-white dark:bg-white dark:hover:bg-zinc-100 dark:active:bg-zinc-200 dark:text-zinc-950 rounded-xl text-xs font-semibold transition-all shadow-xs border border-zinc-800 dark:border-white/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none group text-left"
                     title="Utiliser l'IA DevNotes pour synthétiser, annoter et générer le schéma en 1 seule passe"
                   >
                     {isProcessing ? (
                       <>
-                        <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                        <RefreshCw className="w-4 h-4 animate-spin shrink-0 text-white dark:text-zinc-950" strokeWidth={1.5} />
                         <div className="flex flex-col min-w-0">
-                          <span className="font-bold leading-tight">Traitement IA...</span>
-                          <span className="text-[10px] font-normal text-blue-100/80 leading-tight">Analyse en cours</span>
+                          <span className="font-semibold leading-tight">Traitement IA...</span>
+                          <span className="text-[10px] font-normal opacity-80 leading-tight">Analyse en cours</span>
                         </div>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 text-blue-200 shrink-0 group-hover:scale-110 transition-transform" strokeWidth={1.5} />
+                        <Sparkles className="w-4 h-4 text-zinc-300 dark:text-zinc-700 shrink-0 group-hover:scale-105 transition-transform" strokeWidth={1.5} />
                         <div className="flex flex-col min-w-0">
-                          <span className="font-bold leading-tight truncate">Structurer avec l'IA</span>
-                          <span className="text-[10px] font-normal text-blue-100/80 leading-tight">Transcription · 1-Pass</span>
+                          <span className="font-semibold leading-tight truncate">Structurer avec l'IA</span>
+                          <span className="text-[10px] font-normal text-zinc-400 dark:text-zinc-600 leading-tight">Transcription · 1-Pass</span>
                         </div>
                       </>
                     )}
@@ -1475,20 +1475,20 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       {activeNote && (
                         <button
                           onClick={() => handleCreateNoteFromAi(true)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center gap-1.5 cursor-pointer"
+                          className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 dark:bg-white/[0.08] dark:hover:bg-white/[0.12] dark:text-zinc-100 border border-zinc-200 dark:border-white/[0.1] rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                           title="Met à jour la note actuellement ouverte"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                          Mettre à jour la note active
+                          <RefreshCw className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" strokeWidth={1.5} />
+                          <span>Mettre à jour la note active</span>
                         </button>
                       )}
                       <button
                         onClick={() => handleCreateNoteFromAi(false)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 rounded-lg text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                         title="Créer une nouvelle note distincte"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        {activeNote ? 'Créer comme nouvelle' : 'Enregistrer dans DevNotes'}
+                        <Check className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-800" strokeWidth={1.5} />
+                        <span>{activeNote ? 'Créer comme nouvelle' : 'Enregistrer dans DevNotes'}</span>
                       </button>
                     </div>
                   )}
@@ -1787,10 +1787,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       type="button"
                       onClick={() => handleSendChat(`Explique-moi cette note ("${activeNote.title}") en profondeur avec des analogies concrètes, le décorticage du code pas à pas et les pièges à éviter.`)}
                       disabled={isChatSending}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all cursor-pointer shadow-xs shadow-blue-500/15"
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.08] hover:bg-zinc-200 dark:hover:bg-white/[0.12] border border-zinc-200 dark:border-white/[0.1] disabled:opacity-50 transition-all cursor-pointer shadow-2xs group"
                       title="Expliquer cette note en profondeur avec analogies et détails"
                     >
-                      <Sparkles className="w-3 h-3 text-white" />
+                      <Sparkles className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" strokeWidth={1.5} />
                       <span>Expliquer cette note</span>
                     </button>
                     <span className="text-[10px] text-zinc-400 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06] font-mono shrink-0 hidden md:inline-block">
@@ -1950,7 +1950,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <button
                   onClick={() => handleSendChat()}
                   disabled={!chatInput.trim() || isChatSending}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs shadow-blue-500/15"
+                  className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
                 >
                   <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
                   Envoyer
@@ -2105,7 +2105,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 <div className="flex items-center justify-end pt-3">
                   <button
                     onClick={handleSaveSettings}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-500/15"
+                    className="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-xs"
                   >
                     Enregistrer les Paramètres
                   </button>
@@ -2174,7 +2174,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                           key={idx}
                           type="button"
                           onClick={() => setBlueprintPrompt(idea)}
-                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1a1a1f] hover:bg-blue-500/10 dark:hover:bg-[#24242c] border border-zinc-200 dark:border-white/[0.08] hover:border-blue-400/40 text-[11px] font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-blue-300 transition-all text-left cursor-pointer shadow-2xs"
+                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1a1a1f] hover:bg-zinc-100 dark:hover:bg-[#24242c] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.16] text-[11px] font-medium text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white transition-all text-left cursor-pointer shadow-2xs"
                         >
                           {idea}
                         </button>
@@ -2210,16 +2210,16 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <button
                       onClick={() => handleGenerateBlueprint()}
                       disabled={isArchitectProcessing || !blueprintPrompt.trim()}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-500/15"
+                      className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 disabled:opacity-40 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-xs"
                     >
                       {isArchitectProcessing ? (
                         <>
-                          <Brain className="w-4 h-4 animate-spin text-white" />
+                          <Brain className="w-4 h-4 animate-spin text-white dark:text-zinc-950" strokeWidth={1.5} />
                           <span>Conception architecturale en cours...</span>
                         </>
                       ) : (
                         <>
-                          <Briefcase className="w-4 h-4" />
+                          <Layers className="w-4 h-4" strokeWidth={1.5} />
                           <span>Concevoir l'Architecture du Projet</span>
                         </>
                       )}
@@ -2235,7 +2235,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       onClick={() => setBlueprintResult(null)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-xs font-semibold transition-colors cursor-pointer"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
                       <span>Modifier le prompt</span>
                     </button>
 
@@ -2245,15 +2245,15 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-semibold transition-colors cursor-pointer"
                         title="Copier tout le dossier technique en Markdown"
                       >
-                        {blueprintCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {blueprintCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.5} /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />}
                         <span>{blueprintCopied ? 'Copié !' : 'Copier Markdown'}</span>
                       </button>
 
                       <button
                         onClick={handleSaveBlueprintAsNote}
-                        className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-500/15 cursor-pointer"
+                        className="flex items-center gap-2 px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer"
                       >
-                        {blueprintSavedSuccess ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Plus className="w-3.5 h-3.5" />}
+                        {blueprintSavedSuccess ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.5} /> : <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />}
                         <span>{blueprintSavedSuccess ? 'Projet Enregistré !' : 'Créer la Note Projet'}</span>
                       </button>
                     </div>
@@ -2262,7 +2262,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   {/* Overview Header Card */}
                   <div className="p-6 rounded-2xl bg-card border border-border shadow-md space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 font-mono">
+                      <span className="px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-white/[0.06] border border-zinc-200 dark:border-white/[0.1] text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 font-mono">
                         Dossier d'Architecture
                       </span>
                       {(blueprintResult.suggestedTags || []).map(t => (
@@ -2564,16 +2564,16 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               <button
                 onClick={handleIngestCurriculum}
                 disabled={(!curriculumImage && !curriculumInputText.trim()) || isCurriculumProcessing}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 border border-zinc-800 dark:border-white/20 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
               >
                 {isCurriculumProcessing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-white dark:text-zinc-950" strokeWidth={1.5} />
                     <span>Analyse multimodale du Cursus DataCamp...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 text-zinc-300 dark:text-zinc-700" strokeWidth={1.5} />
                     <span>Analyser et Structurer le Cursus</span>
                   </>
                 )}
@@ -2585,7 +2585,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold">
+                        <span className="text-[10px] font-mono uppercase tracking-wider bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/[0.1] px-2 py-0.5 rounded font-bold">
                           Cursus Détecté
                         </span>
                       </div>
