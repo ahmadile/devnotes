@@ -73,6 +73,8 @@ export const autoFormatMarkdown = (text: string): string => {
   let nakedLines: string[] = [];
 
   const isLangHeader = (l: string) => /^(python|javascript|typescript|sql|bash|sh|css|html|json)$/i.test(l.trim());
+  const isMermaidHeader = (l: string) => /^(mermaid|graph\s+[A-Za-z0-9_]+|flowchart\s+[A-Za-z0-9_]+|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitGraph|mindmap|timeline)/i.test(l.trim());
+  const isFlowStart = (l: string) => /^\[.+?\s*\|\s*.+?\s*\|\s*(?:slate|emerald|indigo|terracotta|purple|blue|zinc|rose)\]/i.test(l.trim());
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -96,6 +98,22 @@ export const autoFormatMarkdown = (text: string): string => {
       continue;
     }
 
+    // Check for naked Mermaid diagram starting without ```mermaid fence
+    if (!inNaked && isMermaidHeader(trimmed)) {
+      inNaked = true;
+      nakedLang = 'mermaid';
+      nakedLines = trimmed.toLowerCase() === 'mermaid' ? [] : [line];
+      continue;
+    }
+
+    // Check for naked Flow diagram starting without ```flow fence
+    if (!inNaked && isFlowStart(trimmed)) {
+      inNaked = true;
+      nakedLang = 'flow';
+      nakedLines = [line];
+      continue;
+    }
+
     if (!inNaked && isLangHeader(trimmed)) {
       inNaked = true;
       nakedLang = trimmed.toLowerCase();
@@ -104,7 +122,20 @@ export const autoFormatMarkdown = (text: string): string => {
     }
 
     if (inNaked) {
-      if (trimmed.startsWith('###') || /^\d+[.)]/.test(trimmed) || trimmed.startsWith('Schéma') || trimmed.startsWith('🔴') || trimmed.startsWith('⚫') || trimmed.startsWith('Analogie') || trimmed.startsWith('>')) {
+      if (
+        trimmed.startsWith('###') ||
+        trimmed.startsWith('##') ||
+        trimmed.startsWith('#') ||
+        trimmed.startsWith('🔵') ||
+        trimmed.startsWith('🟡') ||
+        trimmed.startsWith('🟢') ||
+        trimmed.startsWith('🔴') ||
+        trimmed.startsWith('⚫') ||
+        trimmed.startsWith('>') ||
+        /^\d+[.)]/.test(trimmed) ||
+        trimmed.startsWith('Schéma') ||
+        trimmed.startsWith('Analogie')
+      ) {
         processed.push('```' + nakedLang);
         processed.push(...nakedLines);
         processed.push('```\n');

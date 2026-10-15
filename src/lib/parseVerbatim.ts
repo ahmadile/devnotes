@@ -43,6 +43,8 @@ function formatContentWithSchemas(rawSummary: string): string {
 
   const isBoxCharLine = (l: string) => /[│┌─┐▼▲┼├└═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬]/.test(l);
   const isLangHeader = (l: string) => /^(python|javascript|typescript|sql|bash|sh|css|html|json)$/i.test(l.trim());
+  const isMermaidHeader = (l: string) => /^(mermaid|graph\s+[A-Za-z0-9_]+|flowchart\s+[A-Za-z0-9_]+|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitGraph|mindmap|timeline)/i.test(l.trim());
+  const isFlowStart = (l: string) => /^\[.+?\s*\|\s*.+?\s*\|\s*(?:slate|emerald|indigo|terracotta|purple|blue|zinc|rose)\]/i.test(l.trim());
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -70,6 +72,22 @@ function formatContentWithSchemas(rawSummary: string): string {
 
     if (inFenced) {
       processedLines.push(line);
+      continue;
+    }
+
+    // Detect naked Mermaid diagram
+    if (!inNakedCode && !inAsciiBlock && isMermaidHeader(trimmed)) {
+      inNakedCode = true;
+      nakedCodeLang = 'mermaid';
+      nakedCodeLines = trimmed.toLowerCase() === 'mermaid' ? [] : [line];
+      continue;
+    }
+
+    // Detect naked Flow diagram
+    if (!inNakedCode && !inAsciiBlock && isFlowStart(trimmed)) {
+      inNakedCode = true;
+      nakedCodeLang = 'flow';
+      nakedCodeLines = [line];
       continue;
     }
 

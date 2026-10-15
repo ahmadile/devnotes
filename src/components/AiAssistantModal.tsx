@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Note, Module, CodeSnippet, Annotation, SyntaxDefinition, ProjectBlueprint, ProjectBlueprintComplexPart } from '../types';
 import {
   Sparkles,
@@ -40,7 +40,8 @@ import {
   CheckCircle2,
   Target,
   BookOpen,
-  ClipboardList
+  ClipboardList,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { RevisionView } from './RevisionView';
@@ -469,6 +470,91 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const handleClearInput = () => {
     setInputContent('');
     setAiResult(null);
+  };
+
+  const hiddenImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePasteImageFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(type => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = reader.result as string;
+              setInputContent(prev => prev + `\n\n![Diagramme Schéma](${base64})\n\n`);
+            };
+            reader.readAsDataURL(blob);
+            return;
+          }
+        }
+      }
+      hiddenImageInputRef.current?.click();
+    } catch {
+      hiddenImageInputRef.current?.click();
+    }
+  };
+
+  const handleImageFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        setInputContent(prev => prev + `\n\n![Diagramme Schéma](${base64})\n\n`);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleInputPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    // 1. Direct image paste from clipboard (Ctrl+V with screenshot or copied image)
+    const items = Array.from(clipboardData.items || []);
+    const imageItem = items.find(item => item.type.startsWith('image/'));
+
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        e.preventDefault();
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result as string;
+          const target = e.currentTarget;
+          const start = target.selectionStart || 0;
+          const end = target.selectionEnd || 0;
+          const before = inputContent.substring(0, start);
+          const after = inputContent.substring(end);
+          setInputContent(`${before}\n\n![Diagramme Schéma](${base64})\n\n${after}`);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+
+    // 2. Direct HTML paste containing <img> tag
+    const html = clipboardData.getData('text/html');
+    if (html && html.includes('<img')) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const img = doc.querySelector('img');
+      if (img && img.src && (img.src.startsWith('http') || img.src.startsWith('data:'))) {
+        e.preventDefault();
+        const target = e.currentTarget;
+        const start = target.selectionStart || 0;
+        const end = target.selectionEnd || 0;
+        const before = inputContent.substring(0, start);
+        const after = inputContent.substring(end);
+        setInputContent(`${before}\n\n![${img.alt || 'Diagramme Schéma'}](${img.src})\n\n${after}`);
+        return;
+      }
+    }
   };
 
   const handleSaveSettings = () => {
@@ -1211,7 +1297,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     Texte Brut / Format de la Note
                   </label>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setInputContent(TEMPLATE_5_BLOCKS)}
@@ -1221,6 +1307,22 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       <ClipboardList className="w-3 h-3" />
                       Modèle 5 Blocs
                     </button>
+                    <button
+                      type="button"
+                      onClick={handlePasteImageFromClipboard}
+                      className="text-xs text-sky-400 hover:text-sky-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Coller une image ou capture d'écran du diagramme depuis le presse-papier ou importer un fichier"
+                    >
+                      <ImageIcon className="w-3 h-3" />
+                      Coller Image / Schéma
+                    </button>
+                    <input
+                      ref={hiddenImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileInputChange}
+                      className="hidden"
+                    />
                     <button
                       type="button"
                       onClick={() => setInputContent(DEFAULT_EXAMPLE_INPUT)}
@@ -1262,7 +1364,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         <>
                           <span className="font-semibold text-foreground text-xs">Intégration Universelle & Détection</span>
                           <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                            Prend en charge : note 5 Blocs, texte rédigé, ou transcription vidéo brute.
+                            Prend en charge : note 5 Blocs, texte rédigé, capture de schéma (Ctrl+V) ou transcription.
                           </span>
                         </>
                       )}
@@ -1279,9 +1381,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 </div>
 
                 <textarea
-                  placeholder="Collez votre contenu de note, le format Titre, Tags, Résumé, Code ou chargez la note active pour la restructurer..."
+                  placeholder="Collez votre contenu de note, vos schémas ou faites Ctrl+V pour coller directement une capture de diagramme..."
                   value={inputContent}
                   onChange={(e) => setInputContent(e.target.value)}
+                  onPaste={handleInputPaste}
                   className="flex-1 w-full min-h-[240px] bg-secondary/35 border border-border/80 rounded-xl p-4 text-xs font-mono text-foreground focus:outline-none focus:border-zinc-500 transition-colors resize-none leading-relaxed"
                 />
 
