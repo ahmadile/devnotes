@@ -9,6 +9,7 @@ import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
 import { AiAssistantModal, DevNotesAiEmblem } from './components/AiAssistantModal';
 import { cn, fetchApiWithFallback } from './lib/utils';
+import { Note, Module, SyntaxDefinition, CodeSnippet, AppSettings } from './types';
 
 
 const STORAGE_KEY = 'devnotes_data';
