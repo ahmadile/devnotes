@@ -342,6 +342,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
+  const hiddenImageInputRef = useRef<HTMLInputElement>(null);
 
   // Architect Pro State
   const [blueprintPrompt, setBlueprintPrompt] = useState('');
@@ -471,8 +472,6 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setInputContent('');
     setAiResult(null);
   };
-
-  const hiddenImageInputRef = useRef<HTMLInputElement>(null);
 
   const handlePasteImageFromClipboard = async () => {
     try {
@@ -1177,7 +1176,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <Zap className={cn("w-3.5 h-3.5", activeTab === 'generator' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <Zap className={cn("w-3.5 h-3.5", activeTab === 'generator' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Générateur de Note</span>
               </button>
               <button
@@ -1189,7 +1188,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <MessageSquare className={cn("w-3.5 h-3.5", activeTab === 'chat' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <MessageSquare className={cn("w-3.5 h-3.5", activeTab === 'chat' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Assistant & Pédagogie</span>
               </button>
               <button
@@ -1201,7 +1200,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <Briefcase className={cn("w-3.5 h-3.5", activeTab === 'architect' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <Layers className={cn("w-3.5 h-3.5", activeTab === 'architect' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Architecte Pro</span>
               </button>
               <button
@@ -1213,7 +1212,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <GraduationCap className={cn("w-3.5 h-3.5", activeTab === 'revision' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <BookOpen className={cn("w-3.5 h-3.5", activeTab === 'revision' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Révision</span>
               </button>
               <button
@@ -1225,7 +1224,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <BookOpen className={cn("w-3.5 h-3.5", activeTab === 'curriculum' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <BookOpen className={cn("w-3.5 h-3.5", activeTab === 'curriculum' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Cursus DataCamp & RAG</span>
               </button>
               <button
@@ -1237,7 +1236,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
               >
-                <Settings className={cn("w-3.5 h-3.5", activeTab === 'settings' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <Settings className={cn("w-3.5 h-3.5", activeTab === 'settings' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
                 <span>Configuration IA</span>
               </button>
             </div>
