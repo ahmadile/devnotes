@@ -39,11 +39,13 @@ import {
   ArrowRight,
   CheckCircle2,
   Target,
-  BookOpen
+  BookOpen,
+  ClipboardList
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { RevisionView } from './RevisionView';
 import { cn, fetchApiWithFallback } from '../lib/utils';
+import { parseVerbatimClient } from '../lib/parseVerbatim';
 
 export interface AiConversationMessage {
   role: 'user' | 'assistant';
@@ -245,6 +247,45 @@ positive_nums = nums_mixed[nums_mixed > 0]
 print(positive_nums)
 # → [1 2 3]`;
 
+export const TEMPLATE_5_BLOCKS = `🔵 Titre
+Mon Titre de Note (ex: Remarketing Google Ads & Audiences)
+
+🟡 Tags
+marketing, google-ads, remarketing, tracking, audiences
+
+🟢 Résumé
+
+### Problème résolu & Principes clés
+Expliquez ici les concepts clés, pourquoi c'est important et comment ça fonctionne.
+
+> [!TIP]
+> Un bon remarketing repose sur un ciblage segmenté selon la maturité du prospect dans le tunnel.
+
+### 📊 Flux Logique
+\`\`\`flow
+[Étape 1 | Visiteur sur le site | slate]
+↓
+[Étape 2 | Tag déclenché & Cookie posé | emerald]
+↓
+[Étape 3 | Reciblage avec annonce personnalisée | indigo]
+\`\`\`
+
+🔴 Bloc logique du code
+
+⚪ Titre : Script de tracking des conversions
+\`\`\`javascript
+// Balise d'événement de conversion Google Ads
+gtag('event', 'conversion', {
+  'send_to': 'AW-123456789/AbC-D_efG-h12_34-567',
+  'value': 1.0,
+  'currency': 'EUR'
+});
+\`\`\`
+
+⚫ Ligne 1 : Déclenchement de l'événement de conversion Google Ads
+⚫ Ligne 2 : Identifiant unique de la conversion (send_to)
+⚫ Ligne 3 : Attribution de la valeur monétaire pour l'optimisation du ROAS`;
+
 export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   isOpen,
   onClose,
@@ -440,11 +481,24 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setTimeout(() => setSavedSuccess(false), 2500);
   };
 
-  const handleProcessNote = async () => {
+  const handleProcessNote = async (overrideMode?: 'auto' | 'verbatim') => {
     if (!inputContent.trim()) return;
+    const modeToUse = overrideMode || generationMode;
     setIsProcessing(true);
     setAiResult(null);
     setProcessError(null);
+
+    // Instant Verbatim / 5-Blocks Direct Mode: bypasses AI completely, 0s latency, 0 token
+    if (modeToUse === 'verbatim') {
+      try {
+        const clientParsed = parseVerbatimClient(inputContent, modules, syntaxDefinitions);
+        setAiResult(clientParsed);
+        setIsProcessing(false);
+        return;
+      } catch (err: any) {
+        console.warn('Client verbatim parse failed, attempting server:', err);
+      }
+    }
 
     try {
       let res: Response | null = null;
@@ -462,7 +516,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               input: inputContent,
-              mode: generationMode,
+              mode: modeToUse,
               modules,
               syntaxDefinitions,
               provider: aiProvider,
@@ -1160,6 +1214,15 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => setInputContent(TEMPLATE_5_BLOCKS)}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Insérer la structure standard des 5 blocs (Titre, Tags, Résumé, Code, Annotations)"
+                    >
+                      <ClipboardList className="w-3 h-3" />
+                      Modèle 5 Blocs
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setInputContent(DEFAULT_EXAMPLE_INPUT)}
                       className="text-xs text-zinc-400 hover:text-zinc-200 font-medium hover:underline flex items-center gap-1 cursor-pointer"
                     >
@@ -1188,19 +1251,30 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                     <div className="flex flex-col">
                       {inputContent.includes('🔵 Titre') || (inputContent.includes('🟢 Résumé') && inputContent.includes('🔴 Bloc logique')) ? (
                         <>
-                          <span className="font-semibold text-blue-600 dark:text-blue-400 text-xs">Note structurée détectée</span>
-                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Intégration fidèle 1:1, micro-blocs de code et schémas visuels optimisés sans altérer votre texte.</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Note structurée 5 Blocs détectée
+                          </span>
+                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Prête pour import direct instantané (0s, sans IA) ou pour structuration IA approfondie.
+                          </span>
                         </>
                       ) : (
                         <>
-                          <span className="font-semibold text-foreground text-xs">Intégration Universelle Intelligente</span>
-                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Détection automatique : note rédigée, transcription vidéo brute, ou code.</span>
+                          <span className="font-semibold text-foreground text-xs">Intégration Universelle & Détection</span>
+                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Prend en charge : note 5 Blocs, texte rédigé, ou transcription vidéo brute.
+                          </span>
                         </>
                       )}
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-400/20 shrink-0 font-medium">
-                    Auto-Intelligent
+                  <span className={cn(
+                    "text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0 font-medium",
+                    inputContent.includes('🔵 Titre') 
+                      ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-400/20"
+                      : "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-400/20"
+                  )}>
+                    {inputContent.includes('🔵 Titre') ? '5 Blocs Détectés' : 'Auto-Intelligent'}
                   </span>
                 </div>
 
@@ -1231,24 +1305,48 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                   </select>
                 </div>
 
-                {/* Generate Action Button */}
-                <button
-                  onClick={handleProcessNote}
-                  disabled={!inputContent.trim() || isProcessing}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                >
-                  {isProcessing ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Analyse et structuration par l'IA...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-4 h-4" strokeWidth={1.5} />
-                      <span>Structurer et Intégrer la Note avec l'IA</span>
-                    </>
-                  )}
-                </button>
+                {/* Action Buttons: Direct Import (No AI, 0s) vs AI Structuring */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {/* Button 1: Direct Verbatim Import (Zero AI, Zero Tokens, Instant) */}
+                  <button
+                    onClick={() => handleProcessNote('verbatim')}
+                    disabled={!inputContent.trim() || isProcessing}
+                    className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none group text-left"
+                    title="Intégrer directement la note sans appeler d'IA externe (0 délai, 0 token, extraction fidèle des 5 blocs)"
+                  >
+                    <Zap className="w-4 h-4 text-emerald-200 shrink-0 group-hover:scale-110 transition-transform" strokeWidth={2} />
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold leading-tight truncate">Passer directement</span>
+                      <span className="text-[10px] font-normal text-emerald-100/80 leading-tight">Sans IA · 0s · 5 Blocs</span>
+                    </div>
+                  </button>
+
+                  {/* Button 2: Full AI Synthesis (1-Pass) */}
+                  <button
+                    onClick={() => handleProcessNote('auto')}
+                    disabled={!inputContent.trim() || isProcessing}
+                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:pointer-events-none group text-left"
+                    title="Utiliser l'IA DevNotes pour synthétiser, annoter et générer le schéma en 1 seule passe"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold leading-tight">Traitement IA...</span>
+                          <span className="text-[10px] font-normal text-blue-100/80 leading-tight">Analyse en cours</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-blue-200 shrink-0 group-hover:scale-110 transition-transform" strokeWidth={1.5} />
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold leading-tight truncate">Structurer avec l'IA</span>
+                          <span className="text-[10px] font-normal text-blue-100/80 leading-tight">Transcription · 1-Pass</span>
+                        </div>
+                      </>
+                    )}
+                  </button>
+                </div>
 
                 {processError && (
                   <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2.5 animate-fadeIn">
