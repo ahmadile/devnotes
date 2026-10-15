@@ -190,3 +190,72 @@
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
+
+/* ==========================================================================
+   ReactBits & ReactBits Pro Laser & Glass Design System
+   ========================================================================== */
+
+/* Laser Beam Accent Hairline */
+.laser-beam-top {
+  position: relative;
+}
+.laser-beam-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(6, 182, 212, 0.5) 25%, rgba(139, 92, 246, 0.8) 50%, rgba(236, 72, 153, 0.5) 75%, transparent 100%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Laser Card with ReactBits Pro Glassmorphism */
+.laser-card {
+  position: relative;
+  background: rgba(18, 16, 26, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.laser-card:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 0 0 30px -5px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ReactBits Pro Laser Button */
+.laser-btn {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%), #12101a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f4f4f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+.laser-btn:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%), #181524;
+  border-color: rgba(139, 92, 246, 0.45);
+  color: #ffffff;
+  box-shadow: 0 0 20px -3px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ReactBits Pro Icon Container */
+.laser-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+.group:hover .laser-icon-box,
+.laser-icon-box:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 0 15px -3px rgba(6, 182, 212, 0.3);
+  color: #38bdf8;
+}
+

@@ -9,6 +9,9 @@ import { Markdown } from './components/Markdown';
 import { FloatingToolbar } from './components/FloatingToolbar';
 import { AiAssistantModal, DevNotesAiEmblem } from './components/AiAssistantModal';
 import { cn, fetchApiWithFallback } from './lib/utils';
+import { BeamsBackground } from './components/reactbits/BeamsBackground';
+import { InteractiveGrid } from './components/reactbits/InteractiveGrid';
+import { LaserBadge } from './components/reactbits/LaserBadge';
 
 
 const STORAGE_KEY = 'devnotes_data';
@@ -106,6 +109,22 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => 
     (localStorage.getItem('theme') as 'dark' | 'light') || 'dark'
   );
+  const [showLaserBackground, setShowLaserBackground] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('devnotes_laser_bg');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleLaserBackground = () => {
+    setShowLaserBackground(prev => {
+      const next = !prev;
+      localStorage.setItem('devnotes_laser_bg', String(next));
+      return next;
+    });
+  };
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('devnotes_settings');
     if (saved) {
@@ -853,12 +872,20 @@ export default function App() {
 
           {/* Main Content */}
           <main className="flex-1 flex flex-col h-full bg-background relative min-w-0 transition-colors duration-300">
-            {/* Header */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-border sticky top-0 bg-background/80 backdrop-blur-sm z-20 transition-colors">
+            {/* ReactBits Dynamic Laser Background Layer */}
+            {showLaserBackground && (
+              <>
+                <InteractiveGrid />
+                <BeamsBackground intensity="subtle" color="multi" />
+              </>
+            )}
+
+            {/* Header with ReactBits Laser Beam Rim */}
+            <header className="h-16 flex items-center justify-between px-6 border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-20 transition-colors laser-beam-top">
               <div className="flex items-center gap-3 min-w-0 flex-1 mr-4">
                 <button 
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-secondary rounded-md transition-all shrink-0"
+                  className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-secondary rounded-md transition-all shrink-0 cursor-pointer"
                 >
                   <Layout className="w-5 h-5" strokeWidth="1.5" />
                 </button>
@@ -910,6 +937,22 @@ export default function App() {
                     <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 transition-colors" strokeWidth={1.5} />
                     <span className="font-semibold">Assistant IA</span>
                   </button>
+
+                  {/* ReactBits Laser Ambiance Toggle */}
+                  <button
+                    onClick={toggleLaserBackground}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer group",
+                      showLaserBackground
+                        ? "bg-violet-500/15 text-violet-300 border border-violet-500/40 shadow-[0_0_15px_rgba(139,92,246,0.25)]"
+                        : "text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-[#141417] hover:bg-zinc-200 dark:hover:bg-[#1c1c20] border border-zinc-200 dark:border-white/[0.08]"
+                    )}
+                    title="Ambiance Laser ReactBits (Faisceaux lumineux & Grille dynamique)"
+                  >
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", showLaserBackground ? "bg-cyan-400 animate-ping" : "bg-zinc-500")} />
+                    <span className="hidden xl:inline text-[11px] font-semibold">{showLaserBackground ? 'Laser ON' : 'Laser'}</span>
+                  </button>
+
                   <button 
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md cursor-pointer"
