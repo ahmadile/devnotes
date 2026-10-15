@@ -1141,7 +1141,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-all duration-300">
       <div
         className={cn(
-          "bg-[#0f0f12] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-300 laser-beam-top",
+          "bg-[#0f0f12] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-300",
           isMaximized
             ? "w-full h-full rounded-none max-w-none"
             : "w-full max-w-6xl h-[90vh] rounded-2xl"
