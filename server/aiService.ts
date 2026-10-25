@@ -49,9 +49,52 @@ const ANNOTATION_COLORS: Record<string, string> = {
  * Resilient JSON parser for LLM outputs that strips markdown fences,
  * extracts JSON substrings, and repairs common control character issues.
  */
+/**
+ * Automatically resolves the best Ollama model to use.
+ * If the user specified an installed model, use it.
+ * If requested model is empty or defaulted to 'llama3', auto-detect
+ * and pick the first available local model (e.g. gemma4:e4b, granite4.2:8b).
+ */
+export async function resolveOllamaModel(baseUrl: string, requestedModel?: string): Promise<string> {
+  const cleanUrl = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(`${cleanUrl}/api/tags`, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data = await res.json() as { models?: Array<{ name: string; model: string }> };
+      const models = data.models || [];
+      if (models.length > 0) {
+        if (requestedModel && requestedModel.trim() && requestedModel !== 'llama3') {
+          const cleanReq = requestedModel.trim().toLowerCase();
+          const match = models.find(m =>
+            m.name.toLowerCase() === cleanReq ||
+            m.model.toLowerCase() === cleanReq ||
+            m.name.toLowerCase().startsWith(cleanReq) ||
+            cleanReq.startsWith(m.name.toLowerCase().split(':')[0])
+          );
+          if (match) return match.name;
+        }
+        if (requestedModel === 'llama3') {
+          const hasLlama3 = models.find(m => m.name.toLowerCase().startsWith('llama3'));
+          if (hasLlama3) return hasLlama3.name;
+        }
+        return models[0].name;
+      }
+    }
+  } catch (err) {
+    // Ollama unreachable
+  }
+  return requestedModel && requestedModel !== 'llama3' ? requestedModel : 'gemma4:e4b';
+}
+
 export function parseJsonSafe<T>(rawText: string): T | null {
   if (!rawText || typeof rawText !== 'string') return null;
   let text = rawText.trim();
+  // Strip reasoning thinking tags (<think>...</think>)
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
   // 1. Strip markdown code fences
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -1010,11 +1053,12 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
   if (provider === 'ollama') {
     try {
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelName || 'llama3',
+          model: effectiveModel,
           messages: [{ role: 'user', content: prompt }],
           stream: false,
           format: 'json',
@@ -1144,11 +1188,12 @@ Directives de réponse :
   if (provider === 'ollama') {
     try {
       const baseUrl = params.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelName || 'llama3',
+          model: effectiveModel,
           messages: [
             { role: 'system', content: systemPrompt },
             ...params.messages,
@@ -1159,10 +1204,17 @@ Directives de réponse :
 
       if (res.ok) {
         const data = await res.json() as any;
-        return data.message?.content || "Aucune réponse reçue d'Ollama.";
+        const content = data.message?.content || data.response;
+        if (content) return content;
+        if (data.message?.thinking) return data.message.thinking;
+        return "Aucune réponse reçue d'Ollama.";
+      } else {
+        const errText = await res.text().catch(() => '');
+        return `[Erreur Ollama ${res.status}] : ${errText || 'Impossible d\'obtenir une réponse du modèle local.'}`;
       }
     } catch (err: any) {
       console.error('[aiService] Ollama chat error:', err);
+      return `[Erreur Connexion Ollama] : ${err.message || 'Serveur Ollama inaccessible sur ' + (params.ollamaUrl || 'http://localhost:11434')}. Vérifiez qu\'Ollama est lancé (ex: \`ollama serve\`).`;
     }
   }
 
@@ -1538,11 +1590,12 @@ Renvoie UNIQUEMENT un objet JSON valide conforme à ce schéma :
   if (provider === 'ollama') {
     try {
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelName || 'llama3',
+          model: effectiveModel,
           messages: [{ role: 'user', content: systemPrompt }],
           stream: false,
           format: 'json',
@@ -1551,9 +1604,9 @@ Renvoie UNIQUEMENT un objet JSON valide conforme à ce schéma :
 
       if (res.ok) {
         const data = await res.json() as any;
-        const text = data.message?.content;
+        const text = data.message?.content || data.response;
         if (text) {
-          const parsed = JSON.parse(text) as GeneratedRevisionSession;
+          const parsed = parseJsonSafe<GeneratedRevisionSession>(text);
           if (parsed && parsed.summary && parsed.quiz) {
             return parsed;
           }
@@ -1671,6 +1724,33 @@ Renvoie UNIQUEMENT un JSON conforme à ce format :
       if (response.text) return JSON.parse(response.text);
     } catch (e) {
       console.error('[aiService] Evaluation Gemini error', e);
+    }
+  }
+
+  if (provider === 'ollama') {
+    try {
+      const baseUrl = params.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
+      const res = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: effectiveModel,
+          messages: [{ role: 'user', content: prompt }],
+          stream: false,
+          format: 'json',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.message?.content || data.response;
+        if (text) {
+          const parsed = parseJsonSafe<{ score: number; isCorrect: boolean; feedback: string; suggestion?: string }>(text);
+          if (parsed && typeof parsed.score === 'number') return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('[aiService] Evaluation Ollama error', e);
     }
   }
 
@@ -1993,11 +2073,12 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
   if (provider === 'ollama') {
     try {
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelName || 'llama3',
+          model: effectiveModel,
           messages: [{ role: 'user', content: prompt }],
           stream: false,
           format: 'json',
@@ -2171,11 +2252,12 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
   if (provider === 'ollama') {
     try {
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelName || 'llama3',
+          model: effectiveModel,
           messages: [{ role: 'user', content: systemPrompt }],
           stream: false,
         }),
@@ -2686,11 +2768,12 @@ Règles fondamentales de design et clarté :
   if (provider === 'ollama') {
     try {
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
+      const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: modelName || 'llama3',
+          model: effectiveModel,
           messages: [{ role: 'user', content: prompt }],
           stream: false,
         }),

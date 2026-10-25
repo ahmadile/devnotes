@@ -54,6 +54,23 @@ export interface AiConversationMessage {
   timestamp?: string;
 }
 
+export interface OllamaModelItem {
+  name: string;
+  model: string;
+  size: number;
+  sizeFormatted: string;
+  digest?: string;
+  modified_at?: string;
+  details?: {
+    parent_model?: string;
+    format?: string;
+    family?: string;
+    families?: string[];
+    parameter_size?: string;
+    quantization_level?: string;
+  };
+}
+
 export interface AiConversation {
   id: string;
   title: string;
@@ -360,6 +377,24 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('devnotes_gemini_key') || '');
   const [aiModel, setAiModel] = useState(() => localStorage.getItem('devnotes_ai_model') || 'google/gemini-2.0-flash-001');
   const [ollamaUrl, setOllamaUrl] = useState(() => localStorage.getItem('devnotes_ollama_url') || 'http://localhost:11434');
+  const [ollamaStatus, setOllamaStatus] = useState<{
+    running: boolean;
+    version?: string;
+    checking: boolean;
+    error?: string;
+    lastChecked?: string;
+  }>({
+    running: false,
+    checking: false,
+  });
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelItem[]>([]);
+  const [ollamaTesting, setOllamaTesting] = useState(false);
+  const [ollamaTestResult, setOllamaTestResult] = useState<{
+    success: boolean;
+    latencyMs?: number;
+    message?: string;
+    model?: string;
+  } | null>(null);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
@@ -556,12 +591,101 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     }
   };
 
+  const fetchOllamaInfo = async (targetUrl?: string) => {
+    const urlToUse = (targetUrl !== undefined ? targetUrl : ollamaUrl).trim() || 'http://localhost:11434';
+    setOllamaStatus(prev => ({ ...prev, checking: true, error: undefined }));
+    try {
+      const res = await fetchApiWithFallback(`/api/ollama/models?url=${encodeURIComponent(urlToUse)}`);
+      if (!res.ok) {
+        throw new Error(`Erreur serveur (${res.status})`);
+      }
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.models)) {
+        setOllamaModels(data.models);
+        setOllamaStatus({
+          running: true,
+          version: data.version,
+          checking: false,
+          lastChecked: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
+
+        const currentModel = localStorage.getItem('devnotes_ai_model') || '';
+        const hasCurrent = data.models.some((m: OllamaModelItem) => m.name === currentModel);
+        if (!hasCurrent && data.models.length > 0) {
+          const firstModel = data.models[0].name;
+          setAiModel(firstModel);
+          localStorage.setItem('devnotes_ai_model', firstModel);
+        }
+      } else {
+        setOllamaStatus({
+          running: false,
+          checking: false,
+          error: data.error || "Ollama n'a retourné aucun modèle.",
+        });
+      }
+    } catch (err: any) {
+      setOllamaStatus({
+        running: false,
+        checking: false,
+        error: err.message || "Serveur Ollama inaccessible.",
+      });
+    }
+  };
+
+  const handleTestOllama = async (testModelName?: string) => {
+    const modelToTest = testModelName || aiModel || (ollamaModels[0]?.name) || 'gemma4:e4b';
+    setOllamaTesting(true);
+    setOllamaTestResult(null);
+    try {
+      const res = await fetchApiWithFallback('/api/ollama/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: ollamaUrl.trim() || undefined,
+          model: modelToTest,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setOllamaTestResult({
+          success: true,
+          latencyMs: data.durationMs,
+          message: `Réponse reçue en ${data.durationMs} ms ! Modèle : ${data.model}`,
+          model: data.model,
+        });
+      } else {
+        setOllamaTestResult({
+          success: false,
+          message: data.error || 'Échec du test Ollama.',
+          model: modelToTest,
+        });
+      }
+    } catch (err: any) {
+      setOllamaTestResult({
+        success: false,
+        message: err.message || 'Impossible de contacter Ollama.',
+        model: modelToTest,
+      });
+    } finally {
+      setOllamaTesting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && aiProvider === 'ollama') {
+      fetchOllamaInfo(ollamaUrl);
+    }
+  }, [isOpen, aiProvider]);
+
   const handleSaveSettings = () => {
     localStorage.setItem('devnotes_ai_provider', aiProvider);
     localStorage.setItem('devnotes_openrouter_key', openRouterKey.trim());
     localStorage.setItem('devnotes_gemini_key', geminiApiKey.trim());
     localStorage.setItem('devnotes_ai_model', aiModel.trim());
     localStorage.setItem('devnotes_ollama_url', ollamaUrl.trim());
+    if (aiProvider === 'ollama') {
+      fetchOllamaInfo(ollamaUrl.trim());
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };
@@ -607,7 +731,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               provider: aiProvider,
               apiKey: activeApiKey.trim() || undefined,
               model: aiModel.trim() || undefined,
-              ollamaUrl: ollamaUrl.trim() || undefined,
+          ollamaUrl: ollamaUrl.trim() || undefined,
             }),
           });
           if (attempt.ok) {
@@ -676,6 +800,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           provider: aiProvider,
           apiKey: activeApiKey.trim() || undefined,
           model: aiModel.trim() || undefined,
+          ollamaUrl: ollamaUrl.trim() || undefined,
         }),
       });
 
@@ -1152,12 +1277,53 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           <div className="flex items-center gap-3">
             <DevNotesAiEmblem isThinking={isProcessing || isChatSending} />
             <div>
-              <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                DevNotes AI Engine
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold text-zinc-100">DevNotes AI Engine</h2>
                 <span className="text-[10px] bg-white/[0.05] text-zinc-300 border border-white/[0.08] px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-semibold">
                   {aiProvider === 'openrouter' ? 'OpenRouter' : aiProvider === 'ollama' ? 'Ollama Local' : 'Gemini 2.5'}
                 </span>
-              </h2>
+                {aiProvider === 'ollama' && (
+                  <div className="flex items-center gap-1.5 bg-[#18181c] border border-white/[0.08] px-2 py-0.5 rounded-lg text-xs">
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full shrink-0 transition-all",
+                        ollamaStatus.running ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" : "bg-rose-500"
+                      )}
+                      title={ollamaStatus.running ? `Ollama connecté (v${ollamaStatus.version || ''})` : `Ollama inaccessible : ${ollamaStatus.error || 'Vérifiez le service'}`}
+                    />
+                    <span className="text-[10px] font-mono text-zinc-400 shrink-0">Modèle:</span>
+                    {ollamaModels.length > 0 ? (
+                      <select
+                        value={aiModel}
+                        onChange={(e) => {
+                          const m = e.target.value;
+                          setAiModel(m);
+                          localStorage.setItem('devnotes_ai_model', m);
+                        }}
+                        className="bg-transparent text-xs font-mono font-semibold text-zinc-100 outline-none cursor-pointer max-w-[130px] sm:max-w-[200px] truncate"
+                      >
+                        {ollamaModels.map(m => (
+                          <option key={m.name} value={m.name} className="bg-[#18181c] text-zinc-200">
+                            {m.name} ({m.details?.parameter_size || m.sizeFormatted})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[11px] text-zinc-400 font-mono">
+                        {ollamaStatus.checking ? 'Détection...' : 'Aucun modèle'}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fetchOllamaInfo(ollamaUrl)}
+                      title="Rafraîchir les modèles locaux"
+                      className="text-zinc-400 hover:text-white p-0.5 rounded transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className={cn("w-3 h-3", ollamaStatus.checking && "animate-spin")} />
+                    </button>
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-zinc-400">
                 Génération de notes, explications pédagogiques approfondies et architecture
               </p>
@@ -2074,17 +2240,153 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 )}
 
                 {aiProvider === 'ollama' && (
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      URL Serveur Ollama Local
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="http://localhost:11434"
-                      value={ollamaUrl}
-                      onChange={(e) => setOllamaUrl(e.target.value)}
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
-                    />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          URL Serveur Ollama Local
+                        </label>
+                        <span className="text-[10px] text-emerald-400 font-medium">100% Hors ligne • 0 Token Consommé</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="http://localhost:11434"
+                          value={ollamaUrl}
+                          onChange={(e) => setOllamaUrl(e.target.value)}
+                          className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fetchOllamaInfo(ollamaUrl)}
+                          disabled={ollamaStatus.checking}
+                          className="px-3 py-2.5 bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                          <RefreshCw className={cn("w-3.5 h-3.5", ollamaStatus.checking && "animate-spin")} />
+                          <span>Vérifier</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Ollama Live Status Pill */}
+                    <div className={cn(
+                      "p-3.5 rounded-xl border flex items-start gap-3 transition-all",
+                      ollamaStatus.running
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                        : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                    )}>
+                      <div className={cn(
+                        "w-2.5 h-2.5 rounded-full mt-1 shrink-0",
+                        ollamaStatus.running ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-amber-400"
+                      )} />
+                      <div className="text-xs space-y-1 flex-1">
+                        <div className="font-semibold flex items-center justify-between">
+                          <span>
+                            {ollamaStatus.running
+                              ? `Ollama connecté (v${ollamaStatus.version || '0.40+'})`
+                              : "Serveur Ollama non détecté"}
+                          </span>
+                          {ollamaStatus.lastChecked && (
+                            <span className="text-[10px] opacity-75 font-mono">Vérifié à {ollamaStatus.lastChecked}</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] opacity-90 leading-relaxed">
+                          {ollamaStatus.running
+                            ? `${ollamaModels.length} modèle${ollamaModels.length > 1 ? 's' : ''} local disponible${ollamaModels.length > 1 ? 's' : ''}. Cliquez sur un modèle ci-dessous pour l'activer instantanément.`
+                            : "Assurez-vous qu'Ollama est lancé sur votre machine : ouvrez un terminal et tapez `ollama serve`."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Installed Models Grid */}
+                    {ollamaModels.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                          <span>Modèles Installés Détectés ({ollamaModels.length})</span>
+                          <span className="text-[10px] text-zinc-400 font-normal">Sélection en 1 clic</span>
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {ollamaModels.map((m) => {
+                            const isSelected = aiModel === m.name;
+                            const isReasoning = m.name.toLowerCase().includes('granite') || m.name.toLowerCase().includes('deepseek');
+                            return (
+                              <button
+                                key={m.name}
+                                type="button"
+                                onClick={() => {
+                                  setAiModel(m.name);
+                                  localStorage.setItem('devnotes_ai_model', m.name);
+                                }}
+                                className={cn(
+                                  "p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer relative",
+                                  isSelected
+                                    ? "bg-zinc-800/80 border-white/30 shadow-xs"
+                                    : "bg-secondary/20 border-border/60 hover:bg-secondary/40 hover:border-border"
+                                )}
+                              >
+                                <div className="flex items-center justify-between w-full mb-1">
+                                  <span className="text-xs font-mono font-bold text-foreground truncate pr-2">
+                                    {m.name}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5 shrink-0">
+                                      <Check className="w-3 h-3" /> Actif
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                                  {m.details?.parameter_size && (
+                                    <span className="bg-white/[0.06] px-1.5 py-0.5 rounded text-zinc-300">
+                                      {m.details.parameter_size}
+                                    </span>
+                                  )}
+                                  <span className="bg-white/[0.06] px-1.5 py-0.5 rounded text-zinc-300">
+                                    {m.sizeFormatted}
+                                  </span>
+                                  {m.details?.quantization_level && (
+                                    <span className="bg-white/[0.06] px-1.5 py-0.5 rounded text-zinc-400">
+                                      {m.details.quantization_level}
+                                    </span>
+                                  )}
+                                  {isReasoning && (
+                                    <span className="bg-purple-500/15 text-purple-300 border border-purple-500/20 px-1.5 py-0.5 rounded">
+                                      Raisonnement
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Test Communication Action */}
+                    <div className="pt-2 border-t border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTestOllama()}
+                        disabled={ollamaTesting || !ollamaStatus.running}
+                        className={cn(
+                          "px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer border",
+                          ollamaStatus.running
+                            ? "bg-secondary hover:bg-secondary/80 text-foreground border-border"
+                            : "bg-secondary/40 text-muted-foreground border-border/40 cursor-not-allowed opacity-50"
+                        )}
+                      >
+                        <Zap className={cn("w-3.5 h-3.5", ollamaTesting && "animate-spin text-amber-400")} />
+                        <span>{ollamaTesting ? "Test en cours..." : `Tester ${aiModel || 'le modèle'}`}</span>
+                      </button>
+                      {ollamaTestResult && (
+                        <span className={cn(
+                          "text-xs font-medium flex items-center gap-1",
+                          ollamaTestResult.success ? "text-emerald-400" : "text-rose-400"
+                        )}>
+                          {ollamaTestResult.success ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                          {ollamaTestResult.message}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 

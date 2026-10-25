@@ -331,6 +331,100 @@ app.use('/uploads', express.static(uploadsDir));
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Explain error' });
     }
   });
+  function formatBytes(bytes?: number): string {
+    if (!bytes || bytes <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+  }
+
+  // --- Ollama Discovery & Diagnostics Endpoints ---
+  app.get('/api/ollama/status', async (req, res) => {
+    try {
+      const rawUrl = (req.query.ollamaUrl as string) || 'http://localhost:11434';
+      const baseUrl = rawUrl.replace(/\/+$/, '');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const versionRes = await fetch(`${baseUrl}/api/version`, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!versionRes.ok) {
+        res.json({ ok: false, running: false, error: `HTTP ${versionRes.status}` });
+        return;
+      }
+      const data = await versionRes.json() as any;
+      res.json({ ok: true, running: true, version: data.version || 'unknown', baseUrl });
+    } catch (err: any) {
+      res.json({ ok: false, running: false, error: err.message || 'Serveur Ollama inaccessible' });
+    }
+  });
+
+  app.get('/api/ollama/models', async (req, res) => {
+    try {
+      const rawUrl = (req.query.ollamaUrl as string) || 'http://localhost:11434';
+      const baseUrl = rawUrl.replace(/\/+$/, '');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      const tagsRes = await fetch(`${baseUrl}/api/tags`, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!tagsRes.ok) {
+        res.json({ ok: false, running: false, models: [], error: `HTTP ${tagsRes.status}` });
+        return;
+      }
+      const data = await tagsRes.json() as { models?: Array<any> };
+      const rawModels = data.models || [];
+      const models = rawModels.map(m => ({
+        name: m.name,
+        model: m.model,
+        size: m.size,
+        sizeFormatted: formatBytes(m.size),
+        parameterSize: m.details?.parameter_size,
+        quantization: m.details?.quantization_level,
+        family: m.details?.family,
+        capabilities: Array.isArray(m.capabilities) ? m.capabilities : [],
+        modifiedAt: m.modified_at,
+      }));
+      res.json({ ok: true, running: true, models, count: models.length, baseUrl });
+    } catch (err: any) {
+      res.json({ ok: false, running: false, models: [], error: err.message || 'Impossible de lister les modèles Ollama' });
+    }
+  });
+
+  app.post('/api/ollama/test', async (req, res) => {
+    try {
+      const { ollamaUrl, model } = req.body || {};
+      const baseUrl = ((ollamaUrl as string) || 'http://localhost:11434').replace(/\/+$/, '');
+      const targetModel = model || 'gemma4:e4b';
+      const startTime = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      const testRes = await fetch(`${baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          prompt: 'Réponds en un seul mot: "Prêt !"',
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!testRes.ok) {
+        const errorText = await testRes.text().catch(() => '');
+        res.status(testRes.status).json({ ok: false, error: errorText || `HTTP ${testRes.status}` });
+        return;
+      }
+      const data = await testRes.json() as any;
+      const latencyMs = Date.now() - startTime;
+      res.json({ ok: true, reply: data.response?.trim() || 'Prêt !', latencyMs, model: targetModel });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message || 'Échec du test de communication Ollama' });
+    }
+  });
+
 
 
 
