@@ -593,42 +593,113 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   };
 
   const fetchOllamaInfo = async (targetUrl?: string) => {
-    const urlToUse = (targetUrl !== undefined ? targetUrl : ollamaUrl).trim() || 'http://localhost:11434';
+    const rawTarget = (targetUrl !== undefined ? targetUrl : ollamaUrl).trim() || 'http://127.0.0.1:11434';
+    const cleanUrl = rawTarget.replace(/\/+$/, '');
     setOllamaStatus(prev => ({ ...prev, checking: true, error: undefined }));
-    try {
-      const res = await fetchApiWithFallback(`/api/ollama/models?url=${encodeURIComponent(urlToUse)}`);
-      if (!res.ok) {
-        throw new Error(`Erreur serveur (${res.status})`);
-      }
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.models)) {
-        setOllamaModels(data.models);
-        setOllamaStatus({
-          running: true,
-          version: data.version,
-          checking: false,
-          lastChecked: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        });
 
-        const currentModel = localStorage.getItem('devnotes_ai_model') || '';
-        const hasCurrent = data.models.some((m: OllamaModelItem) => m.name === currentModel);
-        if (!hasCurrent && data.models.length > 0) {
-          const firstModel = data.models[0].name;
-          setAiModel(firstModel);
-          localStorage.setItem('devnotes_ai_model', firstModel);
+    let discoveredModels: any[] = [];
+    let detectedVersion: string | undefined = undefined;
+    let isConnected = false;
+
+    // Layer 1: Call backend proxy with both ?url and ?ollamaUrl
+    try {
+      const res = await fetchApiWithFallback(`/api/ollama/models?url=${encodeURIComponent(cleanUrl)}&ollamaUrl=${encodeURIComponent(cleanUrl)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.models) && data.models.length > 0) {
+          discoveredModels = data.models;
+          isConnected = true;
+          detectedVersion = data.version;
         }
-      } else {
-        setOllamaStatus({
-          running: false,
-          checking: false,
-          error: data.error || "Ollama n'a retourné aucun modèle.",
-        });
       }
-    } catch (err: any) {
+    } catch (proxyErr) {
+      console.warn('[Ollama] Backend proxy attempt failed, trying direct browser connection:', proxyErr);
+    }
+
+    // Layer 2: Direct browser fetch to Ollama (Ollama allows http://localhost:* origins)
+    if (!isConnected || discoveredModels.length === 0) {
+      const directCandidates = [
+        cleanUrl,
+        cleanUrl.includes('localhost') ? cleanUrl.replace('localhost', '127.0.0.1') : cleanUrl.replace('127.0.0.1', 'localhost'),
+        'http://127.0.0.1:11434',
+        'http://localhost:11434',
+      ];
+      const uniqueCandidates = Array.from(new Set(directCandidates));
+
+      for (const candidate of uniqueCandidates) {
+        try {
+          const directRes = await fetch(`${candidate}/api/tags`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (directRes.ok) {
+            const directData = await directRes.json();
+            if (Array.isArray(directData.models) && directData.models.length > 0) {
+              discoveredModels = directData.models.map((m: any) => {
+                const bytes = m.size || 0;
+                let formatted = '0 B';
+                if (bytes > 0) {
+                  const k = 1024;
+                  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                  const i = Math.floor(Math.log(bytes) / Math.log(k));
+                  formatted = parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                }
+                return {
+                  name: m.name,
+                  model: m.model,
+                  size: m.size,
+                  sizeFormatted: formatted,
+                  parameterSize: m.details?.parameter_size,
+                  quantization: m.details?.quantization_level,
+                  family: m.details?.family,
+                  details: m.details,
+                };
+              });
+              isConnected = true;
+              break;
+            }
+          }
+        } catch (directErr) {
+          // try next candidate
+        }
+      }
+    }
+
+    if (isConnected && discoveredModels.length > 0) {
+      setOllamaModels(discoveredModels);
+      setOllamaStatus({
+        running: true,
+        version: detectedVersion || '0.40+',
+        checking: false,
+        lastChecked: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+
+      // Auto-switch away from OpenRouter model names (e.g. xiaomi/mimo-v2.6-flash) to first Ollama model
+      const currentModel = localStorage.getItem('devnotes_ai_model') || aiModel || '';
+      const hasCurrent = discoveredModels.some((m: any) => m.name === currentModel);
+      if (!hasCurrent && discoveredModels.length > 0) {
+        const firstModel = discoveredModels[0].name;
+        setAiModel(firstModel);
+        localStorage.setItem('devnotes_ai_model', firstModel);
+      }
+
+      // Check active models in RAM (ollama ps)
+      try {
+        const psRes = await fetchApiWithFallback(`/api/ollama/ps?url=${encodeURIComponent(cleanUrl)}`);
+        if (psRes.ok) {
+          const psData = await psRes.json();
+          if (psData.ok && Array.isArray(psData.models)) {
+            setOllamaLoadedModels(psData.models.map((m: any) => m.name));
+          }
+        }
+      } catch (e) {
+        // non-blocking
+      }
+    } else {
       setOllamaStatus({
         running: false,
         checking: false,
-        error: err.message || "Serveur Ollama inaccessible.",
+        error: "Aucun modèle Ollama détecté sur ce port.",
       });
     }
   };
@@ -2211,7 +2282,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setAiProvider('ollama')}
+                  onClick={() => {
+                    setAiProvider('ollama');
+                    fetchOllamaInfo(ollamaUrl);
+                  }}
                   className={cn(
                     "p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer",
                     aiProvider === 'ollama'
@@ -2427,12 +2501,15 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                 )}
 
                 <div className="space-y-2 pt-2 border-t border-border/40">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Modèle d'IA cible
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>{aiProvider === 'ollama' ? "Modèle Local Sélectionné" : "Modèle d'IA cible"}</span>
+                    {aiProvider === 'ollama' && (
+                      <span className="text-[10px] text-zinc-400 font-normal">Sélection en 1 clic sur les cartes ci-dessus</span>
+                    )}
                   </label>
                   <input
                     type="text"
-                    placeholder="google/gemini-2.0-flash-001 ou anthropic/claude-3.5-sonnet ou meta-llama/llama-3.3-70b-instruct"
+                    placeholder={aiProvider === 'ollama' ? "gemma4:e4b ou granite4.2:8b ou ornith-1.5:9b" : "google/gemini-2.0-flash-001 ou anthropic/claude-3.5-sonnet"}
                     value={aiModel}
                     onChange={(e) => setAiModel(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-blue-500"

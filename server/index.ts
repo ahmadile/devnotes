@@ -47,7 +47,19 @@ app.use(helmet({
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
       "script-src": ["'self'", "'unsafe-inline'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
-      "connect-src": ["'self'", "*.clerk.accounts.dev", "clerk.devnotes.local"],
+      "connect-src": [
+        "'self'",
+        "*.clerk.accounts.dev",
+        "clerk.devnotes.local",
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "http://localhost:11434",
+        "http://127.0.0.1:11434",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "https://openrouter.ai",
+        "https://generativelanguage.googleapis.com"
+      ],
       "img-src": ["'self'", "data:", "blob:", "https:", "http:", "img.clerk.com"],
       "worker-src": ["'self'", "blob:"],
       "font-src": ["'self'", "fonts.gstatic.com"],
@@ -340,21 +352,42 @@ app.use('/uploads', express.static(uploadsDir));
   }
 
   // --- Ollama Discovery & Diagnostics Endpoints ---
+  async function fetchFromOllama(rawUrl: string, endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const clean = (rawUrl || 'http://127.0.0.1:11434').trim().replace(/\/+$/, '');
+    const candidateUrls = [
+      `${clean}${endpoint}`,
+      clean.includes('localhost') ? `${clean.replace('localhost', '127.0.0.1')}${endpoint}` : `${clean.replace('127.0.0.1', 'localhost')}${endpoint}`,
+      `http://127.0.0.1:11434${endpoint}`,
+      `http://localhost:11434${endpoint}`,
+    ];
+    const uniqueUrls = Array.from(new Set(candidateUrls));
+    let lastErr: any = null;
+    for (const u of uniqueUrls) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(u, { ...options, signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok || (res.status >= 400 && res.status < 500)) {
+          return res;
+        }
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('Ollama inaccessible');
+  }
+
   app.get('/api/ollama/status', async (req, res) => {
     try {
-      const rawUrl = (req.query.ollamaUrl as string) || 'http://localhost:11434';
-      const baseUrl = rawUrl.replace(/\/+$/, '');
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const versionRes = await fetch(`${baseUrl}/api/version`, { signal: controller.signal });
-      clearTimeout(timeout);
-
+      const rawUrl = (req.query.url as string) || (req.query.ollamaUrl as string) || 'http://127.0.0.1:11434';
+      const versionRes = await fetchFromOllama(rawUrl, '/api/version');
       if (!versionRes.ok) {
         res.json({ ok: false, running: false, error: `HTTP ${versionRes.status}` });
         return;
       }
       const data = await versionRes.json() as any;
-      res.json({ ok: true, running: true, version: data.version || 'unknown', baseUrl });
+      res.json({ ok: true, running: true, version: data.version || '0.40+', baseUrl: rawUrl });
     } catch (err: any) {
       res.json({ ok: false, running: false, error: err.message || 'Serveur Ollama inaccessible' });
     }
@@ -362,13 +395,8 @@ app.use('/uploads', express.static(uploadsDir));
 
   app.get('/api/ollama/models', async (req, res) => {
     try {
-      const rawUrl = (req.query.ollamaUrl as string) || 'http://localhost:11434';
-      const baseUrl = rawUrl.replace(/\/+$/, '');
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
-      const tagsRes = await fetch(`${baseUrl}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeout);
-
+      const rawUrl = (req.query.url as string) || (req.query.ollamaUrl as string) || 'http://127.0.0.1:11434';
+      const tagsRes = await fetchFromOllama(rawUrl, '/api/tags');
       if (!tagsRes.ok) {
         res.json({ ok: false, running: false, models: [], error: `HTTP ${tagsRes.status}` });
         return;
@@ -383,10 +411,11 @@ app.use('/uploads', express.static(uploadsDir));
         parameterSize: m.details?.parameter_size,
         quantization: m.details?.quantization_level,
         family: m.details?.family,
+        details: m.details,
         capabilities: Array.isArray(m.capabilities) ? m.capabilities : [],
         modifiedAt: m.modified_at,
       }));
-      res.json({ ok: true, running: true, models, count: models.length, baseUrl });
+      res.json({ ok: true, running: true, models, count: models.length, baseUrl: rawUrl, version: '0.40+' });
     } catch (err: any) {
       res.json({ ok: false, running: false, models: [], error: err.message || 'Impossible de lister les modèles Ollama' });
     }
@@ -394,11 +423,8 @@ app.use('/uploads', express.static(uploadsDir));
 
   app.get('/api/ollama/ps', async (req, res) => {
     try {
-      const baseUrl = ((req.query.url as string) || 'http://localhost:11434').replace(/\/+$/, '');
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const psRes = await fetch(`${baseUrl}/api/ps`, { signal: controller.signal });
-      clearTimeout(timeout);
+      const rawUrl = (req.query.url as string) || (req.query.ollamaUrl as string) || 'http://127.0.0.1:11434';
+      const psRes = await fetchFromOllama(rawUrl, '/api/ps');
       if (psRes.ok) {
         const data = await psRes.json() as any;
         res.json({ ok: true, models: data.models || [] });
@@ -412,21 +438,17 @@ app.use('/uploads', express.static(uploadsDir));
 
   app.post('/api/ollama/preload', async (req, res) => {
     try {
-      const { ollamaUrl, model, keepAlive } = req.body || {};
-      const baseUrl = ((ollamaUrl as string) || 'http://localhost:11434').replace(/\/+$/, '');
+      const { ollamaUrl, url, model, keepAlive } = req.body || {};
+      const rawUrl = (ollamaUrl as string) || (url as string) || 'http://127.0.0.1:11434';
       const targetModel = model || 'gemma4:e4b';
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
-      const preloadRes = await fetch(`${baseUrl}/api/generate`, {
+      const preloadRes = await fetchFromOllama(rawUrl, '/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: targetModel,
           keep_alive: keepAlive || '60m',
         }),
-        signal: controller.signal,
       });
-      clearTimeout(timeout);
       if (preloadRes.ok) {
         res.json({ ok: true, preloaded: true, model: targetModel, message: `Modèle ${targetModel} chargé en mémoire vive (RAM) pour 60 minutes.` });
       } else {
@@ -440,13 +462,11 @@ app.use('/uploads', express.static(uploadsDir));
 
   app.post('/api/ollama/test', async (req, res) => {
     try {
-      const { ollamaUrl, model } = req.body || {};
-      const baseUrl = ((ollamaUrl as string) || 'http://localhost:11434').replace(/\/+$/, '');
+      const { ollamaUrl, url, model } = req.body || {};
+      const rawUrl = (ollamaUrl as string) || (url as string) || 'http://127.0.0.1:11434';
       const targetModel = model || 'gemma4:e4b';
       const startTime = Date.now();
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
-      const testRes = await fetch(`${baseUrl}/api/generate`, {
+      const testRes = await fetchFromOllama(rawUrl, '/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -454,9 +474,7 @@ app.use('/uploads', express.static(uploadsDir));
           prompt: 'Réponds en un seul mot: "Prêt !"',
           stream: false,
         }),
-        signal: controller.signal,
       });
-      clearTimeout(timeout);
 
       if (!testRes.ok) {
         const errorText = await testRes.text().catch(() => '');
