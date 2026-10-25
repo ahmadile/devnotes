@@ -683,14 +683,36 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         localStorage.setItem('devnotes_ai_model', firstModel);
       }
 
-      // Check active models in RAM (ollama ps)
+      // Check active models in RAM (ollama ps) — proxy first, direct fallback
       try {
-        const psRes = await fetchApiWithFallback(`/api/ollama/ps?url=${encodeURIComponent(cleanUrl)}`);
-        if (psRes.ok) {
-          const psData = await psRes.json();
-          if (psData.ok && Array.isArray(psData.models)) {
-            setOllamaLoadedModels(psData.models.map((m: any) => m.name));
+        let psModels: string[] = [];
+        try {
+          const psRes = await fetchApiWithFallback(`/api/ollama/ps?url=${encodeURIComponent(cleanUrl)}`);
+          if (psRes.ok) {
+            const psData = await psRes.json();
+            if (psData.ok && Array.isArray(psData.models)) {
+              psModels = psData.models.map((m: any) => m.name);
+            }
           }
+        } catch (_proxyErr) {
+          // non-blocking
+        }
+        // Direct browser fallback for ps
+        if (psModels.length === 0) {
+          try {
+            const psDirectRes = await fetch(`${cleanUrl}/api/ps`);
+            if (psDirectRes.ok) {
+              const psDirectData = await psDirectRes.json();
+              if (Array.isArray(psDirectData.models)) {
+                psModels = psDirectData.models.map((m: any) => m.name);
+              }
+            }
+          } catch (_directErr) {
+            // non-blocking
+          }
+        }
+        if (psModels.length > 0) {
+          setOllamaLoadedModels(psModels);
         }
       } catch (e) {
         // non-blocking
@@ -708,21 +730,46 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     const target = modelName || aiModel || 'gemma4:e4b';
     setOllamaPreloading(target);
     try {
-      const res = await fetchApiWithFallback('/api/ollama/preload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ollamaUrl: ollamaUrl.trim() || undefined,
-          model: target,
-          keepAlive: '60m',
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
+      let success = false;
+      // Try backend proxy first
+      try {
+        const res = await fetchApiWithFallback('/api/ollama/preload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ollamaUrl: ollamaUrl.trim() || undefined,
+            model: target,
+            keepAlive: '60m',
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) success = true;
+      } catch (_proxyErr) {
+        // non-blocking
+      }
+
+      // Fallback: direct browser fetch to Ollama
+      if (!success) {
+        const baseUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+        const directRes = await fetch(`${baseUrl}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: target, prompt: '', keep_alive: '60m' }),
+        });
+        if (directRes.ok) success = true;
+      }
+
+      if (success) {
         setOllamaLoadedModels(prev => Array.from(new Set([...prev, target])));
         setOllamaTestResult({
           success: true,
           message: `Modèle ${target} chargé en mémoire RAM (actif pour 60 min) !`,
+          model: target,
+        });
+      } else {
+        setOllamaTestResult({
+          success: false,
+          message: 'Impossible de précharger le modèle en mémoire.',
           model: target,
         });
       }
@@ -741,27 +788,59 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     const modelToTest = testModelName || aiModel || (ollamaModels[0]?.name) || 'gemma4:e4b';
     setOllamaTesting(true);
     setOllamaTestResult(null);
+    const startTs = Date.now();
     try {
-      const res = await fetchApiWithFallback('/api/ollama/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: ollamaUrl.trim() || undefined,
-          model: modelToTest,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+      let testOk = false;
+      let latencyMs = 0;
+      let effectiveModel = modelToTest;
+
+      // Try backend proxy first
+      try {
+        const res = await fetchApiWithFallback('/api/ollama/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: ollamaUrl.trim() || undefined,
+            model: modelToTest,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok) {
+            testOk = true;
+            latencyMs = data.durationMs || (Date.now() - startTs);
+            effectiveModel = data.model || modelToTest;
+          }
+        }
+      } catch (_proxyErr) {
+        // non-blocking
+      }
+
+      // Fallback: direct browser fetch to Ollama
+      if (!testOk) {
+        const baseUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+        const directRes = await fetch(`${baseUrl}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: modelToTest, prompt: 'Bonjour, réponds OK en un mot.', stream: false }),
+        });
+        if (directRes.ok) {
+          testOk = true;
+          latencyMs = Date.now() - startTs;
+        }
+      }
+
+      if (testOk) {
         setOllamaTestResult({
           success: true,
-          latencyMs: data.durationMs,
-          message: `Réponse reçue en ${data.durationMs} ms ! Modèle : ${data.model}`,
-          model: data.model,
+          latencyMs,
+          message: `Réponse reçue en ${latencyMs} ms ! Modèle : ${effectiveModel}`,
+          model: effectiveModel,
         });
       } else {
         setOllamaTestResult({
           success: false,
-          message: data.error || 'Échec du test Ollama.',
+          message: 'Échec du test de communication avec Ollama.',
           model: modelToTest,
         });
       }
