@@ -392,6 +392,52 @@ app.use('/uploads', express.static(uploadsDir));
     }
   });
 
+  app.get('/api/ollama/ps', async (req, res) => {
+    try {
+      const baseUrl = ((req.query.url as string) || 'http://localhost:11434').replace(/\/+$/, '');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const psRes = await fetch(`${baseUrl}/api/ps`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (psRes.ok) {
+        const data = await psRes.json() as any;
+        res.json({ ok: true, models: data.models || [] });
+      } else {
+        res.json({ ok: false, models: [] });
+      }
+    } catch (err: any) {
+      res.json({ ok: false, models: [], error: err.message });
+    }
+  });
+
+  app.post('/api/ollama/preload', async (req, res) => {
+    try {
+      const { ollamaUrl, model, keepAlive } = req.body || {};
+      const baseUrl = ((ollamaUrl as string) || 'http://localhost:11434').replace(/\/+$/, '');
+      const targetModel = model || 'gemma4:e4b';
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      const preloadRes = await fetch(`${baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          keep_alive: keepAlive || '60m',
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (preloadRes.ok) {
+        res.json({ ok: true, preloaded: true, model: targetModel, message: `Modèle ${targetModel} chargé en mémoire vive (RAM) pour 60 minutes.` });
+      } else {
+        const errText = await preloadRes.text().catch(() => '');
+        res.status(preloadRes.status).json({ ok: false, error: errText });
+      }
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   app.post('/api/ollama/test', async (req, res) => {
     try {
       const { ollamaUrl, model } = req.body || {};

@@ -388,6 +388,8 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     checking: false,
   });
   const [ollamaModels, setOllamaModels] = useState<OllamaModelItem[]>([]);
+  const [ollamaLoadedModels, setOllamaLoadedModels] = useState<string[]>([]);
+  const [ollamaPreloading, setOllamaPreloading] = useState<string | null>(null);
   const [ollamaTesting, setOllamaTesting] = useState(false);
   const [ollamaTestResult, setOllamaTestResult] = useState<{
     success: boolean;
@@ -628,6 +630,39 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         checking: false,
         error: err.message || "Serveur Ollama inaccessible.",
       });
+    }
+  };
+
+  const handlePreloadOllama = async (modelName?: string) => {
+    const target = modelName || aiModel || 'gemma4:e4b';
+    setOllamaPreloading(target);
+    try {
+      const res = await fetchApiWithFallback('/api/ollama/preload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ollamaUrl: ollamaUrl.trim() || undefined,
+          model: target,
+          keepAlive: '60m',
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setOllamaLoadedModels(prev => Array.from(new Set([...prev, target])));
+        setOllamaTestResult({
+          success: true,
+          message: `Modèle ${target} chargé en mémoire RAM (actif pour 60 min) !`,
+          model: target,
+        });
+      }
+    } catch (err: any) {
+      setOllamaTestResult({
+        success: false,
+        message: err.message || 'Impossible de précharger le modèle en mémoire.',
+        model: target,
+      });
+    } finally {
+      setOllamaPreloading(null);
     }
   };
 
@@ -2294,7 +2329,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                         <p className="text-[11px] opacity-90 leading-relaxed">
                           {ollamaStatus.running
                             ? `${ollamaModels.length} modèle${ollamaModels.length > 1 ? 's' : ''} local disponible${ollamaModels.length > 1 ? 's' : ''}. Cliquez sur un modèle ci-dessous pour l'activer instantanément.`
-                            : "Assurez-vous qu'Ollama est lancé sur votre machine : ouvrez un terminal et tapez `ollama serve`."}
+                            : "Ollama est déjà actif en tâche de fond sous Windows (icône près de l'horloge). Inutile de taper 'ollama serve' dans le terminal."}
                         </p>
                       </div>
                     </div>
