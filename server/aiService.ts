@@ -1,4 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
+const OLLAMA_FETCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for local CPU/GPU inference
+
 
 export interface ProcessNoteRequest {
   input: string;
@@ -1055,6 +1057,7 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1190,6 +1193,7 @@ Directives de réponse :
       const baseUrl = params.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1592,6 +1596,7 @@ Renvoie UNIQUEMENT un objet JSON valide conforme à ce schéma :
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1732,6 +1737,7 @@ Renvoie UNIQUEMENT un JSON conforme à ce format :
       const baseUrl = params.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2075,6 +2081,7 @@ Tu dois répondre STRICTEMENT au format JSON valide selon cette structure :
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2254,6 +2261,7 @@ DIRECTIVES PÉDAGOGIQUES MAJEURES :
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2770,6 +2778,7 @@ Règles fondamentales de design et clarté :
       const baseUrl = req.ollamaUrl || 'http://localhost:11434';
       const effectiveModel = await resolveOllamaModel(baseUrl, modelName);
       const res = await fetch(`${baseUrl}/api/chat`, {
+        signal: AbortSignal.timeout(OLLAMA_FETCH_TIMEOUT_MS),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

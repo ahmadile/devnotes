@@ -52,6 +52,36 @@ export interface AiConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
+  thinking?: string;
+}
+
+function parseJsonSafeClient<T = any>(rawText: string): T | null {
+  if (!rawText || typeof rawText !== 'string') return null;
+  let text = rawText.trim();
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  try {
+    return JSON.parse(text) as T;
+  } catch {}
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = text.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate) as T;
+    } catch {
+      try {
+        const sanitized = candidate.replace(/[\u0000-\u001F]+/g, (match) => {
+          if (match === '\n') return '\\n';
+          if (match === '\r') return '\\r';
+          if (match === '\t') return '\\t';
+          return '';
+        });
+        return JSON.parse(sanitized) as T;
+      } catch {}
+    }
+  }
+  return null;
 }
 
 export interface OllamaModelItem {
@@ -356,6 +386,8 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   }, [isOpen, initialTab, initialSelectedText]);
   const [inputContent, setInputContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<string>('');
+  const [processingThinking, setProcessingThinking] = useState<string>('');
   const [aiResult, setAiResult] = useState<ProcessedAiResult | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -880,6 +912,8 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setIsProcessing(true);
     setAiResult(null);
     setProcessError(null);
+    setProcessingStage('');
+    setProcessingThinking('');
 
     // Instant Verbatim / 5-Blocks Direct Mode: bypasses AI completely, 0s latency, 0 token
     if (modeToUse === 'verbatim') {
@@ -890,6 +924,100 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         return;
       } catch (err: any) {
         console.warn('Client verbatim parse failed, attempting server:', err);
+      }
+    }
+
+    // Direct Browser Ollama Generation (works on Vercel + Localhost with live thinking)
+    if (aiProvider === 'ollama') {
+      try {
+        const cleanBaseUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+        const targetModel = aiModel || (ollamaModels[0]?.name) || 'gemma4:e4b';
+        setProcessingStage(`Connexion à Ollama local (${targetModel})...`);
+
+        const prompt = `Tu es l'assistant IA d'élite de DevNotes, expert en pédagogie et ingénierie logicielle.
+Ta mission est de structurer et d'intégrer l'entrée utilisateur ci-dessous dans DevNotes sous forme de fiche de cours claire et pédagogique.
+
+--- ENTRÉE UTILISATEUR ---
+${inputContent}
+--- FIN ENTRÉE ---
+
+Format JSON STRICT obligatoire (renvoie UNIQUEMENT un objet JSON valide, sans texte d'introduction ni de conclusion) :
+{
+  "title": "Titre en français clair",
+  "tags": ["tag1", "tag2"],
+  "moduleName": "Python / Sujet",
+  "content": "### Résumé Pédagogique\nExplication claire et structurée...\n\n### Points Clés & Règles\n- Règle 1...\n- Règle 2...",
+  "snippets": [
+    {
+      "title": "Script de cours complet",
+      "language": "python",
+      "code": "# Code complet commenté\n",
+      "annotations": []
+    }
+  ]
+}`;
+
+        const directRes = await fetch(`${cleanBaseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: targetModel,
+            messages: [{ role: 'user', content: prompt }],
+            stream: true,
+            format: 'json',
+          }),
+        });
+
+        if (directRes.ok && directRes.body) {
+          const reader = directRes.body.getReader();
+          const decoder = new TextDecoder();
+          let jsonBuffer = '';
+          let thinkingBuffer = '';
+          let streamDone = false;
+
+          while (!streamDone) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunkStr = decoder.decode(value, { stream: true });
+            const chunkLines = chunkStr.split('\n');
+            for (const line of chunkLines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              try {
+                const parsedChunk = JSON.parse(trimmed);
+                if (parsedChunk.message?.thinking) {
+                  thinkingBuffer += parsedChunk.message.thinking;
+                  setProcessingThinking(thinkingBuffer);
+                  setProcessingStage(`Réflexion en cours (${thinkingBuffer.length} car.)...`);
+                }
+                if (parsedChunk.message?.content) {
+                  jsonBuffer += parsedChunk.message.content;
+                  setProcessingStage(`Rédaction de la fiche (${jsonBuffer.length} car.)...`);
+                }
+                if (parsedChunk.done) {
+                  streamDone = true;
+                }
+              } catch {}
+            }
+          }
+
+          const parsedResult = parseJsonSafeClient(jsonBuffer);
+          if (parsedResult && parsedResult.title) {
+            setAiResult({
+              title: parsedResult.title,
+              tags: Array.isArray(parsedResult.tags) ? parsedResult.tags : ['Note'],
+              moduleName: parsedResult.moduleName || 'Général',
+              content: parsedResult.content || '',
+              snippets: Array.isArray(parsedResult.snippets) ? parsedResult.snippets : [],
+            });
+            setIsProcessing(false);
+            setProcessingStage('');
+            setProcessingThinking('');
+            return;
+          }
+        }
+      } catch (ollamaDirectErr: any) {
+        console.warn('[Ollama] Direct client generation failed, falling back to server proxy:', ollamaDirectErr);
       }
     }
 
@@ -915,7 +1043,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
               provider: aiProvider,
               apiKey: activeApiKey.trim() || undefined,
               model: aiModel.trim() || undefined,
-          ollamaUrl: ollamaUrl.trim() || undefined,
+              ollamaUrl: ollamaUrl.trim() || undefined,
             }),
           });
           if (attempt.ok) {
@@ -949,7 +1077,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           } catch {}
         }
         if (!errorDetails || errorDetails.includes('ECONNREFUSED') || errorDetails.includes('500 Internal Server Error')) {
-          throw new Error("Le serveur backend (port 3001) n'a pas répondu. Assurez-vous que l'application est lancée avec 'npm run dev'.");
+          throw new Error("Le serveur backend n'a pas répondu. Assurez-vous qu'Ollama est actif ou vérifiez vos clés API.");
         }
         throw new Error(errorDetails || `Erreur serveur (${res?.status || 500})`);
       }
@@ -962,9 +1090,11 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to process note:', err);
-      setProcessError(err.message || "Erreur de connexion. Vérifiez que 'npm run dev' est bien actif.");
+      setProcessError(err.message || "Erreur de traitement IA.");
     } finally {
       setIsProcessing(false);
+      setProcessingStage('');
+      setProcessingThinking('');
     }
   };
 
@@ -1173,6 +1303,86 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     const updatedConvs = conversations.map(c => c.id === activeConv.id ? updatedConv : c);
     saveConversations(updatedConvs);
     setIsChatSending(true);
+
+    // Direct Browser Ollama Streaming (works on Vercel + Localhost with live thinking)
+    if (aiProvider === 'ollama') {
+      const cleanBaseUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+      const targetModel = aiModel || (ollamaModels[0]?.name) || 'gemma4:e4b';
+      const systemPrompt = `Tu es l'Assistant Pédagogique et Expert Technique de DevNotes.
+Ta mission est d'aider le développeur à comprendre ses notes de cours, son code et les concepts informatiques (Python, algorithmes, architecture).
+Sois clair, précis et utilise du code commenté Markdown si utile.`;
+
+      try {
+        const directChatRes = await fetch(`${cleanBaseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: targetModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...updatedMessages.map(m => ({ role: m.role, content: m.content })),
+            ],
+            stream: true,
+          }),
+        });
+
+        if (directChatRes.ok && directChatRes.body) {
+          const reader = directChatRes.body.getReader();
+          const decoder = new TextDecoder();
+          let accContent = '';
+          let accThinking = '';
+          let streamDone = false;
+
+          const assistantPlaceholder: AiConversationMessage = {
+            role: 'assistant',
+            content: '',
+            thinking: '',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+
+          while (!streamDone) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunkStr = decoder.decode(value, { stream: true });
+            const chunkLines = chunkStr.split('\n');
+            for (const line of chunkLines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              try {
+                const data = JSON.parse(trimmed);
+                if (data.message?.thinking) {
+                  accThinking += data.message.thinking;
+                }
+                if (data.message?.content) {
+                  accContent += data.message.content;
+                }
+                if (data.done) {
+                  streamDone = true;
+                }
+              } catch {}
+            }
+
+            const liveAssistantMsg: AiConversationMessage = {
+              ...assistantPlaceholder,
+              content: accContent,
+              thinking: accThinking,
+            };
+            const liveConv: AiConversation = {
+              ...updatedConv,
+              messages: [...updatedMessages, liveAssistantMsg],
+            };
+            saveConversations(conversations.map(c => c.id === activeConv.id ? liveConv : c));
+          }
+
+          if (accContent || accThinking) {
+            setIsChatSending(false);
+            return;
+          }
+        }
+      } catch (ollamaChatErr) {
+        console.warn('[Ollama] Direct browser chat streaming failed, trying backend proxy:', ollamaChatErr);
+      }
+    }
 
     try {
       const activeNoteSummary = activeNote
@@ -1854,18 +2064,29 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                       </div>
                       <div className="absolute inset-0 rounded-2xl bg-blue-400/20 blur-xl opacity-40 animate-pulse" />
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-2 max-w-lg w-full">
                       <h4 className="text-sm font-bold text-foreground flex items-center justify-center gap-2">
-                        L'IA analyse et réfléchit à votre note...
+                        {processingStage || "L'IA analyse et réfléchit à votre note..."}
                         <span className="inline-flex gap-1">
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
                           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
                         </span>
                       </h4>
-                      <p className="text-xs text-muted-foreground max-w-sm">
-                        Séparation du code pur, création des sous-notes de ligne et croisement des syntaxes en cours.
+                      <p className="text-xs text-muted-foreground">
+                        {aiProvider === 'ollama' 
+                          ? `Génération locale avec ${aiModel || 'Ollama'}. Traitement en direct...`
+                          : 'Séparation du code pur, création des sous-notes de ligne et croisement des syntaxes en cours.'}
                       </p>
+                      {processingThinking && (
+                        <div className="mt-3 p-3 rounded-xl bg-black/70 border border-amber-500/30 text-left font-mono text-[11px] text-amber-200/90 max-h-48 overflow-y-auto w-full shadow-inner animate-fadeIn">
+                          <div className="flex items-center gap-1.5 text-amber-400 font-bold mb-1.5">
+                            <Brain className="w-3.5 h-3.5 animate-pulse" />
+                            <span>Réflexion interne en direct ({processingThinking.length} car.) :</span>
+                          </div>
+                          <p className="whitespace-pre-wrap leading-relaxed">{processingThinking}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : !aiResult ? (
@@ -2198,7 +2419,18 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
                           : 'bg-[#131316] border border-white/[0.06] text-zinc-200 rounded-tl-none'
                       )}
                     >
-                      <Markdown content={m.content} />
+                      {m.thinking && (
+                        <details className="mb-2 p-2 rounded-lg bg-black/40 border border-amber-500/20 text-[11px] text-zinc-400" open={isChatSending && idx === messages.length - 1}>
+                          <summary className="font-mono text-amber-400/90 cursor-pointer flex items-center gap-1.5 hover:text-amber-300 select-none">
+                            <Brain className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Réflexion du modèle ({m.thinking.length} car.)</span>
+                          </summary>
+                          <div className="mt-2 pl-2 border-l border-amber-500/30 whitespace-pre-wrap font-mono text-[10px] text-zinc-400 max-h-48 overflow-y-auto">
+                            {m.thinking}
+                          </div>
+                        </details>
+                      )}
+                      <Markdown content={m.content || (isChatSending && idx === messages.length - 1 ? '...' : '')} />
                       
                       <div className="flex items-center justify-between pt-2 border-t border-white/[0.04] text-[10px] text-zinc-500">
                         <span>{m.timestamp || ''}</span>
