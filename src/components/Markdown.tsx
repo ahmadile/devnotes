@@ -262,6 +262,57 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; onDelete?: (src: str
 };
 
 /**
+ * Cleans and sanitizes raw Mermaid code to eliminate syntax errors:
+ * - Strips fences and conversational preambles
+ * - Ensures diagram header (flowchart TD or LR)
+ * - Wraps unquoted bracket and parenthesis contents in double quotes to prevent
+ *   syntax errors with parentheses, colons, brackets, or accents.
+ */
+export function sanitizeMermaidChart(rawChart: string): string {
+  if (!rawChart || typeof rawChart !== 'string') return '';
+  let chart = rawChart.trim();
+
+  // Strip markdown fences
+  chart = chart.replace(/^```(?:mermaid)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Strip conversational introductory lines
+  chart = chart.replace(/^(?:voici le diagramme|schéma|diagramme|diagram|here is the diagram)[^\n]*\n+/i, '').trim();
+
+  // Ensure diagram type header
+  const knownHeaders = ['flowchart', 'graph', 'sequenceDiagram', 'classDiagram', 'stateDiagram', 'erDiagram', 'gantt', 'pie', 'gitGraph', 'mindmap', 'timeline'];
+  const hasKnownHeader = knownHeaders.some(h => chart.startsWith(h));
+  if (!hasKnownHeader) {
+    chart = `flowchart TD\n${chart}`;
+  }
+
+  // Sanitize line-by-line: fix unquoted bracket labels containing parentheses, commas, colons or accents
+  // E.g. A[1) Analogie (sport)] -> A["1) Analogie (sport)"]
+  const lines = chart.split('\n');
+  const sanitizedLines = lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('%%') || trimmed.startsWith('classDef') || trimmed.startsWith('style') || trimmed.startsWith('subgraph') || trimmed === 'end') {
+      return line;
+    }
+
+    // Fix unquoted node definitions: id[Some text] -> id["Some text"]
+    let sanitized = line.replace(/([A-Za-z0-9_]+)\s*\[([^"\]\n]+)\]/g, (_, id, text) => {
+      const cleanText = text.trim().replace(/"/g, "'");
+      return `${id}["${cleanText}"]`;
+    });
+
+    // Fix unquoted parentheses nodes: id(Some text) -> id("Some text")
+    sanitized = sanitized.replace(/([A-Za-z0-9_]+)\s*\(([^"()\n]+)\)/g, (_, id, text) => {
+      const cleanText = text.trim().replace(/"/g, "'");
+      return `${id}("${cleanText}")`;
+    });
+
+    return sanitized;
+  });
+
+  return sanitizedLines.join('\n');
+}
+
+/**
  * Applies the DeepSeek + Claude hybrid semantic palette to Mermaid flowcharts.
  * - Start / Input / Task: Soft Sky / Cyan
  * - Logic / Process / Execution: Deep Emerald / Teal
@@ -271,17 +322,31 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; onDelete?: (src: str
  * - Intermediate cards: Sleek Charcoal / Slate
  */
 export function enhanceMermaidChart(rawChart: string): string {
-  let chart = rawChart.trim();
+  const chart = sanitizeMermaidChart(rawChart);
 
   // If already styled or sequenceDiagram, preserve untouched
-  if (chart.startsWith('sequenceDiagram') || chart.startsWith('classDiagram') || chart.includes('classDef')) {
+  if (
+    chart.startsWith('sequenceDiagram') ||
+    chart.startsWith('classDiagram') ||
+    chart.startsWith('stateDiagram') ||
+    chart.startsWith('erDiagram') ||
+    chart.includes('classDef') ||
+    chart.includes(':::')
+  ) {
     return chart;
   }
 
-  // Ensure diagram type
+  // Only apply to flowchart / graph
   if (!chart.startsWith('flowchart') && !chart.startsWith('graph')) {
-    chart = `flowchart TD\n${chart}`;
+    return chart;
   }
+
+  // Identify subgraph names so we don't treat them as node IDs
+  const subgraphMatches = [...chart.matchAll(/\bsubgraph\s+([A-Za-z0-9_]+)/g)].map(m => m[1].toLowerCase());
+  const excludedKeywords = new Set([
+    'subgraph', 'end', 'flowchart', 'graph', 'classDef', 'class', 'style', 'click', 'direction',
+    'tb', 'td', 'bt', 'rl', 'lr', ...subgraphMatches
+  ]);
 
   // Claude + DeepSeek hybrid palette (high contrast, enterprise dark theme)
   const classDefs = [
@@ -296,7 +361,7 @@ export function enhanceMermaidChart(rawChart: string): string {
   // Extract node IDs defined like A[...], B(...), C{...}
   const nodeMatches = [...chart.matchAll(/\b([A-Za-z0-9_]+)\s*(?:\[|\(|\{)/g)];
   const uniqueIds = Array.from(new Set(nodeMatches.map(m => m[1]))).filter(id => 
-    !['subgraph', 'end', 'flowchart', 'graph', 'classDef', 'class', 'style', 'click'].includes(id.toLowerCase())
+    !excludedKeywords.has(id.toLowerCase())
   );
 
   if (uniqueIds.length === 0) return chart;
@@ -351,9 +416,9 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
           flowchart: {
             htmlLabels: true,
             curve: 'basis',
-            nodeSpacing: 40,
-            rankSpacing: 40,
-            padding: 15,
+            nodeSpacing: 22,
+            rankSpacing: 26,
+            padding: 10,
           },
           themeVariables: {
             darkMode: true,
@@ -366,13 +431,33 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
             clusterBorder: '#1e293b',
             titleColor: '#38bdf8',
             edgeLabelBackground: '#18181b',
-            fontSize: '12.5px',
+            fontSize: '11px',
           },
         });
-        const uniqueId = `mermaid_${cleanId}_${Math.random().toString(36).slice(2, 7)}`;
-        const { svg: renderedSvg } = await mermaid.render(uniqueId, enhancedChart.trim());
-        if (isMounted) {
-          setSvg(renderedSvg);
+
+        // First attempt: rendered enhanced chart with custom palette
+        try {
+          const uniqueId = `mermaid_${cleanId}_${Math.random().toString(36).slice(2, 7)}`;
+          const { svg: renderedSvg } = await mermaid.render(uniqueId, enhancedChart.trim());
+          if (isMounted) {
+            setSvg(renderedSvg);
+            return;
+          }
+        } catch (firstErr) {
+          // Second attempt: fall back to sanitized chart without custom palette injection
+          try {
+            const rawSanitized = sanitizeMermaidChart(chart);
+            const fallbackId = `mermaid_fb_${cleanId}_${Math.random().toString(36).slice(2, 7)}`;
+            const { svg: fallbackSvg } = await mermaid.render(fallbackId, rawSanitized.trim());
+            if (isMounted) {
+              setSvg(fallbackSvg);
+              return;
+            }
+          } catch (secondErr: any) {
+            if (isMounted) {
+              setError(secondErr?.message || 'Erreur de syntaxe Mermaid');
+            }
+          }
         }
       } catch (err: any) {
         if (isMounted) {
@@ -383,7 +468,7 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 
     renderChart();
     return () => { isMounted = false; };
-  }, [enhancedChart, cleanId]);
+  }, [enhancedChart, cleanId, chart]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -444,13 +529,28 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const cleanSvgHtml = (rawSvg: string) => {
+  // Cleans the SVG and enforces strict compact dimensions:
+  // Diagrams will NEVER stretch infinitely to 1000px+ height.
+  const cleanSvgHtml = (rawSvg: string, inFs: boolean = false) => {
+    if (!rawSvg) return '';
+
+    // Extract viewBox width and height to calculate natural aspect ratio
+    const vbMatch = rawSvg.match(/viewBox=["']\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*["']/i);
+    let vbWidth = 500;
+    if (vbMatch) {
+      vbWidth = Math.max(parseFloat(vbMatch[3]) || 500, 100);
+    }
+
+    // Determine max display width: don't stretch narrow diagrams, cap wide ones
+    const maxRenderWidth = inFs ? '100%' : `${Math.min(Math.max(vbWidth, 260), 680)}px`;
+    const maxRenderHeight = inFs ? '82vh' : '380px';
+
     return rawSvg.replace(/<svg\b([^>]*)>/i, (_, attrs) => {
       const clean = attrs
         .replace(/\bstyle="[^"]*"/gi, '')
         .replace(/\bwidth="[^"]*"/gi, '')
         .replace(/\bheight="[^"]*"/gi, '');
-      return `<svg ${clean} width="100%" style="width: 100%; max-width: 100%; height: auto; min-width: 280px; display: block; margin: auto;">`;
+      return `<svg ${clean} style="width: 100%; max-width: ${maxRenderWidth}; max-height: ${maxRenderHeight}; height: auto; display: block; margin: 0 auto; object-fit: contain;">`;
     });
   };
 
@@ -502,8 +602,8 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
             <button
               type="button"
               onClick={handleResetZoom}
-              className="px-1.5 py-0.5 text-[11px] font-mono hover:bg-white/10 rounded-md hover:text-white transition-colors cursor-pointer"
-              title="Réinitialiser le zoom (100%)"
+              className="px-2 py-0.5 text-[11px] font-mono hover:bg-white/10 rounded-md hover:text-white transition-colors cursor-pointer"
+              title="Ajuster la vue / Réinitialiser le zoom"
             >
               {Math.round(zoom * 100)}%
             </button>
@@ -553,13 +653,13 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     </div>
   );
 
-  // Render diagram viewport
+  // Render diagram viewport with strict vertical height limit
   const renderViewport = (inFullscreen: boolean = false) => {
     if (activeTab === 'code') {
       return (
         <div className={cn(
           "w-full p-4 bg-[#0a0b10] overflow-x-auto text-xs font-mono text-zinc-300 select-text leading-relaxed",
-          inFullscreen ? "h-full" : "max-h-[440px]"
+          inFullscreen ? "h-full" : "max-h-[380px]"
         )}>
           <pre className="select-text whitespace-pre overflow-x-auto">{chart}</pre>
         </div>
@@ -569,8 +669,8 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     return (
       <div 
         className={cn(
-          "w-full relative bg-[#090b10] flex items-center justify-center p-4 sm:p-6 select-none",
-          inFullscreen ? "h-full overflow-hidden" : "min-h-[280px] max-h-[620px] overflow-auto"
+          "w-full relative bg-[#090b10] flex items-center justify-center p-3 sm:p-5 select-none",
+          inFullscreen ? "h-full overflow-hidden" : "min-h-[160px] max-h-[400px] overflow-auto"
         )}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -581,14 +681,13 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
           className={cn(
             "w-full flex items-center justify-center transition-transform duration-75",
             isDragging ? "cursor-grabbing" : "cursor-grab",
-            // Rounded corners on node rects and clean edge strokes
             "[&_.node_rect]:rx-2 [&_.node_rect]:ry-2 [&_.node_polygon]:stroke-[1.5px]"
           )}
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: 'center center',
           }}
-          dangerouslySetInnerHTML={{ __html: cleanSvgHtml(svg) }}
+          dangerouslySetInnerHTML={{ __html: cleanSvgHtml(svg, inFullscreen) }}
         />
       </div>
     );
@@ -611,7 +710,7 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 
   return (
     <>
-      <div className="my-6 rounded-2xl border border-white/[0.08] bg-[#0c0e14] overflow-hidden shadow-xl group/mermaid relative">
+      <div className="my-5 rounded-2xl border border-white/[0.08] bg-[#0c0e14] overflow-hidden shadow-xl group/mermaid relative">
         {renderToolbar(false)}
         {renderViewport(false)}
       </div>
@@ -851,36 +950,42 @@ const VisualFlowChart: React.FC<{ value: string }> = ({ value }) => {
 
   if (steps.length === 0) {
     return (
-      <pre className="p-4 sm:p-5 m-0 overflow-x-auto text-xs font-mono text-zinc-200 bg-transparent whitespace-pre">
+      <pre className="p-3 sm:p-4 m-0 overflow-x-auto text-xs font-mono text-zinc-200 bg-transparent whitespace-pre">
         <code>{value}</code>
       </pre>
     );
   }
 
   return (
-    <div className="p-6 sm:p-8 flex flex-col items-center justify-center gap-0 w-full max-w-xl mx-auto my-2">
+    <div className="p-3 sm:p-4 flex flex-col items-center justify-center gap-0 w-full max-w-lg mx-auto my-2">
       {steps.map((step, idx) => {
         const theme = FLOW_COLOR_STYLES[step.color] || FLOW_COLOR_STYLES.slate;
+        const stepNum = String(idx + 1).padStart(2, '0');
         return (
           <React.Fragment key={idx}>
             <div className={cn(
-              "w-full px-6 py-4 rounded-2xl border text-center transition-all duration-200 hover:scale-[1.01] hover:shadow-lg",
+              "w-full px-4 py-2.5 rounded-xl border text-left transition-all duration-150 hover:shadow-md flex items-start gap-3",
               theme.card
             )}>
-              <div className={cn("text-sm sm:text-base leading-snug", theme.title)}>
-                {step.title}
-              </div>
-              {step.subtitle && (
-                <div className={cn("mt-1 opacity-90 leading-relaxed", theme.subtitle)}>
-                  {step.subtitle}
+              <span className="shrink-0 text-[10.5px] font-mono font-bold opacity-60 mt-0.5 px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                {stepNum}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className={cn("text-xs sm:text-sm font-semibold leading-snug", theme.title)}>
+                  {step.title}
                 </div>
-              )}
+                {step.subtitle && (
+                  <div className={cn("mt-0.5 text-[11px] leading-relaxed opacity-90", theme.subtitle)}>
+                    {step.subtitle}
+                  </div>
+                )}
+              </div>
             </div>
 
             {idx < steps.length - 1 && (
-              <div className="flex flex-col items-center my-2 text-zinc-400 dark:text-zinc-500">
-                <div className="w-0.5 h-3 bg-current opacity-40" />
-                <ArrowDown className="w-4 h-4 text-current -my-0.5" strokeWidth={2} />
+              <div className="flex flex-col items-center my-1 text-zinc-400 dark:text-zinc-500">
+                <div className="w-0.5 h-2.5 bg-current opacity-30" />
+                <ArrowDown className="w-3.5 h-3.5 text-current -my-0.5" strokeWidth={2} />
               </div>
             )}
           </React.Fragment>

@@ -976,10 +976,24 @@ Directives fondamentales de traitement :
    - Produis une fiche de cours de référence "Staff Engineer / DataCamp", approfondie, claire, visuelle et extrêmement pédagogique.
    - Traduis et synthétise en français technique impeccable sans bruit oral.
    - Insère des micro-blocs de code commentés (\`\`\`python ... \`\`\`) avec sorties "# → ...".
-   - SCHÉMA VISUEL DÈS LE DÉPART (OBLIGATOIRE) : Inclus SYSTÉMATIQUEMENT dès la création de la note une section dédiée "### 📊 Architecture & Schéma Visuel" ou "### ⚡ Flux Logique" qui schématise les étapes clés, le pipeline de données ou l'arborescence des concepts :
-     * Soit un bloc \`\`\`flow avec des cartes d'étapes séquentielles colorées (format : Titre de l'étape | Description courte | slate/emerald/indigo/terracotta/purple).
-     * Soit un bloc \`\`\`mermaid (flowchart TD compact avec sous-graphes et classes sémantiques).
-     * Soit un schéma conceptuel ASCII précis dans un bloc \`\`\`text.
+   - SCHÉMA VISUEL DÈS LE DÉPART (OBLIGATOIRE, SYNTHÉTIQUE ET COMPACT) :
+     Inclus SYSTÉMATIQUEMENT dans "content" une section "### 📊 Schéma Visuel" (3 à 5 étapes clés maximum) :
+     * Recommandé (bloc \`\`\`flow, ultra-propre, lisible et garanti sans erreur de syntaxe) :
+\`\`\`flow
+[ 1. Cadrage | Entrée ou données brutes | slate ]
+[ 2. Analyse | Vérification et normalisation | emerald ]
+[ 3. Traitement | Logique métier ou inférence | indigo ]
+[ 4. Résultat | Sortie exploitable et métriques | terracotta ]
+\`\`\`
+     * Ou bloc \`\`\`mermaid (flowchart LR horizontal compact, STRICTEMENT avec 3 à 5 nœuds, et TOUS les libellés obligatoirement entre guillemets doubles pour éviter toute erreur de syntaxe) :
+\`\`\`mermaid
+flowchart LR
+  A["📥 Entrée"] --> B["⚙️ Traitement"]
+  B --> C["📤 Sortie"]
+\`\`\`
+     RÈGLES STRICTES DU SCHÉMA :
+     - 3 à 5 étapes maximum ! Ne crée JAMAIS de diagrammes interminables de 15 boîtes verticales qui noient l'écran.
+     - TOUS les libellés de nœuds DOIVENT être entre guillemets doubles : id["Libellé"] pour éviter toute erreur de syntaxe avec les parenthèses, crochets ou accents.
    - Fournis le script complet exécutable dans "snippets" avec des sous-notes précises (annotations) sur les lignes clés.
 
 3. STRUCTURE PÉDAGOGIQUE DU CHAMP "content" (Markdown Haute Précision) :
@@ -1065,6 +1079,11 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
           messages: [{ role: 'user', content: prompt }],
           stream: false,
           format: 'json',
+          options: {
+            num_predict: 2048,
+            temperature: 0.2,
+            top_p: 0.9,
+          },
         }),
       });
 
@@ -2697,7 +2716,7 @@ Contenu :
 ${(req.content || '').slice(0, 3500)}
 
 Règles fondamentales de design et clarté :
-1. COMPACITÉ & LISIBILITÉ : Évite les diagrammes gigantesques ou interminables à 15 boîtes verticales isolées. Fais un schéma équilibré (4 à 7 étapes clés), avec sous-graphes (subgraph) logiques et parallélisme si pertinent.
+1. COMPACITÉ & LISIBILITÉ : Diagramme STRICTEMENT compact (4 à 6 nœuds maximum). Évite les diagrammes gigantesques ou interminables de 15 boîtes. Privilégie un flowchart LR horizontal équilibré.
 2. PALETTE COULEURS SÉMANTIQUE DEEPSEEK + CLAUDE :
    Inclus impérativement ces classes de style et applique-les aux nœuds :
    classDef startNode fill:#082f49,stroke:#38bdf8,stroke-width:1.8px,color:#f0f9ff;
@@ -2785,6 +2804,10 @@ Règles fondamentales de design et clarté :
           model: effectiveModel,
           messages: [{ role: 'user', content: prompt }],
           stream: false,
+          options: {
+            num_predict: 1024,
+            temperature: 0.2,
+          },
         }),
       });
 

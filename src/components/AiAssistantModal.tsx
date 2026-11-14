@@ -934,24 +934,47 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         const targetModel = aiModel || (ollamaModels[0]?.name) || 'gemma4:e4b';
         setProcessingStage(`Connexion à Ollama local (${targetModel})...`);
 
-        const prompt = `Tu es l'assistant IA d'élite de DevNotes, expert en pédagogie et ingénierie logicielle.
-Ta mission est de structurer et d'intégrer l'entrée utilisateur ci-dessous dans DevNotes sous forme de fiche de cours claire et pédagogique.
+        const systemPrompt = `Tu es le moteur IA d'élite de DevNotes, expert en pédagogie et modélisation logicielle.
+RÈGLE ABSOLUE DE VITESSE ET CONCISION :
+- Réponds IMMÉDIATEMENT et UNIQUEMENT avec l'objet JSON valide demandé.
+- Ne produis aucun monologue de réflexion interne. Va droit au but.
+- Rédige en français technique clair et structuré.`;
+
+        const prompt = `Structure cette entrée pour DevNotes sous forme de fiche de cours claire et pédagogique :
 
 --- ENTRÉE UTILISATEUR ---
 ${inputContent}
 --- FIN ENTRÉE ---
 
+Consignes impératives :
+1. RESPECT DU FOND : Préserve fidèlement toutes les explications, analogies et points clés de l'auteur.
+2. SCHÉMA VISUEL (OBLIGATOIRE DANS 'content') : Inclus impérativement une section '### 📊 Schéma Visuel' (3 à 5 étapes clés) :
+   - Format recommandé (bloc flow ultra-propre et lisible) :
+\`\`\`flow
+[ 1. Cadrage | Entrée ou données brutes | slate ]
+[ 2. Analyse | Vérification et normalisation | emerald ]
+[ 3. Traitement | Logique métier ou calcul | indigo ]
+[ 4. Résultat | Sortie exploitable et métriques | terracotta ]
+\`\`\`
+   - Ou format compact Mermaid (flowchart LR horizontal avec 3 à 5 nœuds, libellés STRICTEMENT entre guillemets doubles pour éviter toute erreur de syntaxe) :
+\`\`\`mermaid
+flowchart LR
+  A["📥 Entrée"] --> B["⚙️ Traitement"]
+  B --> C["📤 Sortie"]
+\`\`\`
+3. SNIPPET DE CODE COMPLET : Inclus dans 'snippets' le code complet exécutable et commenté avec ses annotations.
+
 Format JSON STRICT obligatoire (renvoie UNIQUEMENT un objet JSON valide, sans texte d'introduction ni de conclusion) :
 {
-  "title": "Titre en français clair",
+  "title": "Titre clair en français",
   "tags": ["tag1", "tag2"],
   "moduleName": "Python / Sujet",
-  "content": "### Résumé Pédagogique\nExplication claire et structurée...\n\n### Points Clés & Règles\n- Règle 1...\n- Règle 2...",
+  "content": "### Résumé Pédagogique\\nExplications...\\n\\n### 📊 Schéma Visuel\\n\`\`\`flow\\n[ 1. Entrée | Données initiales | slate ]\\n[ 2. Traitement | Calcul principal | emerald ]\\n[ 3. Sortie | Résultat | terracotta ]\\n\`\`\`\\n\\n### Points Clés & Règles\\n- Règle 1...",
   "snippets": [
     {
       "title": "Script de cours complet",
       "language": "python",
-      "code": "# Code complet commenté\n",
+      "code": "# Code complet commenté\\n",
       "annotations": []
     }
   ]
@@ -962,9 +985,17 @@ Format JSON STRICT obligatoire (renvoie UNIQUEMENT un objet JSON valide, sans te
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: targetModel,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt }
+            ],
             stream: true,
             format: 'json',
+            options: {
+              num_predict: 2048,
+              temperature: 0.2,
+              top_p: 0.9,
+            },
           }),
         });
 
@@ -1319,10 +1350,14 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
           body: JSON.stringify({
             model: targetModel,
             messages: [
-              { role: 'system', content: systemPrompt },
+              { role: 'system', content: systemPrompt + ' Sois direct, concis et pédagogique. Évite les longs monologues de réflexion interne.' },
               ...updatedMessages.map(m => ({ role: m.role, content: m.content })),
             ],
             stream: true,
+            options: {
+              num_predict: 1200,
+              temperature: 0.3,
+            },
           }),
         });
 
