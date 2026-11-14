@@ -534,26 +534,75 @@ export default function App() {
     setSyncMessage(null);
     const token = await getToken();
     const remote = await fetchRemoteNotes(token);
-    if (!remote) {
+    if (!remote || !Array.isArray(remote.notes) || remote.notes.length === 0) {
       setIsSyncing(false);
-      setSyncMessage('Could not load from cloud.');
+      setSyncMessage("Aucune note trouvée sur votre compte Cloud.");
       return;
     }
 
-    if (!confirm('Replace local notes and syntax library with cloud version?')) {
+    const isDefaultOrEmpty = notes.length === 0 || (notes.length === 1 && notes[0]?.id === "welcome");
+    if (!isDefaultOrEmpty && !confirm(`Remplacer vos notes locales par les ${remote.notes.length} notes enregistrées sur votre compte Cloud ?`)) {
       setIsSyncing(false);
       return;
     }
 
     setNotes(remote.notes);
-    setSyntaxDefinitions(remote.syntaxDefinitions);
-    setModules(remote.modules);
+    setSyntaxDefinitions(remote.syntaxDefinitions || {});
+    setModules(remote.modules || []);
     setActiveNoteId(remote.notes.length > 0 ? remote.notes[0].id : null);
-    persistNotes(remote.notes, remote.syntaxDefinitions, remote.modules);
+    persistNotes(remote.notes, remote.syntaxDefinitions || {}, remote.modules || []);
     setLastCloudSyncAt(Date.now());
     setIsSyncing(false);
-    setSyncMessage('Cloud data loaded.');
+    setSyncMessage(`${remote.notes.length} notes restaurées depuis le Cloud avec succès !`);
   };
+
+  // Auto-sync from cloud on sign-in if local only has default welcome note
+  const hasCheckedCloudOnLogin = useRef(false);
+  useEffect(() => {
+    if (!isAuthLoaded || hasCheckedCloudOnLogin.current) return;
+
+    const autoSyncFromCloud = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        hasCheckedCloudOnLogin.current = true;
+
+        const remote = await fetchRemoteNotes(token);
+        if (!remote || !Array.isArray(remote.notes) || remote.notes.length === 0) return;
+
+        // Check if local storage is empty or only contains the default welcome note
+        const localSaved = localStorage.getItem(STORAGE_KEY);
+        let isDefaultOrEmpty = false;
+        if (!localSaved) {
+          isDefaultOrEmpty = true;
+        } else {
+          try {
+            const parsed = JSON.parse(localSaved);
+            const savedNotes = Array.isArray(parsed) ? parsed : parsed.notes;
+            if (!savedNotes || savedNotes.length === 0 || (savedNotes.length === 1 && savedNotes[0]?.id === "welcome")) {
+              isDefaultOrEmpty = true;
+            }
+          } catch {
+            isDefaultOrEmpty = true;
+          }
+        }
+
+        if (isDefaultOrEmpty) {
+          setNotes(remote.notes);
+          setSyntaxDefinitions(remote.syntaxDefinitions || {});
+          setModules(remote.modules || []);
+          setActiveNoteId(remote.notes[0]?.id || null);
+          persistNotes(remote.notes, remote.syntaxDefinitions || {}, remote.modules || []);
+          setLastCloudSyncAt(Date.now());
+          setSyncMessage(`Synchronisation automatique : ${remote.notes.length} notes restaurées depuis votre compte Cloud !`);
+        }
+      } catch (err) {
+        console.warn("Auto cloud sync error:", err);
+      }
+    };
+
+    autoSyncFromCloud();
+  }, [isAuthLoaded, getToken]);
 
   const exportAsJson = () => {
     const payload = {
@@ -922,7 +971,7 @@ export default function App() {
                   <button 
                     onClick={manualSave}
                     className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md cursor-pointer"
-                    title="Save locally"
+                    title="Sauvegarder en local"
                   >
                     <Save className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
@@ -930,7 +979,7 @@ export default function App() {
                     onClick={syncToCloud}
                     disabled={isSyncing}
                     className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors p-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md disabled:opacity-30 cursor-pointer"
-                    title="Sync to cloud"
+                    title="Envoyer vers le Cloud (Sauvegarder en ligne)"
                   >
                     <CloudUpload className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
@@ -938,7 +987,7 @@ export default function App() {
                     onClick={loadFromCloud}
                     disabled={isSyncing}
                     className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md disabled:opacity-30 cursor-pointer"
-                    title="Pull from cloud"
+                    title="Rapatrier depuis le Cloud (Télécharger mes notes)"
                   >
                     <CloudDownload className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
@@ -946,14 +995,14 @@ export default function App() {
                   <button 
                     onClick={exportAsJson}
                     className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
-                    title="Export backup"
+                    title="Exporter une sauvegarde JSON"
                   >
                     <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
                   <button 
                     onClick={() => importInputRef.current?.click()}
                     className="text-zinc-400 hover:text-white transition-colors p-1.5 hover:bg-white/[0.06] rounded-md cursor-pointer"
-                    title="Import backup"
+                    title="Importer une sauvegarde JSON"
                   >
                     <Upload className="w-3.5 h-3.5" strokeWidth={1.5} />
                   </button>
