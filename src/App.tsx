@@ -1603,6 +1603,10 @@ export default function App() {
             syntaxDefinitions={syntaxDefinitions}
             onSaveNote={handleSaveAiNote}
             onImportCurriculum={handleImportCurriculum}
+            onSelectNote={(noteId) => {
+              setActiveNoteId(noteId);
+              setIsAiModalOpen(false);
+            }}
             initialTab={aiModalTab}
             initialTopic={aiModalTopic}
             initialSelectedText={aiModalSelectedText}

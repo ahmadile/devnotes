@@ -1045,7 +1045,13 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
         },
         body: JSON.stringify({
           model: (modelName || 'google/gemini-2.0-flash-001').replace('2.5', '2.0'),
-          messages: [{ role: 'user', content: prompt }],
+          messages: [
+            {
+              role: 'system',
+              content: "Tu es un synthétiseur de cours accéléré pour développeurs. Réponds IMMÉDIATEMENT et UNIQUEMENT avec l'objet JSON valide demandé, sans balises de réflexion <think> ni préambule."
+            },
+            { role: 'user', content: prompt }
+          ],
           response_format: { type: 'json_object' },
         }),
       });
@@ -1080,7 +1086,8 @@ Format JSON STRICT de réponse (renvoie uniquement l'objet JSON valide, sans tex
           stream: false,
           format: 'json',
           options: {
-            num_predict: 2048,
+            num_ctx: 16384,
+            num_predict: 4096,
             temperature: 0.2,
             top_p: 0.9,
           },
@@ -1222,6 +1229,12 @@ Directives de réponse :
             ...params.messages,
           ],
           stream: false,
+          options: {
+            num_ctx: 16384,
+            num_predict: 2048,
+            temperature: 0.3,
+            top_p: 0.9,
+          },
         }),
       });
 
@@ -2853,3 +2866,159 @@ Règles fondamentales de design et clarté :
 
 
 
+
+
+/**
+ * Compute cosine similarity between two numerical vectors.
+ */
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+/**
+ * Generate embedding vectors for text using Ollama (embeddinggemma:300m) or Gemini API.
+ */
+export async function generateEmbeddings(params: {
+  input: string | string[];
+  provider?: 'ollama' | 'gemini' | 'openrouter';
+  model?: string;
+  ollamaUrl?: string;
+  apiKey?: string;
+}): Promise<number[][]> {
+  const rawInputs = Array.isArray(params.input) ? params.input : [params.input];
+  const cleanInputs = rawInputs.map(t => (t || '').trim()).filter(Boolean);
+  if (cleanInputs.length === 0) return [];
+
+  const provider = params.provider || 'ollama';
+  const ollamaUrl = (params.ollamaUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  const model = params.model || (provider === 'ollama' ? 'embeddinggemma:300m' : 'text-embedding-004');
+
+  // Provider: Local Ollama (embeddinggemma:300m)
+  if (provider === 'ollama') {
+    try {
+      const batchSize = 20;
+      const allEmbeddings: number[][] = [];
+
+      for (let i = 0; i < cleanInputs.length; i += batchSize) {
+        const batch = cleanInputs.slice(i, i + batchSize);
+        const res = await fetch(`${ollamaUrl}/api/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            input: batch.length === 1 ? batch[0] : batch,
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (res.ok) {
+          const data = await res.json() as { embeddings?: number[][] };
+          if (data.embeddings && Array.isArray(data.embeddings)) {
+            allEmbeddings.push(...data.embeddings);
+          }
+        }
+      }
+
+      if (allEmbeddings.length > 0) {
+        return allEmbeddings;
+      }
+    } catch (err) {
+      console.warn('[aiService] Ollama embedding error:', err);
+    }
+  }
+
+  // Provider: Gemini API fallback
+  const apiKey = params.apiKey || process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const geminiEmbeddings: number[][] = [];
+      for (const text of cleanInputs) {
+        const response = await ai.models.embedContent({
+          model: 'text-embedding-004',
+          contents: text,
+        });
+        if (response.embeddings && response.embeddings[0]?.values) {
+          geminiEmbeddings.push(response.embeddings[0].values);
+        }
+      }
+      if (geminiEmbeddings.length > 0) return geminiEmbeddings;
+    } catch (err) {
+      console.warn('[aiService] Gemini embedding error:', err);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Perform semantic similarity search across user notes using embeddings.
+ */
+export async function searchNotesSemantic(params: {
+  query: string;
+  notes: Array<{
+    id: string;
+    title: string;
+    content: string;
+    tags?: string[];
+    vector?: number[];
+  }>;
+  topK?: number;
+  provider?: 'ollama' | 'gemini';
+  ollamaUrl?: string;
+  apiKey?: string;
+}): Promise<Array<{
+  note: { id: string; title: string; content: string; tags?: string[] };
+  score: number;
+  similarityPercentage: number;
+}>> {
+  const { query, notes, topK = 6 } = params;
+  if (!query || !notes || notes.length === 0) return [];
+
+  // Generate embedding for query
+  const queryVectors = await generateEmbeddings({
+    input: query,
+    provider: params.provider,
+    ollamaUrl: params.ollamaUrl,
+    apiKey: params.apiKey,
+  });
+
+  const queryVector = queryVectors[0];
+  if (!queryVector || queryVector.length === 0) return [];
+
+  const scored = [];
+  for (const n of notes) {
+    let score = 0;
+    if (n.vector && n.vector.length === queryVector.length) {
+      score = cosineSimilarity(queryVector, n.vector);
+    } else {
+      // Keyword fallback
+      const qTokens = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+      const targetText = `${n.title} ${(n.tags || []).join(' ')} ${n.content.slice(0, 500)}`.toLowerCase();
+      let matchCount = 0;
+      for (const t of qTokens) {
+        if (targetText.includes(t)) matchCount++;
+      }
+      score = qTokens.length > 0 ? (matchCount / qTokens.length) * 0.5 : 0;
+    }
+
+    scored.push({
+      note: { id: n.id, title: n.title, content: n.content, tags: n.tags },
+      score,
+      similarityPercentage: Math.min(100, Math.max(0, Math.round(score * 100))),
+    });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}

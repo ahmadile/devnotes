@@ -41,7 +41,11 @@ import {
   Target,
   BookOpen,
   ClipboardList,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Database,
+  Search,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 import { Markdown } from './Markdown';
 import { RevisionView } from './RevisionView';
@@ -118,7 +122,8 @@ interface AiAssistantModalProps {
   syntaxDefinitions?: Record<string, SyntaxDefinition>;
   onSaveNote: (newNote: Partial<Note>, targetModuleId?: string | null, updateExistingId?: string | null) => void;
   onImportCurriculum?: (newModules: Module[], newNotes: Note[]) => void;
-  initialTab?: 'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'curriculum' | 'explainer';
+  onSelectNote?: (noteId: string) => void;
+  initialTab?: 'generator' | 'chat' | 'architect' | 'vector_rag' | 'revision' | 'settings' | 'curriculum' | 'explainer';
   initialTopic?: string;
   initialSelectedText?: string;
 }
@@ -343,16 +348,135 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   syntaxDefinitions = {},
   onSaveNote,
   onImportCurriculum,
+  onSelectNote,
   initialTab = 'generator',
   initialTopic,
   initialSelectedText,
 }) => {
-  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'revision' | 'settings' | 'curriculum'>(
+  const [activeTab, setActiveTab] = useState<'generator' | 'chat' | 'architect' | 'vector_rag' | 'revision' | 'settings' | 'curriculum'>(
     initialTab === 'explainer' ? 'chat' : initialTab
   );
 
   // Generation Mode: Auto-detect, Verbatim 1:1, or Transcription AI
   const [generationMode, setGenerationMode] = useState<'auto' | 'verbatim' | 'transcription'>('auto');
+
+  // Helper: Cleans long transcriptions from audio timestamps & fillers for local Ollama
+  const cleanTranscriptionText = (raw: string): string => {
+    if (!raw) return '';
+    return raw
+      .replace(/\[?\b\d{1,2}:\d{2}(?::\d{2})?\b\]?/g, '')
+      .replace(/^(?:speaker\s*\d*|intervenant|professeur|formateur|narrateur)\s*:\s*/gmi, '')
+      .replace(/\b(?:euh|ehm|hum|bah|genre|vous voyez|en fait|donc voilà)\b/gi, '')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
+      .trim();
+  };
+
+  // Vector Embeddings & Semantic Search State (embeddinggemma:300m)
+  const [vectorEmbeddings, setVectorEmbeddings] = useState<Record<string, number[]>>(() => {
+    try {
+      const saved = localStorage.getItem('devnotes_embeddings');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [indexingProgress, setIndexingProgress] = useState({ current: 0, total: 0 });
+  const [semanticQuery, setSemanticQuery] = useState('');
+  const [semanticResults, setSemanticResults] = useState<Array<{
+    note: { id: string; title: string; content: string; tags?: string[] };
+    score: number;
+    similarityPercentage: number;
+  }>>([]);
+  const [isSearchingSemantic, setIsSearchingSemantic] = useState(false);
+
+  // Batch index all notes with embeddinggemma:300m
+  const handleIndexAllNotes = async () => {
+    if (!notes || notes.length === 0) return;
+    setIsIndexing(true);
+    setIndexingProgress({ current: 0, total: notes.length });
+
+    try {
+      const cleanOllamaUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+      const batchSize = 10;
+      const updatedEmbeddings = { ...vectorEmbeddings };
+
+      for (let i = 0; i < notes.length; i += batchSize) {
+        const batch = notes.slice(i, i + batchSize);
+        const res = await fetch('/api/ai/embed-notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notes: batch.map(n => ({
+              id: n.id,
+              title: n.title,
+              tags: n.tags,
+              content: n.content,
+            })),
+            provider: 'ollama',
+            model: 'embeddinggemma:300m',
+            ollamaUrl: cleanOllamaUrl,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.embeddings) {
+            Object.assign(updatedEmbeddings, data.embeddings);
+            setVectorEmbeddings({ ...updatedEmbeddings });
+            localStorage.setItem('devnotes_embeddings', JSON.stringify(updatedEmbeddings));
+          }
+        }
+        setIndexingProgress({ current: Math.min(i + batchSize, notes.length), total: notes.length });
+      }
+    } catch (err) {
+      console.error('Error indexing notes:', err);
+    } finally {
+      setIsIndexing(false);
+    }
+  };
+
+  // Perform semantic search across notes using embeddinggemma:300m
+  const handleSemanticSearch = async (queryText: string) => {
+    if (!queryText.trim()) {
+      setSemanticResults([]);
+      return;
+    }
+    setIsSearchingSemantic(true);
+    try {
+      const cleanOllamaUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+      const notesWithVectors = notes.map(n => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        tags: n.tags,
+        vector: vectorEmbeddings[n.id] || undefined,
+      }));
+
+      const res = await fetch('/api/ai/semantic-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: queryText,
+          notes: notesWithVectors,
+          topK: 6,
+          provider: 'ollama',
+          model: 'embeddinggemma:300m',
+          ollamaUrl: cleanOllamaUrl,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSemanticResults(data.results || []);
+      }
+    } catch (err) {
+      console.error('Semantic search error:', err);
+    } finally {
+      setIsSearchingSemantic(false);
+    }
+  };
 
   // Curriculum Ingestion & RAG State
   const [curriculumInputText, setCurriculumInputText] = useState('');
@@ -992,7 +1116,8 @@ Format JSON STRICT obligatoire (renvoie UNIQUEMENT un objet JSON valide, sans te
             stream: true,
             format: 'json',
             options: {
-              num_predict: 2048,
+              num_ctx: 16384,
+              num_predict: 4096,
               temperature: 0.2,
               top_p: 0.9,
             },
@@ -1355,8 +1480,10 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
             ],
             stream: true,
             options: {
-              num_predict: 1200,
+              num_ctx: 16384,
+              num_predict: 2048,
               temperature: 0.3,
+              top_p: 0.9,
             },
           }),
         });
@@ -1492,11 +1619,45 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
     setBlueprintSavedSuccess(false);
 
     try {
-      const scopedNotes = blueprintScope === 'all'
+      let candidateNotes = blueprintScope === 'all'
         ? notes
         : notes.filter(n => n.moduleId === blueprintScope);
 
-      const notesContext = scopedNotes.map(n => ({
+      // Semantic RAG: filter closest notes to project idea if embeddings exist
+      if (Object.keys(vectorEmbeddings).length > 0 && candidateNotes.length > 8) {
+        try {
+          const cleanOllamaUrl = (ollamaUrl.trim() || 'http://localhost:11434').replace(/\/+$/, '');
+          const searchRes = await fetch('/api/ai/semantic-search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: promptToUse,
+              notes: candidateNotes.map(n => ({
+                id: n.id,
+                title: n.title,
+                content: n.content,
+                tags: n.tags,
+                vector: vectorEmbeddings[n.id] || undefined,
+              })),
+              topK: 8,
+              provider: 'ollama',
+              model: 'embeddinggemma:300m',
+              ollamaUrl: cleanOllamaUrl,
+            }),
+          });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.results && searchData.results.length > 0) {
+              const matchedIds = new Set(searchData.results.map((r: any) => r.note.id));
+              candidateNotes = candidateNotes.filter(n => matchedIds.has(n.id));
+            }
+          }
+        } catch (ragErr) {
+          console.warn('[RAG] Fallback to candidate notes:', ragErr);
+        }
+      }
+
+      const notesContext = candidateNotes.slice(0, 10).map(n => ({
         id: n.id,
         title: n.title,
         tags: n.tags,
@@ -1791,14 +1952,28 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
               <button
                 onClick={() => setActiveTab('architect')}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0',
                   activeTab === 'architect'
                     ? 'bg-[#222228] text-white shadow-xs border border-white/[0.12]'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
                 )}
+                title="Incubateur de Projets alimenté par RAG sur vos notes de cours"
               >
                 <Layers className={cn("w-3.5 h-3.5", activeTab === 'architect' ? "text-white" : "text-zinc-400")} strokeWidth={1.5} />
-                <span>Architecte Pro</span>
+                <span>Incubateur Projets (RAG)</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('vector_rag')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0',
+                  activeTab === 'vector_rag'
+                    ? 'bg-blue-600/30 text-blue-300 shadow-xs border border-blue-500/40'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
+                )}
+                title="Indexation sémantique et recherche vectorielle avec embeddinggemma:300m"
+              >
+                <Database className={cn("w-3.5 h-3.5", activeTab === 'vector_rag' ? "text-blue-400" : "text-zinc-400")} strokeWidth={1.5} />
+                <span>Index Vectoriel</span>
               </button>
               <button
                 onClick={() => setActiveTab('revision')}
@@ -1864,6 +2039,35 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
               
               {/* Left Column: Input Prompt & Controls */}
               <div className="p-6 flex flex-col h-full bg-secondary/10 space-y-4 overflow-y-auto">
+                {/* Quick RAG Index Access Banner */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Database className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span className="text-[11px] font-semibold text-blue-300 truncate">
+                      {Object.keys(vectorEmbeddings).length > 0 
+                        ? `${Object.keys(vectorEmbeddings).length}/${notes.length} notes vectorisées (embeddinggemma)` 
+                        : "Base vectorielle : Aucune note indexée"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('vector_rag')}
+                      className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/30 text-[10.5px] font-semibold transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <Search className="w-3 h-3 text-blue-300" />
+                      <span>Index & Recherche</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('architect')}
+                      className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.1] text-[10.5px] font-semibold transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <Layers className="w-3 h-3 text-zinc-300" />
+                      <span>Projets RAG</span>
+                    </button>
+                  </div>
+                </div>
                 {/* Active Note Banner if available */}
                 {activeNote && (
                   <div className="bg-[#151518] border border-white/[0.08] rounded-xl p-3 flex items-center justify-between gap-3">
@@ -1976,6 +2180,23 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
                   </span>
                 </div>
 
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] font-mono text-zinc-500">Contenu brut / Transcription de cours :</span>
+                  {inputContent.length > 50 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cleaned = cleanTranscriptionText(inputContent);
+                        setInputContent(cleaned);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                      title="Nettoie les horodatages ([00:15]) et répétitions pour accélérer le traitement par l'IA locale"
+                    >
+                      <Sparkles className="w-3 h-3 text-blue-400" />
+                      <span>Nettoyer la transcription</span>
+                    </button>
+                  )}
+                </div>
                 <textarea
                   placeholder="Collez votre contenu de note, vos schémas ou faites Ctrl+V pour coller directement une capture de diagramme..."
                   value={inputContent}
@@ -2578,6 +2799,231 @@ Sois clair, précis et utilise du code commenté Markdown si utile.`;
           )}
 
           {/* Settings Tab */}
+          {activeTab === 'vector_rag' && (
+            <div className="flex-1 p-6 max-w-4xl mx-auto w-full space-y-6 overflow-y-auto animate-in fade-in duration-200">
+              {/* Header Banner */}
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-950/20 via-zinc-900/60 to-zinc-950 border border-blue-500/25 shadow-lg space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        Base Vectorielle & Embeddings
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                          embeddinggemma:300m
+                        </span>
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Indexation sémantique propulsée par le modèle Google Gemma 2 (768 dimensions). 100% local sur votre machine, privé et sans quota.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleIndexAllNotes}
+                    disabled={isIndexing || notes.length === 0}
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer disabled:opacity-40 shrink-0"
+                  >
+                    {isIndexing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Vectorisation ({indexingProgress.current}/{indexingProgress.total})...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Indexer toutes mes notes ({notes.length})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Progress bar if indexing */}
+                {isIndexing && (
+                  <div className="space-y-1.5 pt-2">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                      <span>Génération des embeddings par lots via Ollama...</span>
+                      <span>{Math.round((indexingProgress.current / (indexingProgress.total || 1)) * 100)}%</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500 transition-all duration-300 rounded-full"
+                        style={{ width: `${(indexingProgress.current / (indexingProgress.total || 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Metric cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3">
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase block">Notes Indexées</span>
+                    <span className="text-lg font-bold text-white font-mono">
+                      {Object.keys(vectorEmbeddings).length} <span className="text-xs text-zinc-500 font-normal">/ {notes.length}</span>
+                    </span>
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3">
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase block">Moteur Vectoriel</span>
+                    <span className="text-xs font-bold text-blue-400 font-mono">embeddinggemma</span>
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3">
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase block">Dimensions</span>
+                    <span className="text-lg font-bold text-emerald-400 font-mono">768-D</span>
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3">
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase block">Confidentialité</span>
+                    <span className="text-xs font-bold text-zinc-300 font-mono flex items-center gap-1 mt-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      100% Local (GPU)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Semantic Search Interactive Bar */}
+              <div className="p-5 rounded-2xl bg-card border border-border/80 space-y-4 shadow-sm">
+                <div>
+                  <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Search className="w-4 h-4 text-blue-500" />
+                    Recherche Sémantique Multidimensionnelle
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Trouvez instantanément les concepts de vos cours par affinité mathématique, même si les mots exacts ne figurent pas dans la note.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-3 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={semanticQuery}
+                      onChange={(e) => {
+                        setSemanticQuery(e.target.value);
+                        if (e.target.value.length > 2) {
+                          handleSemanticSearch(e.target.value);
+                        } else {
+                          setSemanticResults([]);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSemanticSearch(semanticQuery);
+                      }}
+                      placeholder="Ex: Optimiser les requêtes SQL, pipeline ETL, gestion mémoire en Python, broadcasting NumPy..."
+                      className="w-full bg-secondary/35 border border-border/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSemanticSearch(semanticQuery)}
+                    disabled={isSearchingSemantic || !semanticQuery.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSearchingSemantic ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                    <span>Chercher</span>
+                  </button>
+                </div>
+
+                {/* Suggestions */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] font-mono text-muted-foreground mr-1">Suggestions :</span>
+                  {[
+                    "Tableaux NumPy et vectorisation",
+                    "Pipeline de données et streaming",
+                    "Fonctions d'agrégation et groupby",
+                    "Gestion des erreurs et exceptions"
+                  ].map((sug, sIdx) => (
+                    <button
+                      key={sIdx}
+                      type="button"
+                      onClick={() => {
+                        setSemanticQuery(sug);
+                        handleSemanticSearch(sug);
+                      }}
+                      className="text-[10.5px] px-2.5 py-1 rounded-lg bg-secondary/60 hover:bg-secondary border border-border/60 hover:border-border text-muted-foreground hover:text-foreground transition-all cursor-pointer font-sans"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Semantic Results List */}
+                {semanticResults.length > 0 && (
+                  <div className="space-y-3 pt-3 border-t border-border/60">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {semanticResults.length} notes trouvées par affinité vectorielle :
+                      </span>
+                      <span className="text-[11px] font-mono">Similarité Cosinus (0-100%)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {semanticResults.map((res, rIdx) => {
+                        const sim = res.similarityPercentage;
+                        const scoreColor = sim >= 70 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : sim >= 50 ? 'text-blue-400 bg-blue-500/10 border-blue-500/30' : 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30';
+                        return (
+                          <div
+                            key={res.note.id || rIdx}
+                            className="p-4 rounded-xl bg-secondary/25 hover:bg-secondary/40 border border-border/70 hover:border-primary/40 transition-all flex flex-col justify-between space-y-3 group"
+                          >
+                            <div className="space-y-1.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <h5 className="text-xs font-bold text-foreground leading-snug line-clamp-1 group-hover:text-primary transition-colors">
+                                  {res.note.title}
+                                </h5>
+                                <span className={cn("text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border shrink-0", scoreColor)}>
+                                  {sim}%
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed font-sans">
+                                {res.note.content.replace(/\`\`\`[\s\S]*?\`\`\`/g, '').replace(/[#*`>]/g, '').trim()}
+                              </p>
+                              {res.note.tags && res.note.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-1">
+                                  {res.note.tags.slice(0, 3).map((tg: string, tIdx: number) => (
+                                    <span key={tIdx} className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-secondary/80 text-muted-foreground border border-border/50">
+                                      #{tg}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">
+                              {onSelectNote && (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectNote(res.note.id)}
+                                  className="text-xs font-semibold text-primary hover:text-primary/80 flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Ouvrir la note</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBlueprintPrompt(`Concevoir un projet basé sur : ${res.note.title}`);
+                                  setActiveTab('architect');
+                                }}
+                                className="text-[10.5px] font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer transition-colors ml-auto"
+                              >
+                                <span>Utiliser dans un Projet</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'settings' && (
             <div className="flex-1 p-8 max-w-2xl mx-auto space-y-6 overflow-y-auto">
               <div className="space-y-2">

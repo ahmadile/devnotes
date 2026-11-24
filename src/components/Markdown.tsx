@@ -350,12 +350,12 @@ export function enhanceMermaidChart(rawChart: string): string {
 
   // Claude + DeepSeek hybrid palette (high contrast, enterprise dark theme)
   const classDefs = [
-    'classDef startNode fill:#082f49,stroke:#38bdf8,stroke-width:1.8px,color:#f0f9ff;',
-    'classDef actionNode fill:#064e3b,stroke:#34d399,stroke-width:1.8px,color:#ecfdf5;',
-    'classDef modelNode fill:#312e81,stroke:#a78bfa,stroke-width:1.8px,color:#f5f3ff;',
-    'classDef decisionNode fill:#78350f,stroke:#fbbf24,stroke-width:1.8px,color:#fef3c7;',
-    'classDef outputNode fill:#7c2d12,stroke:#fb923c,stroke-width:1.8px,color:#fff7ed;',
-    'classDef slateNode fill:#1e293b,stroke:#475569,stroke-width:1.8px,color:#f8fafc;',
+    'classDef startNode fill:#0369a1,stroke:#38bdf8,stroke-width:2px,color:#ffffff;',
+    'classDef actionNode fill:#047857,stroke:#34d399,stroke-width:2px,color:#ffffff;',
+    'classDef modelNode fill:#4338ca,stroke:#a78bfa,stroke-width:2px,color:#ffffff;',
+    'classDef decisionNode fill:#b45309,stroke:#fbbf24,stroke-width:2px,color:#ffffff;',
+    'classDef outputNode fill:#c2410c,stroke:#fb923c,stroke-width:2px,color:#ffffff;',
+    'classDef slateNode fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff;',
   ].join('\n    ');
 
   // Extract node IDs defined like A[...], B(...), C{...}
@@ -423,15 +423,15 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
           themeVariables: {
             darkMode: true,
             background: 'transparent',
-            mainBkg: '#161922',
-            nodeBorder: '#334155',
-            nodeTextColor: '#f8fafc',
-            lineColor: '#64748b',
+            mainBkg: '#181b24',
+            nodeBorder: '#38bdf8',
+            nodeTextColor: '#ffffff',
+            lineColor: '#94a3b8',
             clusterBkg: '#0d1017',
-            clusterBorder: '#1e293b',
+            clusterBorder: '#334155',
             titleColor: '#38bdf8',
             edgeLabelBackground: '#18181b',
-            fontSize: '11px',
+            fontSize: '11.5px',
           },
         });
 
@@ -669,7 +669,9 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     return (
       <div 
         className={cn(
-          "w-full relative bg-[#090b10] flex items-center justify-center p-3 sm:p-5 select-none",
+          "w-full relative bg-[#0a0c13] dark:bg-[#08090f] flex items-center justify-center p-3 sm:p-5 select-none text-zinc-100",
+          "[&_.nodeLabel]:!text-white [&_.nodeLabel]:!fill-white [&_text]:!fill-white [&_span]:!text-white",
+          "[&_.edgeLabel]:!text-zinc-200 [&_.edgeLabel]:!bg-[#18181b] [&_.edgeLabel_span]:!text-zinc-200",
           inFullscreen ? "h-full overflow-hidden" : "min-h-[160px] max-h-[400px] overflow-auto"
         )}
         onMouseDown={handleMouseDown}
@@ -755,7 +757,9 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className, onDelete
             const isInline = !match;
             const codeString = String(children).replace(/\n$/, '');
 
-            if (match && match[1].toLowerCase() === 'mermaid') {
+            const lang = (match ? match[1] : '').toLowerCase();
+            const isMermaid = ['mermaid', 'flowchart', 'graph', 'sequencediagram', 'classdiagram', 'statediagram', 'erdiagram', 'gantt', 'gitgraph', 'mindmap', 'timeline'].includes(lang);
+            if (isMermaid) {
               return <MermaidDiagram chart={codeString} />;
             }
 
@@ -1009,7 +1013,7 @@ const CodeBlock: React.FC<{ language: string; value: string }> = ({ language, va
     }
   };
 
-  const isFlow = language === 'flow' || language === 'flowchart' || (language === 'diagram' && (value.includes('↓') || value.includes('-->') || value.includes('->')) && value.includes('|'));
+  const isFlow = language === 'flow' || language === 'flow-cards' || (language === 'diagram' && value.includes('|') && (value.includes('↓') || value.includes('-->') || value.includes('->')));
 
   const isSchemaOrDiagram = 
     isFlow ||

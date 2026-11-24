@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, atomDark, prism, tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal, Upload } from 'lucide-react';
+import { Plus, Layout, Trash2, MessageSquare, Info, AlertTriangle, Lightbulb, Code2, Edit3, Clipboard, Bug, Star, Palette, Highlighter, Eye, EyeOff, ChevronDown, ChevronRight, BookOpen, GripHorizontal, Upload } from 'lucide-react';
 import { CodeSnippet, Annotation, AppSettings, SyntaxDefinition } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence, useDragControls } from 'motion/react';
@@ -265,7 +265,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [hoveredLine, setHoveredLine] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isMinimizedMode, setIsMinimizedMode] = useState(true);
+  const [isMinimizedMode, setIsMinimizedMode] = useState(false);
+  const [displayMode, setDisplayMode] = useState<'floating' | 'inline'>('floating');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dragRange, setDragRange] = useState<{ start: number, end: number } | null>(null);
   const [associationKeyword, setAssociationKeyword] = useState('');
@@ -719,7 +720,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 style={getSyntaxStyle()}
                 customStyle={{
                   margin: 0,
-                  padding: `24px 24px ${snippet.annotations.length > 0 ? Math.max(64, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 120) : 24}px 24px`,
+                  padding: `24px ${displayMode === 'floating' && snippet.annotations.length > 0 ? '360px' : '24px'} ${displayMode === 'floating' && snippet.annotations.length > 0 ? Math.max(64, (cardPositions.maxBottom || 0) - (snippet.code.split('\n').length * 24) + 120) : 24}px 24px`,
                   background: 'transparent',
                   fontSize: '13.6px', // 0.85rem
                   lineHeight: '24px', // STRICT 24px height for alignment
@@ -770,8 +771,59 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 {snippet.code || '// No code provided'}
               </SyntaxHighlighter>
 
+              {/* SVG Curved Connectors between Code Lines and Displaced Floating Cards */}
+              {displayMode === 'floating' && snippet.annotations.length > 0 && (
+                <svg 
+                  className="absolute top-0 right-[336px] w-[50px] h-full pointer-events-none z-20 hidden lg:block overflow-visible"
+                  style={{ minHeight: `${(cardPositions.maxBottom || 0) + 60}px` }}
+                >
+                  <defs>
+                    <filter id="connectorGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="2" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+                  {snippet.annotations.map(ann => {
+                    const idealY = 24 + (ann.line - 1) * 24 + 12;
+                    const cardY = (cardPositions.positions[ann.id] ?? (24 + (ann.line - 1) * 24)) + 24;
+                    const isActive = hoveredLine !== null && hoveredLine >= ann.line && hoveredLine <= (ann.endLine || ann.line);
+                    const isDisplaced = Math.abs(cardY - idealY) > 8;
+                    const color = ann.color || '#6366f1';
+
+                    return (
+                      <g key={`connector-${ann.id}`} className="transition-all duration-200" style={{ opacity: isActive ? 1 : 0.45 }}>
+                        {/* Anchor dot on code line */}
+                        <circle
+                          cx="2"
+                          cy={idealY}
+                          r={isActive ? 4 : 2.5}
+                          fill={color}
+                          filter={isActive ? 'url(#connectorGlow)' : undefined}
+                        />
+                        {/* Smooth Bezier S-curve to displaced card */}
+                        <path
+                          d={`M 2 ${idealY} C 25 ${idealY}, 25 ${cardY}, 48 ${cardY}`}
+                          fill="none"
+                          stroke={color}
+                          strokeWidth={isActive ? 2.5 : 1.5}
+                          strokeDasharray={isDisplaced ? (isActive ? 'none' : '3 3') : 'none'}
+                          filter={isActive ? 'url(#connectorGlow)' : undefined}
+                        />
+                        {/* Entry dot into card */}
+                        <circle
+                          cx="48"
+                          cy={cardY}
+                          r={isActive ? 3.5 : 2}
+                          fill={color}
+                        />
+                      </g>
+                    );
+                  })}
+                </svg>
+              )}
+
               {/* Floating Annotation Cards (Desktop side) */}
-              <div className="absolute top-0 right-4 w-80 h-full pointer-events-none py-6 hidden lg:block">
+              <div className={cn("absolute top-0 right-4 w-80 h-full pointer-events-none py-6 hidden", displayMode === 'floating' && "lg:block")}>
                 <AnimatePresence>
                   {snippet.annotations.map((ann, index) => {
                     const isExpanded = expandedId === ann.id;
@@ -941,6 +993,80 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   })}
                 </AnimatePresence>
               </div>
+
+{/* Chronological Inline Notes List (Active when displayMode === 'inline' or on mobile screens) */}
+              {(displayMode === 'inline' || typeof window !== 'undefined') && snippet.annotations.length > 0 && (
+                <div className={cn(
+                  "border-t border-border/60 bg-secondary/15 p-4 space-y-3",
+                  displayMode === 'floating' ? "block lg:hidden" : "block"
+                )}>
+                  <div className="flex items-center justify-between pb-2 border-b border-border/40">
+                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground font-mono flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                      Notes associées au code ({snippet.annotations.length})
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">Classées par ordre d'apparition dans le code</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[...snippet.annotations].sort((a, b) => a.line - b.line).map((ann, idx) => {
+                      const isExpanded = expandedId === ann.id;
+                      return (
+                        <div 
+                          key={`inline-${ann.id}`}
+                          className="bg-card border border-border/70 rounded-xl p-3 shadow-xs space-y-2 hover:border-primary/40 transition-colors"
+                          style={{ borderLeftColor: ann.color || 'var(--primary)', borderLeftWidth: '3px' }}
+                          onMouseEnter={() => setHoveredLine(ann.line)}
+                          onMouseLeave={() => setHoveredLine(null)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[10px] font-extrabold font-mono uppercase px-1.5 py-0.5 rounded bg-secondary/80 text-foreground border border-border/60 shrink-0">
+                                Lignes {ann.line}{ann.endLine && ann.endLine !== ann.line ? `-${ann.endLine}` : ''}
+                              </span>
+                              <div className="flex items-center gap-1 text-[11px] font-semibold text-foreground truncate">
+                                {getIcon(ann.type, ann.color)}
+                                <span className="capitalize">{ann.type}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {ann.fullContext && (
+                                <button 
+                                  onClick={() => setExpandedId(isExpanded ? null : ann.id)}
+                                  className="text-[10px] font-mono font-medium text-zinc-300 hover:text-white bg-[#1a1a1e] hover:bg-[#242429] border border-white/[0.08] px-2 py-0.5 rounded transition-all cursor-pointer"
+                                >
+                                  {isExpanded ? 'Réduire' : 'Détails'}
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => handleEdit(ann)}
+                                className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                                title="Modifier"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                              <button 
+                                onClick={() => removeAnnotation(ann.id)}
+                                className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-foreground font-medium whitespace-pre-line leading-relaxed">
+                            {ann.text}
+                          </p>
+                          {isExpanded && ann.fullContext && (
+                            <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground max-h-48 overflow-y-auto">
+                              <Markdown content={ann.fullContext} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Contextual Annotation Form (Absolute Floating / Draggable) */}
               <AnimatePresence>

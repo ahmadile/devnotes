@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { getMongoClient, getMongoDbName } from './db.js';
-import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept, ingestCurriculumFromImageOrText, generateDiagramWithAI } from './aiService.js';
+import { processNoteWithAI, chatWithAI, generateRevisionSession, evaluateRevisionCode, generateProjectBlueprint, explainNoteConcept, ingestCurriculumFromImageOrText, generateDiagramWithAI, generateEmbeddings, searchNotesSemantic } from './aiService.js';
 import dns from 'dns';
 
 import fs from 'fs';
@@ -341,6 +341,71 @@ app.use('/uploads', express.static(uploadsDir));
       res.json({ ok: true, ...result });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'AI Explain error' });
+    }
+  });
+
+  // --- Vector Embedding & Semantic RAG Search Endpoints ---
+
+  app.post('/api/ai/embed', async (req, res) => {
+    try {
+      const { input, provider, model, ollamaUrl, apiKey } = req.body || {};
+      if (!input) {
+        res.status(400).json({ error: 'input is required' });
+        return;
+      }
+      const embeddings = await generateEmbeddings({ input, provider, model, ollamaUrl, apiKey });
+      res.json({ ok: true, embeddings });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Embedding error' });
+    }
+  });
+
+  app.post('/api/ai/embed-notes', async (req, res) => {
+    try {
+      const { notes, provider, model, ollamaUrl, apiKey } = req.body || {};
+      if (!Array.isArray(notes) || notes.length === 0) {
+        res.status(400).json({ error: 'notes array is required' });
+        return;
+      }
+
+      const texts = notes.map((n: any) => {
+        const tags = (n.tags || []).join(' ');
+        const cleanContent = (n.content || '').replace(/```[\s\S]*?```/g, ' [code] ').slice(0, 1000);
+        return `${n.title}\nTags: ${tags}\n${cleanContent}`.trim();
+      });
+
+      const embeddings = await generateEmbeddings({ input: texts, provider, model, ollamaUrl, apiKey });
+      const resultMap: Record<string, number[]> = {};
+      notes.forEach((n: any, idx: number) => {
+        if (embeddings[idx]) {
+          resultMap[n.id] = embeddings[idx];
+        }
+      });
+
+      res.json({ ok: true, embeddings: resultMap, count: Object.keys(resultMap).length });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Embedding notes error' });
+    }
+  });
+
+  app.post('/api/ai/semantic-search', async (req, res) => {
+    try {
+      const { query, notes, topK, provider, model, ollamaUrl, apiKey } = req.body || {};
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({ error: 'query is required' });
+        return;
+      }
+      const results = await searchNotesSemantic({
+        query,
+        notes: notes || [],
+        topK: topK || 6,
+        provider,
+        ollamaUrl,
+        apiKey,
+      });
+      res.json({ ok: true, results });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Semantic search error' });
     }
   });
   function formatBytes(bytes?: number): string {
